@@ -13,7 +13,7 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { RARE-VAR-ASSOC-NF  } from './workflows/rare-var-assoc-nf'
+include { RARE_VAR_ASSOC_NF  } from './workflows/rare-var-assoc-nf'
 include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_rare-var-assoc-nf_pipeline'
 include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_rare-var-assoc-nf_pipeline'
 /*
@@ -25,7 +25,7 @@ include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_rare
 //
 // WORKFLOW: Run main analysis pipeline depending on type of input
 //
-workflow PSUSZYNS_RARE-VAR-ASSOC-NF {
+workflow PSUSZYNS_RARE_VAR_ASSOC_NF {
 
     take:
     samplesheet // channel: samplesheet read in from --input
@@ -35,11 +35,11 @@ workflow PSUSZYNS_RARE-VAR-ASSOC-NF {
     //
     // WORKFLOW: Run pipeline
     //
-    RARE-VAR-ASSOC-NF (
+    RARE_VAR_ASSOC_NF (
         samplesheet
     )
     emit:
-    multiqc_report = RARE-VAR-ASSOC-NF.out.multiqc_report // channel: /path/to/multiqc_report.html
+    multiqc_report = RARE_VAR_ASSOC_NF.out.multiqc_report // channel: /path/to/multiqc_report.html
 }
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -65,7 +65,7 @@ workflow {
     //
     // WORKFLOW: Run main workflow
     //
-    PSUSZYNS_RARE-VAR-ASSOC-NF (
+    PSUSZYNS_RARE_VAR_ASSOC_NF (
         PIPELINE_INITIALISATION.out.samplesheet
     )
     //
@@ -74,7 +74,7 @@ workflow {
     PIPELINE_COMPLETION (
         params.outdir,
         params.monochrome_logs,
-        PSUSZYNS_RARE-VAR-ASSOC-NF.out.multiqc_report
+        PSUSZYNS_RARE_VAR_ASSOC_NF.out.multiqc_report
     )
 }
 

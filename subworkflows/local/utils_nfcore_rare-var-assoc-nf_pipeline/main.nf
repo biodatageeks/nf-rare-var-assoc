@@ -65,6 +65,7 @@ workflow PIPELINE_INITIALISATION {
     // Create channel from input file provided through params.input
     //
 
+    /*
     Channel
         .fromList(samplesheetToList(params.input, "${projectDir}/assets/schema_input.json"))
         .map {
@@ -82,6 +83,13 @@ workflow PIPELINE_INITIALISATION {
         .map {
             meta, fastqs ->
                 return [ meta, fastqs.flatten() ]
+        }
+        .set { ch_samplesheet }
+    */
+
+    Channel.fromPath(params.input, checkIfExists: true)
+        .map { files ->
+            tuple( [id: 'fixme_do_we_need_meta'], files ) // Add meta component
         }
         .set { ch_samplesheet }
 
