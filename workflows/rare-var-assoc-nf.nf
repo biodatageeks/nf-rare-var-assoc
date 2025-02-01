@@ -3,6 +3,8 @@
     IMPORT MODULES / SUBWORKFLOWS / FUNCTIONS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
+include { PLINK2_WRITE_SNPLIST as PLINK2_WRITE_SNPLIST_1 } from '../modules/local/plink2/write_snplist'
+include { PLINK2_WRITE_SNPLIST as PLINK2_WRITE_SNPLIST_2 } from '../modules/local/plink2/write_snplist'
 include { PLINK19_MAKEBED        } from '../modules/local/plink19/makebed'
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
@@ -33,6 +35,27 @@ workflow RARE_VAR_ASSOC_NF {
     ch_fam  = PLINK19_MAKEBED.out.fam
     ch_nosex  = PLINK19_MAKEBED.out.nosex
     ch_versions = ch_versions.mix(PLINK19_MAKEBED.out.versions.first())
+
+    PLINK2_WRITE_SNPLIST_1 (
+        ch_bed,
+        ch_bim,
+        ch_fam,
+        'snps_pass',
+        params.plink2_write_snplist_options
+    )
+    ch_snplist_1  = PLINK2_WRITE_SNPLIST_1.out.snplist
+    ch_versions = ch_versions.mix(PLINK2_WRITE_SNPLIST_1.out.versions.first())
+
+    PLINK2_WRITE_SNPLIST_2 (
+        ch_bed,
+        ch_bim,
+        ch_fam,
+        'qc_pass',
+        params.plink2_write_snplist_qc_options
+    )
+    ch_snplist_2  = PLINK2_WRITE_SNPLIST_2.out.snplist
+    ch_id_2  = PLINK2_WRITE_SNPLIST_2.out.id
+    ch_versions = ch_versions.mix(PLINK2_WRITE_SNPLIST_2.out.versions.first())
 
 
     //

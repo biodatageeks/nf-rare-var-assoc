@@ -15,7 +15,7 @@
 // TODO nf-core: Optional inputs are not currently supported by Nextflow. However, using an empty
 //               list (`[]`) instead of a file can be used to work around this issue.
 
-process PLINK19_MAKEBED {
+process PLINK2_WRITE_SNPLIST {
     tag "$meta.id"
     label 'process_single'
 
@@ -25,8 +25,8 @@ process PLINK19_MAKEBED {
     // TODO nf-core: See section in main README for further information regarding finding and adding container addresses to the section below.
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/plink:1.90b6.21--h7b50bb2_6':
-        'biocontainers/plink:1.90b6.21--h7b50bb2_6' }"
+        'https://depot.galaxyproject.org/singularity/plink2:2.00a5.10--h4ac6f70_0':
+        'biocontainers/plink2:2.00a5.10--h4ac6f70_0' }"
 
     input:
     // TODO nf-core: Where applicable all sample-specific information e.g. "id", "single_end", "read_group"
@@ -35,15 +35,17 @@ process PLINK19_MAKEBED {
     //               https://github.com/nf-core/modules/blob/master/modules/nf-core/bwa/index/main.nf
     // TODO nf-core: Where applicable please provide/convert compressed files as input/output
     //               e.g. "*.fastq.gz" and NOT "*.fastq", "*.bam" and NOT "*.sam" etc.
-    tuple val(meta), path(vcf)
+    tuple val(meta), path(bed)
+    tuple val(meta), path(bim)
+    tuple val(meta), path(fam)
+    val(out_name_part)
+    val(input_args)
 
     output:
     // TODO nf-core: Named file extensions MUST be emitted for ALL output channels
-    tuple val(meta), path("*.bed"), emit: bed
-    tuple val(meta), path("*.bim"), emit: bim
-    tuple val(meta), path("*.fam"), emit: fam
-    tuple val(meta), path("*.nosex"), emit: nosex
+    tuple val(meta), path("*.snplist"), emit: snplist
     tuple val(meta), path("*.log"), emit: log
+    path("*.id"), emit: id, optional: true
     path "versions.yml"           , emit: versions
 
     when:
@@ -52,6 +54,7 @@ process PLINK19_MAKEBED {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
+    def mem_mb = task.memory.toMega()
     // TODO nf-core: Where possible, a command MUST be provided to obtain the version number of the software e.g. 1.10
     //               If the software is unable to output a version number on the command-line then it can be manually specified
     //               e.g. https://github.com/nf-core/modules/blob/master/modules/nf-core/homer/annotatepeaks/main.nf
@@ -62,15 +65,20 @@ process PLINK19_MAKEBED {
     // TODO nf-core: Please replace the example samtools command below with your module's command
     // TODO nf-core: Please indent the command appropriately (4 spaces!!) to help with readability ;)
     """
-    plink \\
+    plink2 \\
         --threads ${task.cpus} \\
-        --vcf ${vcf} \\
+        --memory $mem_mb \\
         $args \\
-        --make-bed --out ${prefix}
+        $input_args \\
+        --bed ${bed} \\
+        --bim ${bim} \\
+        --fam ${fam} \\
+        --write-snplist \\
+        --out ${prefix}_${out_name_part}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        plink19: \$(echo \$(plink --version 2>&1) | sed 's/^PLINK v//' | sed 's/..-bit.*//' )
+        plink2: \$(echo \$(plink2 --version 2>&1) | sed 's/^PLINK v//' | sed 's/..-bit.*//' )
     END_VERSIONS
     """
 
@@ -82,15 +90,12 @@ process PLINK19_MAKEBED {
     //               Simple example: https://github.com/nf-core/modules/blob/818474a292b4860ae8ff88e149fbcda68814114d/modules/nf-core/bcftools/annotate/main.nf#L47-L63
     //               Complex example: https://github.com/nf-core/modules/blob/818474a292b4860ae8ff88e149fbcda68814114d/modules/nf-core/bedtools/split/main.nf#L38-L54
     """
-    touch ${prefix}.bed
-    touch ${prefix}.bim
-    touch ${prefix}.fam
-    touch ${prefix}.nosex
-    touch ${prefix}.log
+    touch ${prefix}_${out_name_part}.snplist
+    touch ${prefix}_${out_name_part}.log
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        plink19: \$(echo \$(plink --version 2>&1) | sed 's/^PLINK v//' | sed 's/..-bit.*//' )
+        plink2: \$(echo \$(plink2 --version 2>&1) | sed 's/^PLINK v//' | sed 's/..-bit.*//' )
     END_VERSIONS
     """
 }

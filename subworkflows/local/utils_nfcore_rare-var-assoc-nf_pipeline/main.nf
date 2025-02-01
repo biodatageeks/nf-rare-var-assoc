@@ -89,7 +89,7 @@ workflow PIPELINE_INITIALISATION {
 
     Channel.fromPath(params.input, checkIfExists: true)
         .map { files ->
-            tuple( [id: 'fixme_do_we_need_meta'], files ) // Add meta component
+            tuple( [id: 'pims'], files ) // Add meta component
         }
         .set { ch_samplesheet }
 

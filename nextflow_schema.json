@@ -104,6 +104,27 @@
                     "enum": ["symlink", "rellink", "link", "copy", "copyNoFollow", "move"],
                     "hidden": true
                 },
+                "plink19_makebed_options": {
+                    "type": "string",
+                    "description": "Options to pass to plink1.9 makebed call.",
+                    "default": "--double-id --vcf-half-call missing --chr 1-22,X",
+                    "fa_icon": "fas fa-bed",
+                    "hidden": false
+                },
+                "plink2_write_snplist_options": {
+                    "type": "string",
+                    "description": "Options to pass to plink2 write-snplist call.",
+                    "default": "--mac 100",
+                    "fa_icon": "fas fa-pen-to-square",
+                    "hidden": false
+                },
+                "plink2_write_snplist_qc_options": {
+                    "type": "string",
+                    "description": "Options to pass to plink2 write-snplist qc call.",
+                    "default": "--maf 0.01 --mac 100 --geno 0.1 --hwe 1e-15 --mind 0.1 --write-samples",
+                    "fa_icon": "fas fa-pen-to-square",
+                    "hidden": false
+                },
                 "max_multiqc_email_size": {
                     "type": "string",
                     "description": "File size limit when attaching MultiQC reports to summary emails.",
@@ -148,6 +169,13 @@
                     "fa_icon": "far fa-check-circle",
                     "description": "Base URL or local path to location of pipeline test dataset files",
                     "default": "https://raw.githubusercontent.com/nf-core/test-datasets/",
+                    "hidden": true
+                },
+                "modules_testdata_base_path": {
+                    "type": "string",
+                    "fa_icon": "far fa-check-circle",
+                    "description": "Base URL or local path to location of modules test dataset files",
+                    "default": "https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/",
                     "hidden": true
                 },
                 "trace_report_suffix": {
