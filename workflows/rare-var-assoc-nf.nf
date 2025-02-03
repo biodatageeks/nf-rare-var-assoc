@@ -3,6 +3,7 @@
     IMPORT MODULES / SUBWORKFLOWS / FUNCTIONS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
+include { BGENIX                } from '../modules/local/bgenix'
 include { QCTOOL                } from '../modules/local/qctool'
 include { PLINK2_EXPORT_BGEN    } from '../modules/local/plink2/export_bgen'
 include { PLINK2_WRITE_SNPLIST as PLINK2_WRITE_SNPLIST_1 } from '../modules/local/plink2/write_snplist'
@@ -80,6 +81,12 @@ workflow RARE_VAR_ASSOC_NF {
     ch_qc_sample  = QCTOOL.out.sample
     ch_versions = ch_versions.mix(QCTOOL.out.versions.first())
 
+    BGENIX (
+        ch_qc_bgen,
+        Channel.of(params.bgenix_options)
+    )
+    ch_bgen_bgi  = BGENIX.out.bgen_bgi
+    ch_versions = ch_versions.mix(BGENIX.out.versions.first())
 
     //
     // Collate and save software versions

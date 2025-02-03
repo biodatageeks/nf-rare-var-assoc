@@ -139,6 +139,13 @@
                     "fa_icon": "fas fa-stars",
                     "hidden": false
                 },
+                "bgenix_options": {
+                    "type": "string",
+                    "description": "Options to pass to bgenix call.",
+                    "default": "-clobber",
+                    "fa_icon": "fas fa-book",
+                    "hidden": false
+                },
                 "max_multiqc_email_size": {
                     "type": "string",
                     "description": "File size limit when attaching MultiQC reports to summary emails.",
