@@ -125,6 +125,20 @@
                     "fa_icon": "fas fa-pen-to-square",
                     "hidden": false
                 },
+                "plink2_export_bgen_options": {
+                    "type": "string",
+                    "description": "Options to pass to plink2 export bgen call.",
+                    "default": "--1 --export bgen-1.2 bits=8 id-paste=iid ref-first",
+                    "fa_icon": "fas fa-pen-to-square",
+                    "hidden": false
+                },
+                "qctool_options": {
+                    "type": "string",
+                    "description": "Options to pass to qctool call.",
+                    "default": "-ofiletype bgen -bgen-bits 8 -bgen-compression zstd -bgen-omit-sample-identifier-block",
+                    "fa_icon": "fas fa-stars",
+                    "hidden": false
+                },
                 "max_multiqc_email_size": {
                     "type": "string",
                     "description": "File size limit when attaching MultiQC reports to summary emails.",

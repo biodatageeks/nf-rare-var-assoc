@@ -1,6 +1,6 @@
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
-name: "plink2_write_snplist"
+name: "qctool"
 ## TODO nf-core: Add a description of the module and list keywords
 description: write your description here
 keywords:
@@ -8,15 +8,15 @@ keywords:
   - example
   - genomics
 tools:
-  - "plink2_write_snplist":
+  - "qctool":
       ## TODO nf-core: Add a description and other details for the software below
-      description: "Whole genome association analysis toolset"
+      description: "Command-line programs that manipulate gwas datasets and other genomic data."
       homepage: "None"
       documentation: "None"
       tool_dev_url: "None"
       doi: ""
-      licence: ['GPL v3']
-      identifier:
+      licence: ['BSL-1.0']
+      identifier: biotools:qctool
 
 ## TODO nf-core: Add a description of all of the variables used as input
 input:
@@ -27,32 +27,20 @@ input:
           Groovy Map containing sample information
           e.g. `[ id:'sample1', single_end:false ]`
 
-    - bed:
+    - bgen:
         type: file
-        description: BED file
-        pattern: "*.bed"
+        description: BGEN file
+        pattern: "*.bgen"
 
   - - meta:
         type: map
         description: |
           Groovy Map containing sample information
           e.g. `[ id:'sample1', single_end:false ]`
-
-    - bim:
+    - bgen:
         type: file
-        description: BIM file
-        pattern: "*.bim"
-
-  - - meta:
-        type: map
-        description: |
-          Groovy Map containing sample information
-          e.g. `[ id:'sample1', single_end:false ]`
-
-    - fam:
-        type: file
-        description: FAM file
-        pattern: "*.fam"
+        description: SAMPLE file
+        pattern: "*.sample"
 
   - - out_name_part:
         type: string
@@ -67,31 +55,31 @@ input:
 
 ## TODO nf-core: Add a description of all of the variables used as output
 output:
-  - snplist:
+  - bgen:
   #Only when we have meta
     - meta:
         type: map
         description: |
           Groovy Map containing sample information
           e.g. `[ id:'sample1', single_end:false ]`
-  ## TODO nf-core: Delete / customise this example output
-    - "*.snplist":
-        type: file
-        description: snplist file
-        pattern: "*.snplist"
 
-  - log:
+    - "*.bgen":
+        type: file
+        description: BGEN file
+        pattern: "*.bgen"
+
+  - sample:
       #Only when we have meta
       - meta:
           type: map
           description: |
             Groovy Map containing sample information
             e.g. `[ id:'sample1', single_end:false ]`
-      ## TODO nf-core: Delete / customise this example output
-      - "*.log":
+
+      - "*.sample":
           type: file
-          description: log file
-          pattern: "*.log"
+          description: SAMPLE file
+          pattern: "*.sample"
 
   - versions:
     - "versions.yml":

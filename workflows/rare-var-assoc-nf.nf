@@ -3,6 +3,8 @@
     IMPORT MODULES / SUBWORKFLOWS / FUNCTIONS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
+include { QCTOOL                } from '../modules/local/qctool'
+include { PLINK2_EXPORT_BGEN    } from '../modules/local/plink2/export_bgen'
 include { PLINK2_WRITE_SNPLIST as PLINK2_WRITE_SNPLIST_1 } from '../modules/local/plink2/write_snplist'
 include { PLINK2_WRITE_SNPLIST as PLINK2_WRITE_SNPLIST_2 } from '../modules/local/plink2/write_snplist'
 include { PLINK19_MAKEBED        } from '../modules/local/plink19/makebed'
@@ -40,8 +42,8 @@ workflow RARE_VAR_ASSOC_NF {
         ch_bed,
         ch_bim,
         ch_fam,
-        'snps_pass',
-        params.plink2_write_snplist_options
+        Channel.of('snps_pass'),
+        Channel.of(params.plink2_write_snplist_options)
     )
     ch_snplist_1  = PLINK2_WRITE_SNPLIST_1.out.snplist
     ch_versions = ch_versions.mix(PLINK2_WRITE_SNPLIST_1.out.versions.first())
@@ -50,12 +52,33 @@ workflow RARE_VAR_ASSOC_NF {
         ch_bed,
         ch_bim,
         ch_fam,
-        'qc_pass',
-        params.plink2_write_snplist_qc_options
+        Channel.of('qc_pass'),
+        Channel.of(params.plink2_write_snplist_qc_options)
     )
     ch_snplist_2  = PLINK2_WRITE_SNPLIST_2.out.snplist
     ch_id_2  = PLINK2_WRITE_SNPLIST_2.out.id
     ch_versions = ch_versions.mix(PLINK2_WRITE_SNPLIST_2.out.versions.first())
+
+    PLINK2_EXPORT_BGEN (
+        ch_bed,
+        ch_bim,
+        ch_fam,
+        Channel.of('pvcf.norm_zlib'),
+        Channel.of(params.plink2_export_bgen_options)
+    )
+    ch_bgen  = PLINK2_EXPORT_BGEN.out.bgen
+    ch_sample  = PLINK2_EXPORT_BGEN.out.sample
+    ch_versions = ch_versions.mix(PLINK2_EXPORT_BGEN.out.versions.first())
+
+    QCTOOL (
+        ch_bgen,
+        ch_sample,
+        Channel.of('pvcf.norm'),
+        Channel.of(params.qctool_options)
+    )
+    ch_qc_bgen  = QCTOOL.out.bgen
+    ch_qc_sample  = QCTOOL.out.sample
+    ch_versions = ch_versions.mix(QCTOOL.out.versions.first())
 
 
     //

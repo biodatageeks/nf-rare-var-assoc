@@ -2,13 +2,13 @@
 // nf-core modules test plink2
 nextflow_process {
 
-    name "Test Process PLINK2_WRITE_SNPLIST"
+    name "Test Process PLINK2_EXPORT_BGEN"
     script "../main.nf"
-    process "PLINK2_WRITE_SNPLIST"
+    process "PLINK2_EXPORT_BGEN"
 
     tag "modules"
     tag "modules_"
-    tag "plink2_write_snplist"
+    tag "plink2_export_bgen"
 
     // TODO nf-core: Change the test name preferably indicating the test-data and file-format used
     test("na12878 - bed,bim,fam") {
@@ -21,8 +21,6 @@ nextflow_process {
         when {
             process {
                 """
-                // TODO nf-core: define inputs of the process here. Example:
-
                 input[0] = [
                     [ id:'test', single_end:false ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/plink/test.rnaseq.bed', checkIfExists: true),
@@ -35,8 +33,8 @@ nextflow_process {
                     [ id:'test', single_end:false ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/plink/test.rnaseq.fam', checkIfExists: true),
                 ]
-                input[3] = 'snps_pass'
-                input[4] = '--mac 1'
+                input[3] = 'pvcf.norm_zlib'
+                input[4] = '--1 --export bgen-1.2 bits=8 id-paste=iid ref-first'
                 """
             }
         }
@@ -74,8 +72,8 @@ nextflow_process {
                     [ id:'test', single_end:false ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/plink/test.rnaseq.fam', checkIfExists: true),
                 ]
-                input[3] = 'snps_pass'
-                input[4] = '--mac 1'
+                input[3] = 'pvcf.norm_zlib'
+                input[4] = '--1 --export bgen-1.2 bits=8 id-paste=iid ref-first'
                 """
             }
         }
