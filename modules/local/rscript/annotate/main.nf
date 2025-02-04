@@ -15,7 +15,7 @@
 // TODO nf-core: Optional inputs are not currently supported by Nextflow. However, using an empty
 //               list (`[]`) instead of a file can be used to work around this issue.
 
-process RSCRIPTANNOTATE {
+process RSCRIPT_ANNOTATE {
     tag "$meta.id"
     label 'process_single'
 

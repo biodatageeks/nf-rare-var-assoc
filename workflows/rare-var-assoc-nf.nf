@@ -3,7 +3,7 @@
     IMPORT MODULES / SUBWORKFLOWS / FUNCTIONS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
-include { RSCRIPTANNOTATE       } from '../modules/local/rscriptannotate'
+include { RSCRIPT_ANNOTATE       } from '../modules/local/rscript/annotate'
 include { BGENIX                } from '../modules/local/bgenix'
 include { QCTOOL                } from '../modules/local/qctool'
 include { PLINK2_EXPORT_BGEN    } from '../modules/local/plink2/export_bgen'
@@ -93,8 +93,8 @@ workflow RARE_VAR_ASSOC_NF {
     ch_versions = ch_versions.mix(BGENIX.out.versions.first())
 
     r_script_ch = Channel.fromPath(params.rscript_annotate_path, checkIfExists: true)
-    // r_script_ch = Channel.fromPath("${projectDir}/modules/local/rscriptannotate/assets/test.R", checkIfExists: true)
-    RSCRIPTANNOTATE (
+    // r_script_ch = Channel.fromPath("${projectDir}/modules/local/rscript/annotate/assets/test.R", checkIfExists: true)
+    RSCRIPT_ANNOTATE (
         r_script_ch,
         ch_vcf,
         ch_bed,
@@ -106,13 +106,13 @@ workflow RARE_VAR_ASSOC_NF {
         ch_controls,
         ch_cases
     )
-    ch_r_out_fam  = RSCRIPTANNOTATE.out.out_fam
-    ch_r_out_sample  = RSCRIPTANNOTATE.out.out_sample
-    ch_phenotype  = RSCRIPTANNOTATE.out.phenotype
-    ch_annotations  = RSCRIPTANNOTATE.out.annotations
-    ch_masks  = RSCRIPTANNOTATE.out.masks
-    ch_setlist  = RSCRIPTANNOTATE.out.setlist
-    ch_versions = ch_versions.mix(RSCRIPTANNOTATE.out.versions.first())
+    ch_r_out_fam  = RSCRIPT_ANNOTATE.out.out_fam
+    ch_r_out_sample  = RSCRIPT_ANNOTATE.out.out_sample
+    ch_phenotype  = RSCRIPT_ANNOTATE.out.phenotype
+    ch_annotations  = RSCRIPT_ANNOTATE.out.annotations
+    ch_masks  = RSCRIPT_ANNOTATE.out.masks
+    ch_setlist  = RSCRIPT_ANNOTATE.out.setlist
+    ch_versions = ch_versions.mix(RSCRIPT_ANNOTATE.out.versions.first())
 
 
     //

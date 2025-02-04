@@ -2,9 +2,9 @@
 // nf-core modules test rscriptannotate
 nextflow_process {
 
-    name "Test Process RSCRIPTANNOTATE"
+    name "Test Process RSCRIPT_ANNOTATE"
     script "../main.nf"
-    process "RSCRIPTANNOTATE"
+    process "RSCRIPT_ANNOTATE"
 
     tag "modules"
     tag "modules_"
@@ -58,7 +58,7 @@ nextflow_process {
                 """
                 // TODO nf-core: define inputs of the process here. Example:
 
-                input[0] = file('${projectDir}/modules/local/rscriptannotate/assets/annotate.R', checkIfExists: true)
+                input[0] = file('${projectDir}/modules/local/rscript/annotate/assets/annotate.R', checkIfExists: true)
                 input[1] = [
                     [ id:'test', single_end:false ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/vcf/test_models.vcf.gz', checkIfExists: true),

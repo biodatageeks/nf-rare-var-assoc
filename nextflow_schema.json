@@ -158,7 +158,7 @@
                 "rscript_annotate_path": {
                     "type": "string",
                     "description": "Path to annotate.R script.",
-                    "default": "${projectDir}/modules/local/rscriptannotate/assets/annotate.R",
+                    "default": "${projectDir}/modules/local/rscript/annotate/assets/annotate.R",
                     "fa_icon": "fas fa-stars",
                     "hidden": false
                 },
