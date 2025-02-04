@@ -159,7 +159,21 @@
                     "type": "string",
                     "description": "Path to annotate.R script.",
                     "default": "${projectDir}/modules/local/rscript/annotate/assets/annotate.R",
-                    "fa_icon": "fas fa-stars",
+                    "fa_icon": "fas fa-code",
+                    "hidden": false
+                },
+                "rscript_vcf2aaf_path": {
+                    "type": "string",
+                    "description": "Path to vcf2aaf.R script.",
+                    "default": "${projectDir}/modules/local/rscript/vcf2aaf/assets/vcf2aaf.R",
+                    "fa_icon": "fas fa-code",
+                    "hidden": false
+                },
+                "rscript_vcf2aaf_options": {
+                    "type": "string",
+                    "description": "Options for vcf2aaf.R script.",
+                    "default": "AF_nfe_gnomad AF",
+                    "fa_icon": "fas fa-gear",
                     "hidden": false
                 },
                 "bgenix_options": {

@@ -3,6 +3,7 @@
     IMPORT MODULES / SUBWORKFLOWS / FUNCTIONS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
+include { RSCRIPT_VCFTOAAF       } from '../modules/local/rscript/vcf2aaf'
 include { RSCRIPT_ANNOTATE       } from '../modules/local/rscript/annotate'
 include { BGENIX                } from '../modules/local/bgenix'
 include { QCTOOL                } from '../modules/local/qctool'
@@ -113,6 +114,9 @@ workflow RARE_VAR_ASSOC_NF {
     ch_masks  = RSCRIPT_ANNOTATE.out.masks
     ch_setlist  = RSCRIPT_ANNOTATE.out.setlist
     ch_versions = ch_versions.mix(RSCRIPT_ANNOTATE.out.versions.first())
+
+    RSCRIPT_VCFTOAAF (
+    )
 
 
     //
