@@ -28,7 +28,9 @@ include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_rare
 workflow PSUSZYNS_RARE_VAR_ASSOC_NF {
 
     take:
-    samplesheet // channel: samplesheet read in from --input
+    input_vcf // channel: samplesheet read in from --input
+    input_controls
+    input_cases
 
     main:
 
@@ -36,7 +38,9 @@ workflow PSUSZYNS_RARE_VAR_ASSOC_NF {
     // WORKFLOW: Run pipeline
     //
     RARE_VAR_ASSOC_NF (
-        samplesheet
+        input_vcf,
+        input_controls,
+        input_cases
     )
     emit:
     multiqc_report = RARE_VAR_ASSOC_NF.out.multiqc_report // channel: /path/to/multiqc_report.html
@@ -59,14 +63,18 @@ workflow {
         params.monochrome_logs,
         args,
         params.outdir,
-        params.input
+        params.input_vcf,
+        params.input_controls,
+        params.input_cases
     )
 
     //
     // WORKFLOW: Run main workflow
     //
     PSUSZYNS_RARE_VAR_ASSOC_NF (
-        PIPELINE_INITIALISATION.out.samplesheet
+        PIPELINE_INITIALISATION.out.input_vcf,
+        PIPELINE_INITIALISATION.out.input_controls,
+        PIPELINE_INITIALISATION.out.input_cases
     )
     //
     // SUBWORKFLOW: Run completion tasks

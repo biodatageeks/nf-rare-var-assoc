@@ -10,9 +10,9 @@
             "type": "object",
             "fa_icon": "fas fa-terminal",
             "description": "Define where the pipeline should find input data and save output data.",
-            "required": ["input", "outdir"],
+            "required": ["input_vcf", "input_controls", "input_cases", "outdir"],
             "properties": {
-                "input": {
+                "input_vcf": {
                     "type": "string",
                     "format": "file-path",
                     "exists": true,
@@ -20,6 +20,22 @@
                     "pattern": "^\\S+\\.vcf(\\.gz){0,1}$",
                     "description": "Path to the VCF file.",
                     "fa_icon": "fas fa-file-plus-minus"
+                },
+                "input_controls": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/tab-separated-values",
+                    "description": "Path to the controls file.",
+                    "fa_icon": "fas fa-briefcase-blank"
+                },
+                "input_cases": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/tab-separated-values",
+                    "description": "Path to the cases file.",
+                    "fa_icon": "fas fa-briefcase-medical"
                 },
                 "outdir": {
                     "type": "string",
@@ -136,6 +152,13 @@
                     "type": "string",
                     "description": "Options to pass to qctool call.",
                     "default": "-ofiletype bgen -bgen-bits 8 -bgen-compression zstd -bgen-omit-sample-identifier-block",
+                    "fa_icon": "fas fa-stars",
+                    "hidden": false
+                },
+                "rscript_annotate_path": {
+                    "type": "string",
+                    "description": "Path to annotate.R script.",
+                    "default": "${projectDir}/modules/local/rscriptannotate/assets/annotate.R",
                     "fa_icon": "fas fa-stars",
                     "hidden": false
                 },

@@ -29,7 +29,9 @@ workflow PIPELINE_INITIALISATION {
     monochrome_logs   // boolean: Do not use coloured log outputs
     nextflow_cli_args //   array: List of positional nextflow CLI args
     outdir            //  string: The output directory where the results will be saved
-    input             //  string: Path to input samplesheet
+    input_vcf         //  string: Path to input samplesheet
+    input_controls
+    input_cases
 
     main:
 
@@ -87,14 +89,30 @@ workflow PIPELINE_INITIALISATION {
         .set { ch_samplesheet }
     */
 
-    Channel.fromPath(params.input, checkIfExists: true)
+    Channel.fromPath(params.input_vcf, checkIfExists: true)
         .map { files ->
             tuple( [id: 'pims'], files ) // Add meta component
         }
-        .set { ch_samplesheet }
+        .set { ch_input_vcf }
+
+
+    Channel.fromPath(params.input_controls, checkIfExists: true)
+        .map { files ->
+            tuple( [id: 'pims'], files ) // Add meta component
+        }
+        .set { ch_input_controls }
+
+
+    Channel.fromPath(params.input_cases, checkIfExists: true)
+        .map { files ->
+            tuple( [id: 'pims'], files ) // Add meta component
+        }
+        .set { ch_input_cases }
 
     emit:
-    samplesheet = ch_samplesheet
+    input_vcf = ch_input_vcf
+    input_controls = ch_input_controls
+    input_cases = ch_input_cases
     versions    = ch_versions
 }
 

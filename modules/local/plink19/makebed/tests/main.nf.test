@@ -11,7 +11,7 @@ nextflow_process {
     tag "plink19makebed"
 
     // TODO nf-core: Change the test name preferably indicating the test-data and file-format used
-    test("na12878 - vcf") {
+    test("small vcf - vcf") {
 
         // TODO nf-core: If you are created a test for a chained module
         // (the module requires running more than one process to generate the required output)
@@ -25,7 +25,7 @@ nextflow_process {
 
                 input[0] = [
                     [ id:'test', single_end:false ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/vcf/NA12878.chr22.1X.vcf.gz', checkIfExists: true),
+                    file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/vcf/test_models.vcf.gz', checkIfExists: true),
                 ]
                 """
             }
@@ -43,7 +43,7 @@ nextflow_process {
     }
 
     // TODO nf-core: Change the test name preferably indicating the test-data and file-format used but keep the " - stub" suffix.
-    test("na12878 - vcf - stub") {
+    test("small vcf - vcf - stub") {
 
         options "-stub"
 
@@ -54,7 +54,7 @@ nextflow_process {
 
                 input[0] = [
                     [ id:'test', single_end:false ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/vcf/NA12878.chr22.1X.vcf.gz', checkIfExists: true),
+                    file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/vcf/test_models.vcf.gz', checkIfExists: true),
                 ]
                 """
             }

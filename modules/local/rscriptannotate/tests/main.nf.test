@@ -1,0 +1,87 @@
+// TODO nf-core: Once you have added the required tests, please run the following command to build this file:
+// nf-core modules test rscriptannotate
+nextflow_process {
+
+    name "Test Process RSCRIPTANNOTATE"
+    script "../main.nf"
+    process "RSCRIPTANNOTATE"
+
+    tag "modules"
+    tag "modules_"
+    tag "rscriptannotate"
+
+    // TODO nf-core: Change the test name preferably indicating the test-data and file-format used
+    test("small vcf") {
+
+        // TODO nf-core: If you are created a test for a chained module
+        // (the module requires running more than one process to generate the required output)
+        // add the 'setup' method here.
+        // You can find more information about how to use a 'setup' method in the docs (https://nf-co.re/docs/contributing/modules#steps-for-creating-nf-test-for-chained-modules).
+
+        setup {
+            run("PLINK19_MAKEBED") {
+                script "../../plink19/makebed/main.nf"
+                process {
+                    """
+                    input[0] = [
+                        [ id:'test', single_end:false ], // meta map
+                        file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/vcf/test_models.vcf.gz', checkIfExists: true),
+                    ]
+                    """
+                }
+            }
+            run("PLINK2_EXPORT_BGEN") {
+                script "../../plink2/export_bgen/main.nf"
+                process {
+                    """
+                    input[0] = PLINK19_MAKEBED.out.bed
+                    input[1] = PLINK19_MAKEBED.out.bim
+                    input[2] = PLINK19_MAKEBED.out.fam
+                    input[3] = 'pvcf.norm_zlib'
+                    input[4] = '--1 --export bgen-1.2 bits=8 id-paste=iid ref-first'
+                    """
+                }
+            }
+            run("BGENIX") {
+                script "../../bgenix/main.nf"
+                process {
+                    """
+                    input[0] = PLINK2_EXPORT_BGEN.out.bgen
+                    input[1] = '-clobber'
+                    """
+                }
+            }
+        }
+
+        when {
+            process {
+                """
+                // TODO nf-core: define inputs of the process here. Example:
+
+                input[0] = file('${projectDir}/modules/local/rscriptannotate/assets/annotate.R', checkIfExists: true)
+                input[1] = [
+                    [ id:'test', single_end:false ], // meta map
+                    file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/vcf/test_models.vcf.gz', checkIfExists: true),
+                ]
+                input[2] = PLINK19_MAKEBED.out.bed
+                input[3] = PLINK19_MAKEBED.out.bim
+                input[4] = PLINK19_MAKEBED.out.fam
+                input[5] = PLINK2_EXPORT_BGEN.out.bgen
+                input[6] = BGENIX.out.bgen_bgi
+                input[7] = PLINK2_EXPORT_BGEN.out.sample
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot(process.out).match() }
+                //TODO nf-core: Add all required assertions to verify the test output.
+                // See https://nf-co.re/docs/contributing/tutorials/nf-test_assertions for more information and examples.
+            )
+        }
+
+    }
+
+}
