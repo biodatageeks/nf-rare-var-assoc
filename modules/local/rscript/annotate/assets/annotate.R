@@ -1,6 +1,6 @@
-required.packages <- c("data.table", "R.utils")
-new.packages <- required.packages[!(required.packages %in% installed.packages()[,"Package"])]
-if(length(new.packages)) install.packages(new.packages)
+# required.packages <- c("data.table", "R.utils")
+# new.packages <- required.packages[!(required.packages %in% installed.packages()[,"Package"])]
+# if(length(new.packages)) install.packages(new.packages)
 
 
 library("data.table")
@@ -55,7 +55,7 @@ r_out_annotations_path <- args[9]
 r_out_masks_path <- args[10]
 r_out_setlist_path <- args[11]
 
-tmp_dir = "/tmp/"
+tmp_dir = "./"
 
 study_name <- "pims"
 

@@ -155,6 +155,13 @@
                     "fa_icon": "fas fa-stars",
                     "hidden": false
                 },
+                "bgenix_options": {
+                    "type": "string",
+                    "description": "Options to pass to bgenix call.",
+                    "default": "-clobber",
+                    "fa_icon": "fas fa-book",
+                    "hidden": false
+                },
                 "rscript_annotate_path": {
                     "type": "string",
                     "description": "Path to annotate.R script.",
@@ -176,11 +183,25 @@
                     "fa_icon": "fas fa-gear",
                     "hidden": false
                 },
-                "bgenix_options": {
+                "regenie_step1_options": {
                     "type": "string",
-                    "description": "Options to pass to bgenix call.",
-                    "default": "-clobber",
-                    "fa_icon": "fas fa-book",
+                    "description": "Options for regenie step1.",
+                    "default": "--bt --bsize 100 --lowmem",
+                    "fa_icon": "fas fa-dna",
+                    "hidden": false
+                },
+                "regenie_step2_options": {
+                    "type": "string",
+                    "description": "Options for regenie step2.",
+                    "default": "--bt --ref-first --firth --approx --bsize 200 --lowmem --aaf-bins 0.01,0.05,0.1,1 --write-mask --write-mask-snplist --vc-tests skato",
+                    "fa_icon": "fas fa-dna",
+                    "hidden": false
+                },
+                "rscript_buildreports_path": {
+                    "type": "string",
+                    "description": "Path to build_reports.R script.",
+                    "default": "${projectDir}/modules/local/rscript/buildreports/assets/build_reports.R",
+                    "fa_icon": "fas fa-code",
                     "hidden": false
                 },
                 "max_multiqc_email_size": {

@@ -1,8 +1,8 @@
 # podman run --rm -v $PWD/:/work_dir/:Z -w /work_dir rocker/r-ver:4.4.2 Rscript /work_dir/vcf_to_aaf.R /work_dir/gnomad.exomes.v4.1.sites.chr1_head1k.vcf /work_dir AF_nfe AF
 
-required.packages <- c("data.table", "stringr", "dplyr", "R.utils")
-new.packages <- required.packages[!(required.packages %in% installed.packages()[,"Package"])]
-if(length(new.packages)) install.packages(new.packages)
+# required.packages <- c("data.table", "stringr", "dplyr", "R.utils")
+# new.packages <- required.packages[!(required.packages %in% installed.packages()[,"Package"])]
+# if(length(new.packages)) install.packages(new.packages)
 
 
 library("data.table")
@@ -12,8 +12,6 @@ library("R.utils")
 
 
 args <- commandArgs(trailingOnly = TRUE)
-print("args:")
-print(args)
 
 if (length(args)<=0) {
   stop("Provide the path to the vcf file", call.=FALSE)
@@ -29,7 +27,7 @@ if (length(args)<=3) {
 }
 
 vcf_path <- args[1]
-out_aaf_path <- paste0(args[2], "/")
+out_aaf_path <- args[2]
 tag_name <- args[3]  # tag_name = "AF_nfe"
 default_tag_name <- args[4]  # default_tag_name = "AF"
 

@@ -1,14 +1,14 @@
 // TODO nf-core: Once you have added the required tests, please run the following command to build this file:
-// nf-core modules test rscriptannotate
+// nf-core modules test regenie
 nextflow_process {
 
-    name "Test Process RSCRIPT_ANNOTATE"
+    name "Test Process REGENIE_STEP1"
     script "../main.nf"
-    process "RSCRIPT_ANNOTATE"
+    process "REGENIE_STEP1"
 
     tag "modules"
     tag "modules_"
-    tag "rscriptannotate"
+    tag "regeniestep1"
 
     // TODO nf-core: Change the test name preferably indicating the test-data and file-format used
     test("small vcf") {
@@ -20,7 +20,7 @@ nextflow_process {
 
         setup {
             run("PLINK19_MAKEBED") {
-                script "../../plink19/makebed/main.nf"
+                script "../../../plink19/makebed/main.nf"
                 process {
                     """
                     input[0] = [
@@ -31,7 +31,7 @@ nextflow_process {
                 }
             }
             run("PLINK2_EXPORT_BGEN") {
-                script "../../plink2/export_bgen/main.nf"
+                script "../../../plink2/export_bgen/main.nf"
                 process {
                     """
                     input[0] = PLINK19_MAKEBED.out.bed
@@ -42,12 +42,42 @@ nextflow_process {
                     """
                 }
             }
+            run("PLINK2_WRITE_SNPLIST") {
+                script "../../../plink2/write_snplist/main.nf"
+                process {
+                    """
+                    input[0] = PLINK19_MAKEBED.out.bed
+                    input[1] = PLINK19_MAKEBED.out.bim
+                    input[2] = PLINK19_MAKEBED.out.fam
+                    input[3] = 'qc_pass'
+                    input[4] = '--maf 0.01 --mac 1 --geno 0.1 --hwe 1e-15 --write-samples'
+                    """
+                }
+            }
             run("BGENIX") {
-                script "../../bgenix/main.nf"
+                script "../../../bgenix/main.nf"
                 process {
                     """
                     input[0] = PLINK2_EXPORT_BGEN.out.bgen
                     input[1] = '-clobber'
+                    """
+                }
+            }
+            run("RSCRIPT_ANNOTATE") {
+                script "../../../rscript/annotate/main.nf"
+                process {
+                    """
+                    input[0] = file('${projectDir}/modules/local/rscript/annotate/assets/annotate.R', checkIfExists: true)
+                    input[1] = [
+                        [ id:'test', single_end:false ], // meta map
+                        file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/vcf/test_models.vcf.gz', checkIfExists: true),
+                    ]
+                    input[2] = PLINK19_MAKEBED.out.bed
+                    input[3] = PLINK19_MAKEBED.out.bim
+                    input[4] = PLINK19_MAKEBED.out.fam
+                    input[5] = PLINK2_EXPORT_BGEN.out.bgen
+                    input[6] = BGENIX.out.bgen_bgi
+                    input[7] = PLINK2_EXPORT_BGEN.out.sample
                     """
                 }
             }
@@ -56,17 +86,13 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file('${projectDir}/modules/local/rscript/annotate/assets/annotate.R', checkIfExists: true)
-                input[1] = [
-                    [ id:'test', single_end:false ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/vcf/test_models.vcf.gz', checkIfExists: true),
-                ]
-                input[2] = PLINK19_MAKEBED.out.bed
-                input[3] = PLINK19_MAKEBED.out.bim
-                input[4] = PLINK19_MAKEBED.out.fam
-                input[5] = PLINK2_EXPORT_BGEN.out.bgen
-                input[6] = BGENIX.out.bgen_bgi
-                input[7] = PLINK2_EXPORT_BGEN.out.sample
+                input[0] = PLINK19_MAKEBED.out.bed
+                input[1] = PLINK19_MAKEBED.out.bim
+                input[2] = PLINK19_MAKEBED.out.fam
+                input[3] = PLINK2_WRITE_SNPLIST.out.id
+                input[4] = PLINK2_WRITE_SNPLIST.out.snplist
+                input[5] = RSCRIPT_ANNOTATE.out.phenotype
+                input[6] = '--bt --bsize 100 --lowmem'
                 """
             }
         }

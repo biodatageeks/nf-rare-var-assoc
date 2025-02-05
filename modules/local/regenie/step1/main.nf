@@ -15,7 +15,7 @@
 // TODO nf-core: Optional inputs are not currently supported by Nextflow. However, using an empty
 //               list (`[]`) instead of a file can be used to work around this issue.
 
-process PLINK2_WRITE_SNPLIST {
+process REGENIE_STEP1 {
     tag "$meta.id"
     label 'process_single'
 
@@ -24,9 +24,7 @@ process PLINK2_WRITE_SNPLIST {
     //               For Conda, the build (i.e. "h9402c20_2") must be EXCLUDED to support installation on different operating systems.
     // TODO nf-core: See section in main README for further information regarding finding and adding container addresses to the section below.
     conda "${moduleDir}/environment.yml"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/plink2:2.00a5.10--h4ac6f70_0':
-        'biocontainers/plink2:2.00a5.10--h4ac6f70_0' }"
+    container 'ghcr.io/rgcgithub/regenie/regenie:v4.1.gz'
 
     input:
     // TODO nf-core: Where applicable all sample-specific information e.g. "id", "single_end", "read_group"
@@ -38,13 +36,15 @@ process PLINK2_WRITE_SNPLIST {
     tuple val(meta), path(bed)
     tuple val(meta), path(bim)
     tuple val(meta), path(fam)
-    val(out_name_part)
+    tuple val(meta), path(qc_pass_id)
+    tuple val(meta), path(qc_pass_snplist)
+    tuple val(meta), path(phenotype)
     val(input_args)
 
     output:
     // TODO nf-core: Named file extensions MUST be emitted for ALL output channels
-    tuple val(meta), path("*.snplist"), emit: snplist
-    tuple val(meta), path("*.id"), emit: id, optional: true
+    tuple val(meta), path("*.loco"), emit: loco
+    tuple val(meta), path("*_pred.list"), emit: pred_list
     tuple val(meta), path("*.log"), emit: log
     path "versions.yml"           , emit: versions
 
@@ -54,7 +54,6 @@ process PLINK2_WRITE_SNPLIST {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
-    def mem_mb = task.memory.toMega()
     // TODO nf-core: Where possible, a command MUST be provided to obtain the version number of the software e.g. 1.10
     //               If the software is unable to output a version number on the command-line then it can be manually specified
     //               e.g. https://github.com/nf-core/modules/blob/master/modules/nf-core/homer/annotatepeaks/main.nf
@@ -65,20 +64,19 @@ process PLINK2_WRITE_SNPLIST {
     // TODO nf-core: Please replace the example samtools command below with your module's command
     // TODO nf-core: Please indent the command appropriately (4 spaces!!) to help with readability ;)
     """
-    plink2 \\
-        --threads ${task.cpus} \\
-        --memory $mem_mb \\
-        $args \\
-        $input_args \\
-        --bed ${bed} \\
-        --bim ${bim} \\
-        --fam ${fam} \\
-        --write-snplist \\
-        --out ${prefix}_${out_name_part}
+    regenie \\
+       --step 1 \\
+       --threads ${task.cpus} \\
+       --bed ${bed.baseName} \\
+       --keep ${qc_pass_id} \\
+       --extract ${qc_pass_snplist} \\
+       --phenoFile ${phenotype} \\
+       --out ${prefix}_step1 \\
+       $args $input_args
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        plink2: \$(echo \$(plink2 --version 2>&1) | sed 's/^PLINK v//' | sed 's/..-bit.*//' )
+        regenie: \$(regenie --version)
     END_VERSIONS
     """
 
@@ -90,12 +88,12 @@ process PLINK2_WRITE_SNPLIST {
     //               Simple example: https://github.com/nf-core/modules/blob/818474a292b4860ae8ff88e149fbcda68814114d/modules/nf-core/bcftools/annotate/main.nf#L47-L63
     //               Complex example: https://github.com/nf-core/modules/blob/818474a292b4860ae8ff88e149fbcda68814114d/modules/nf-core/bedtools/split/main.nf#L38-L54
     """
-    touch ${prefix}_${out_name_part}.snplist
-    touch ${prefix}_${out_name_part}.log
+    touch ${prefix}.loco
+    touch ${prefix}_pred.list
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        plink2: \$(echo \$(plink2 --version 2>&1) | sed 's/^PLINK v//' | sed 's/..-bit.*//' )
+        regenie: \$(regenie --version)
     END_VERSIONS
     """
 }

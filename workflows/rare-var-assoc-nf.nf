@@ -3,11 +3,14 @@
     IMPORT MODULES / SUBWORKFLOWS / FUNCTIONS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
+include { RSCRIPT_BUILDREPORTS   } from '../modules/local/rscript/buildreports'
+include { REGENIE_STEP2          } from '../modules/local/regenie/step2'
+include { REGENIE_STEP1          } from '../modules/local/regenie/step1'
 include { RSCRIPT_VCFTOAAF       } from '../modules/local/rscript/vcf2aaf'
 include { RSCRIPT_ANNOTATE       } from '../modules/local/rscript/annotate'
-include { BGENIX                } from '../modules/local/bgenix'
-include { QCTOOL                } from '../modules/local/qctool'
-include { PLINK2_EXPORT_BGEN    } from '../modules/local/plink2/export_bgen'
+include { BGENIX                 } from '../modules/local/bgenix'
+include { QCTOOL                 } from '../modules/local/qctool'
+include { PLINK2_EXPORT_BGEN     } from '../modules/local/plink2/export_bgen'
 include { PLINK2_WRITE_SNPLIST as PLINK2_WRITE_SNPLIST_1 } from '../modules/local/plink2/write_snplist'
 include { PLINK2_WRITE_SNPLIST as PLINK2_WRITE_SNPLIST_2 } from '../modules/local/plink2/write_snplist'
 include { PLINK19_MAKEBED        } from '../modules/local/plink19/makebed'
@@ -93,10 +96,10 @@ workflow RARE_VAR_ASSOC_NF {
     ch_bgen_bgi  = BGENIX.out.bgen_bgi
     ch_versions = ch_versions.mix(BGENIX.out.versions.first())
 
-    r_script_ch = Channel.fromPath(params.rscript_annotate_path, checkIfExists: true)
-    // r_script_ch = Channel.fromPath("${projectDir}/modules/local/rscript/annotate/assets/test.R", checkIfExists: true)
+    r_script_annotate_ch = Channel.fromPath(params.rscript_annotate_path, checkIfExists: true)
+    // r_script_annotate_ch = Channel.fromPath("${projectDir}/modules/local/rscript/annotate/assets/test.R", checkIfExists: true)
     RSCRIPT_ANNOTATE (
-        r_script_ch,
+        r_script_annotate_ch,
         ch_vcf,
         ch_bed,
         ch_bim,
@@ -115,8 +118,59 @@ workflow RARE_VAR_ASSOC_NF {
     ch_setlist  = RSCRIPT_ANNOTATE.out.setlist
     ch_versions = ch_versions.mix(RSCRIPT_ANNOTATE.out.versions.first())
 
+    r_script_vcf2aaf_ch = Channel.fromPath(params.rscript_vcf2aaf_path, checkIfExists: true)
     RSCRIPT_VCFTOAAF (
+        r_script_vcf2aaf_ch,
+        ch_vcf,
+        Channel.of(params.rscript_vcf2aaf_options)
     )
+    ch_aaf  = RSCRIPT_VCFTOAAF.out.aaf
+    ch_versions = ch_versions.mix(RSCRIPT_VCFTOAAF.out.versions.first())
+
+    REGENIE_STEP1 (
+        ch_bed,
+        ch_bim,
+        ch_fam,
+        ch_id_2,
+        ch_snplist_2,
+        ch_phenotype,
+        Channel.of(params.regenie_step1_options)
+    )
+    ch_regenie_step1_loco  = REGENIE_STEP1.out.loco
+    ch_regenie_step1_pred_list  = REGENIE_STEP1.out.pred_list
+    ch_versions = ch_versions.mix(REGENIE_STEP1.out.versions.first())
+
+    REGENIE_STEP2 (
+        ch_qc_bgen,
+        ch_r_out_sample,
+        ch_phenotype,
+        ch_annotations,
+        ch_setlist,
+        ch_masks,
+        ch_aaf,
+        ch_regenie_step1_pred_list,
+        Channel.of(params.regenie_step2_options)
+    )
+    ch_regenie_step2_masks_bed  = REGENIE_STEP2.out.masks_bed
+    ch_regenie_step2_masks_bim  = REGENIE_STEP2.out.masks_bim
+    ch_regenie_step2_masks_fam  = REGENIE_STEP2.out.masks_fam
+    ch_regenie_step2_masks_snplist  = REGENIE_STEP2.out.masks_snplist
+    ch_regenie_step2_y1_regenie  = REGENIE_STEP2.out.y1_regenie
+    ch_versions = ch_versions.mix(REGENIE_STEP2.out.versions.first())
+
+    r_script_buildreports_ch = Channel.fromPath(params.rscript_buildreports_path, checkIfExists: true)
+    RSCRIPT_BUILDREPORTS (
+        r_script_buildreports_ch,
+        ch_regenie_step2_masks_snplist,
+        ch_regenie_step2_y1_regenie,
+        ch_vcf,
+        ch_phenotype,
+        ch_annotations
+    )
+    ch_annotated_snps  = RSCRIPT_BUILDREPORTS.out.annotated_snps
+    ch_res_log10p_1_annotated  = RSCRIPT_BUILDREPORTS.out.res_log10p_1_annotated
+    ch_annotated_snps_with_sample_ids  = RSCRIPT_BUILDREPORTS.out.annotated_snps_with_sample_ids
+    ch_versions = ch_versions.mix(RSCRIPT_BUILDREPORTS.out.versions.first())
 
 
     //

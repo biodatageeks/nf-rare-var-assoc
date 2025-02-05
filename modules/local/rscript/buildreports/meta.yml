@@ -1,6 +1,6 @@
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
-name: "plink2_write_snplist"
+name: "rscriptvcftoaaf"
 ## TODO nf-core: Add a description of the module and list keywords
 description: write your description here
 keywords:
@@ -8,29 +8,22 @@ keywords:
   - example
   - genomics
 tools:
-  - "plink2_write_snplist":
+  - "rscriptvcftoaaf":
       ## TODO nf-core: Add a description and other details for the software below
-      description: "Whole genome association analysis toolset"
+      description: "R is a free software environment for statistical computing and graphics."
       homepage: "None"
       documentation: "None"
       tool_dev_url: "None"
       doi: ""
-      licence: ['GPL v3']
+      licence: ['GPL v2-or-later']
       identifier:
 
 ## TODO nf-core: Add a description of all of the variables used as input
 input:
-  # Only when we have meta
-  - - meta:
-        type: map
-        description: |
-          Groovy Map containing sample information
-          e.g. `[ id:'sample1', single_end:false ]`
-
-    - bed:
+  - - rscript:
         type: file
-        description: BED file
-        pattern: "*.bed"
+        description: R script file
+        pattern: "*.R"
 
   - - meta:
         type: map
@@ -38,10 +31,20 @@ input:
           Groovy Map containing sample information
           e.g. `[ id:'sample1', single_end:false ]`
 
-    - bim:
+    - masks_snplist:
         type: file
-        description: BIM file
-        pattern: "*.bim"
+        description: masks_snplist file
+        pattern: "*_masks.snplist"
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1', single_end:false ]`
+
+    - y1_regenie:
+        type: file
+        description: y1_regenie file
+        pattern: "*_Y1.regenie"
 
   - - meta:
         type: map
@@ -49,47 +52,51 @@ input:
           Groovy Map containing sample information
           e.g. `[ id:'sample1', single_end:false ]`
 
-    - fam:
+    - vcf:
         type: file
-        description: FAM file
-        pattern: "*.fam"
+        description: VCF file
+        pattern: "*.{vcf,vcf.gz}"
+        ontologies:
+          - edam: "http://edamontology.org/format_3016"
 
-  - - out_name_part:
-        type: string
+  - - meta:
+        type: map
         description: |
-          out_name_part
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1', single_end:false ]`
 
-  - - input_args:
-        type: string
+    - phenotype:
+        type: file
+        description: phenotype file
+        pattern: "*_phenotype.txt"
+
+  - - meta:
+        type: map
         description: |
-          input_args
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1', single_end:false ]`
+
+    - annotations:
+        type: file
+        description: annotations file
+        pattern: "*.annotations"
 
 
 ## TODO nf-core: Add a description of all of the variables used as output
 output:
-  - snplist:
+  - annotated_snps:
+  #Only when we have meta
     - meta:
         type: map
         description: |
           Groovy Map containing sample information
           e.g. `[ id:'sample1', single_end:false ]`
-    - "*.snplist":
+  ## TODO nf-core: Delete / customise this example output
+    - "*_annotated_snps.tsv":
         type: file
-        description: snplist file
-        pattern: "*.snplist"
-
-  - id:
-      - meta:
-          type: map
-          description: |
-            Groovy Map containing sample information
-            e.g. `[ id:'sample1', single_end:false ]`
-      - "*.id":
-          type: file
-          description: id file
-          pattern: "*.id"
-
-  - log:
+        description: annotated_snps file
+        pattern: "*_annotated_snps.tsv"
+  - res_log10p_1_annotated:
       #Only when we have meta
       - meta:
           type: map
@@ -97,10 +104,22 @@ output:
             Groovy Map containing sample information
             e.g. `[ id:'sample1', single_end:false ]`
       ## TODO nf-core: Delete / customise this example output
-      - "*.log":
+      - "*_res_log10p_1_annotated.tsv":
           type: file
-          description: log file
-          pattern: "*.log"
+          description: _es_log10p_1_annotated file
+          pattern: "*_res_log10p_1_annotated.tsv"
+  - annotated_snps_with_sample_ids:
+      #Only when we have meta
+      - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1', single_end:false ]`
+      ## TODO nf-core: Delete / customise this example output
+      - "*_annotated_snps_with_sample_ids.tsv":
+          type: file
+          description: annotated_snps_with_sample_ids file
+          pattern: "*_annotated_snps_with_sample_ids.tsv"
 
   - versions:
     - "versions.yml":

@@ -1,14 +1,14 @@
 // TODO nf-core: Once you have added the required tests, please run the following command to build this file:
-// nf-core modules test rscriptvcftoaaf
+// nf-core modules test rscriptbuildreports
 nextflow_process {
 
-    name "Test Process RSCRIPT_VCFTOAAF"
+    name "Test Process RSCRIPT_BUILDREPORTS"
     script "../main.nf"
-    process "RSCRIPT_VCFTOAAF"
+    process "RSCRIPT_BUILDREPORTS"
 
     tag "modules"
     tag "modules_"
-    tag "rscriptvcftoaaf"
+    tag "rscriptbuildreports"
 
     // TODO nf-core: Change the test name preferably indicating the test-data and file-format used
     test("small vcf") {
@@ -21,12 +21,8 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file('${projectDir}/modules/local/rscript/vcf2aaf/assets/vcf2aaf.R', checkIfExists: true)
-                input[1] = [
-                    [ id:'test', single_end:false ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/vcf/test_models.vcf.gz', checkIfExists: true),
-                ]
-                input[2] = 'GNOMADAF swegenAF'
+                input[0] = file('${projectDir}/modules/local/rscript/buildreports/assets/build_reports.R', checkIfExists: true)
+                // TODO
                 """
             }
         }

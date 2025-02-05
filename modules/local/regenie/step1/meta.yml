@@ -1,6 +1,6 @@
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
-name: "plink2_write_snplist"
+name: "regeniestep1"
 ## TODO nf-core: Add a description of the module and list keywords
 description: write your description here
 keywords:
@@ -8,14 +8,14 @@ keywords:
   - example
   - genomics
 tools:
-  - "plink2_write_snplist":
+  - "regenie":
       ## TODO nf-core: Add a description and other details for the software below
-      description: "Whole genome association analysis toolset"
-      homepage: "None"
-      documentation: "None"
-      tool_dev_url: "None"
+      description: "Regenie is a C++ program for whole genome regression modelling of large genome-wide association studies (GWAS)."
+      homepage: "https://rgcgithub.github.io/regenie/options/"
+      documentation: "https://rgcgithub.github.io/regenie/options/"
+      tool_dev_url: "https://github.com/rgcgithub/regenie"
       doi: ""
-      licence: ['GPL v3']
+      licence: ['MIT']
       identifier:
 
 ## TODO nf-core: Add a description of all of the variables used as input
@@ -54,10 +54,38 @@ input:
         description: FAM file
         pattern: "*.fam"
 
-  - - out_name_part:
-        type: string
+  - - meta:
+        type: map
         description: |
-          out_name_part
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1', single_end:false ]`
+
+    - id:
+        type: file
+        description: ID file
+        pattern: "*.id"
+
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1', single_end:false ]`
+
+    - snplist:
+        type: file
+        description: snplist file
+        pattern: "*.snplist"
+
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1', single_end:false ]`
+
+    - phenotype:
+        type: file
+        description: phenotype file
+        pattern: "*_phenotype.txt"
 
   - - input_args:
         type: string
@@ -67,36 +95,32 @@ input:
 
 ## TODO nf-core: Add a description of all of the variables used as output
 output:
-  - snplist:
+  - loco:
     - meta:
         type: map
         description: |
           Groovy Map containing sample information
           e.g. `[ id:'sample1', single_end:false ]`
-    - "*.snplist":
+    - "*.loco":
         type: file
-        description: snplist file
-        pattern: "*.snplist"
-
-  - id:
+        description: loco file
+        pattern: "*.loco"
+  - pred_list:
       - meta:
           type: map
           description: |
             Groovy Map containing sample information
             e.g. `[ id:'sample1', single_end:false ]`
-      - "*.id":
+      - "*_pred.list":
           type: file
-          description: id file
-          pattern: "*.id"
-
+          description: pred_list file
+          pattern: "*_pred.list"
   - log:
-      #Only when we have meta
       - meta:
           type: map
           description: |
             Groovy Map containing sample information
             e.g. `[ id:'sample1', single_end:false ]`
-      ## TODO nf-core: Delete / customise this example output
       - "*.log":
           type: file
           description: log file

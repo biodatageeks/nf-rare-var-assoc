@@ -1,0 +1,196 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "regeniestep1"
+## TODO nf-core: Add a description of the module and list keywords
+description: write your description here
+keywords:
+  - sort
+  - example
+  - genomics
+tools:
+  - "regenie":
+      ## TODO nf-core: Add a description and other details for the software below
+      description: "Regenie is a C++ program for whole genome regression modelling of large genome-wide association studies (GWAS)."
+      homepage: "https://rgcgithub.github.io/regenie/options/"
+      documentation: "https://rgcgithub.github.io/regenie/options/"
+      tool_dev_url: "https://github.com/rgcgithub/regenie"
+      doi: ""
+      licence: ['MIT']
+      identifier:
+
+## TODO nf-core: Add a description of all of the variables used as input
+input:
+  # Only when we have meta
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1', single_end:false ]`
+
+    - bgen:
+        type: file
+        description: bgen file
+        pattern: "*.bgen"
+
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1', single_end:false ]`
+
+    - sample:
+        type: file
+        description: sample file
+        pattern: "*.sample"
+
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1', single_end:false ]`
+
+    - phenotype:
+        type: file
+        description: phenotype file
+        pattern: "*_phenotype.txt"
+
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1', single_end:false ]`
+
+    - annotations:
+        type: file
+        description: annotations file
+        pattern: "*.annotations"
+
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1', single_end:false ]`
+
+    - setlist:
+        type: file
+        description: setlist file
+        pattern: "*.setlist"
+
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1', single_end:false ]`
+
+    - masks:
+        type: file
+        description: masks file
+        pattern: "*.masks"
+
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1', single_end:false ]`
+
+    - aaf:
+        type: file
+        description: aaf file
+        pattern: "*_aaf.tsv"
+
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1', single_end:false ]`
+
+    - pred_list:
+        type: file
+        description: pred_list file
+        pattern: "*_pred.list"
+
+  - - input_args:
+        type: string
+        description: |
+          input_args
+
+
+## TODO nf-core: Add a description of all of the variables used as output
+output:
+  - masks_bed:
+      - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1', single_end:false ]`
+      - "*_masks.bed":
+          type: file
+          description: BED file
+          pattern: "*_masks.bed"
+          ontologies:
+            - edam: "http://edamontology.org/format_3003"
+
+  - masks_bim:
+      #Only when we have meta
+      - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1', single_end:false ]`
+      - "*_masks.bim":
+          type: file
+          description: BIM file
+          pattern: "*_masks.bim"
+
+  - masks_fam:
+      #Only when we have meta
+      - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1', single_end:false ]`
+      - "*_masks.fam":
+          type: file
+          description: FAM file
+          pattern: "*_masks.fam"
+  - masks_snplist:
+      - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1', single_end:false ]`
+      - "*_masks.snplist":
+          type: file
+          description: masks_snplist file
+          pattern: "*_masks.snplist"
+  - y1_regenie:
+      - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1', single_end:false ]`
+      - "*_Y1.regenie":
+          type: file
+          description: Y1 regenie file
+          pattern: "*_Y1.regenie"
+  - log:
+      - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1', single_end:false ]`
+      - "*.log":
+          type: file
+          description: log file
+          pattern: "*.log"
+
+  - versions:
+    - "versions.yml":
+        type: file
+        description: File containing software versions
+        pattern: "versions.yml"
+
+authors:
+  - "@psuszyns"
+maintainers:
+  - "@psuszyns"
