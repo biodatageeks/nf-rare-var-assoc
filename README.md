@@ -29,7 +29,7 @@
 > [!NOTE]
 > If you are new to Nextflow and nf-core, please refer to [this page](https://nf-co.re/docs/usage/installation) on how to set-up Nextflow. Make sure to [test your setup](https://nf-co.re/docs/usage/introduction#how-to-run-a-pipeline) with `-profile test` before running the workflow on actual data.
 
-<!-- TODO nf-core: Describe the minimum required steps to execute the pipeline, e.g. how to prepare samplesheets.
+<!-- TODO nf-core: Describe the minimum required steps to execute the pipeline, e.g. how to prepare input.
      Explain what rows and columns represent. For instance (please edit as appropriate):
 
 First, prepare a samplesheet with your input data that looks as follows:
@@ -50,10 +50,11 @@ Now, you can run the pipeline using:
 <!-- TODO nf-core: update the following command to include all required parameters for a minimal example -->
 
 ```bash
-nextflow run psuszyns/rare-var-assoc-nf \
-   -profile <docker/singularity/.../institute> \
-   --input samplesheet.csv \
-   --outdir <OUTDIR>
+nextflow run psuszyns/rare-var-assoc-nf -profile docker \
+    --input_vcf /mnt/zgmvol/_forge/psuszynski/nf_input_data/pims.vcf \
+    --input_controls /mnt/zgmvol/_forge/psuszynski/nf_input_data/kontr \
+    --input_cases /mnt/zgmvol/_forge/psuszynski/nf_input_data/tes \
+    --outdir /mnt/zgmvol/_forge/psuszynski/nf_results_run_1
 ```
 
 > [!WARNING]
