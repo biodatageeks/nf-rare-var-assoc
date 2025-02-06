@@ -55,6 +55,13 @@ r_out_annotations_path <- args[9]
 r_out_masks_path <- args[10]
 r_out_setlist_path <- args[11]
 
+filter_annotations_threshold <- 50
+if (length(args) > 11) {
+  filter_annotations_threshold <- as.numeric(args[12])
+}
+cat(paste0("filter_annotations_threshold = ", filter_annotations_threshold, "\n"))
+
+
 tmp_dir = "./"
 
 study_name <- "pims"
@@ -123,7 +130,7 @@ fwrite(setlist , set_list_file, sep="\t", col.names=F, quote=F )
 
 # cmd <- paste0("cp ", plink_out_dir, study_name, ".bim", " ", tmp_dir, study_name, "-with-chrM.bim")
 # system(cmd)
-cmd <- paste0("cp ", r_out_setlist_path, " ", tmp_dir, study_name, "-with-chrM.setlist")
+cmd <- paste0("cp ", r_out_setlist_path, " ", tmp_dir, study_name, ".setlist-with-chrM")
 system(cmd)
 cmd <- paste0("cp ", r_out_annotations_path, " ", tmp_dir, study_name, ".annotations_with_semicolon")
 system(cmd)
@@ -132,16 +139,20 @@ system(cmd)
 
 # cmd <- paste0("grep -v chrM ", tmp_dir, study_name, "-with-chrM.bim", " > ", tmp_dir, study_name, ".bim")
 # system(cmd)
-cmd <- paste0("grep -v chrM ", tmp_dir, study_name, "-with-chrM.setlist", " | grep -v chrY | sed -r 's/:/_/g' | sed 1d > ", r_out_setlist_path)
+# cmd <- paste0("grep -v chrM ", tmp_dir, study_name, "-with-chrM.setlist", " | grep -v chrY | sed -r 's/:/_/g' | sed 1d > ", r_out_setlist_path)
+cmd <- paste0("grep -v chrM ", tmp_dir, study_name, ".setlist-with-chrM", " | grep -v chrY | sed -r 's/:/_/g' > ", r_out_setlist_path)
 system(cmd)
 cmd <- paste0("grep -v chrM ", tmp_dir, study_name, ".annotations_with_semicolon", " | sed -r 's/:/_/g' > ", r_out_annotations_path)
 system(cmd)
 
 
 anno <- fread(r_out_annotations_path, header=F)
-anno$V3[anno$V3 %in% names(head(sort(table(anno$V3)), 50))] <- "NULL"
-anno_file <-  r_out_annotations_path
-fwrite(anno, anno_file, sep="\t", col.names=F, quote=F )
+cat(paste0("read ", nrow(anno), " rows from ", r_out_annotations_path, "\n"))
+cat("sort(table(anno$V3)):\n")
+print(sort(table(anno$V3)))
+
+anno$V3[anno$V3 %in% names(head(sort(table(anno$V3)), filter_annotations_threshold))] <- "NULL"
+fwrite(anno, r_out_annotations_path, sep="\t", col.names=F, quote=F )
 
 
 
@@ -153,5 +164,8 @@ fwrite(dd, file=r_out_sample_path, sep="\t", quote=F)
 
 # remove multiallelic
 dd <- fread(r_out_annotations_path, header=F)
-dd2 <- dd [-grep (",",dd$V1),]
+cat(paste0("read ", nrow(dd), " rows from ", r_out_annotations_path, "\n"))
+
+dd2 <- dd[!grepl(",", dd$V1),]
+cat(paste0("writing ", nrow(dd2), " rows to ", r_out_annotations_path, "\n"))
 fwrite(dd2, r_out_annotations_path, sep="\t", col.names=F, quote=F)

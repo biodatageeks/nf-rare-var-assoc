@@ -102,6 +102,11 @@ input:
         description: SAMPLE file
         pattern: "*.sample"
 
+  - - input_args:
+        type: string
+        description: |
+          input_args
+
 
 ## TODO nf-core: Add a description of all of the variables used as output
 output:

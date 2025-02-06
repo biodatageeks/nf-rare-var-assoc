@@ -162,6 +162,13 @@
                     "fa_icon": "fas fa-book",
                     "hidden": false
                 },
+                "rscript_annotate_options": {
+                    "type": "string",
+                    "description": "Options for annotate.R script.",
+                    "default": "",
+                    "fa_icon": "fas fa-code",
+                    "hidden": false
+                },
                 "rscript_annotate_path": {
                     "type": "string",
                     "description": "Path to annotate.R script.",

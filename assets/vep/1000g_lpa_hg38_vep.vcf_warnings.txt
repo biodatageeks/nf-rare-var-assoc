@@ -1,0 +1,2 @@
+WARNING: Failed to instantiate plugin GO: specify assembly using --assembly [assembly]
+

@@ -39,7 +39,7 @@ r_out_res_log10p_1_annotated_tsv_path <- args[7]
 r_out_annotated_snps_with_sample_ids_tsv_path <- args[8]
 
 
-vars <- fread(vcf_path, skip="#CHROM", sep="\t")
+vars <- fread(r_in_vcf_path, skip="#CHROM", sep="\t")
 
 masks <- fread(r_in_regenie_step2_masks_snplist_path, header=F)
 umaskvars <- unique(unlist(strsplit(masks$V4,",")))
@@ -51,7 +51,7 @@ print(paste0("nrow(sel) = ", nrow(sel)))
 
 cat("Creating annotated_snps.tsv ")
 resList <- lapply( (1:nrow(sel)), function(i){
-        if (i %% (nrow(sel) %/% 100) == 0) {
+        if (nrow(sel) > 100 && i %% (nrow(sel) %/% 100) == 0) {
             cat(".")
         }
         selV <- sel$V1[i]
@@ -93,12 +93,17 @@ anno_snps2 <- cbind(anno[match( anno_snps$selV, anno$V1),], anno_snps)
 
 cat("Creating res_log10p_1_annotated.tsv ..")
 sel_dd <- dd[which(dd$LOG10P > 1),]
+cat(paste0(" (nrow(sel_dd) = ", nrow(sel_dd), ") "))
 
-ll <- lapply(1:nrow(sel_dd), function(i){
+if (nrow(sel_dd) > 0) {
+    ll <- lapply(1:nrow(sel_dd), function(i){
         anno_snps2$selV %in% strsplit(masks$V4[which(masks$V1 == sel_dd$ID[i])],",")
         cbind(sel_dd[i,],anno_snps2[which(anno_snps2$selV %in% strsplit(masks$V4[which(masks$V1 == sel_dd$ID[i])],",")[[1]]),])
-})
-final <- rbindlist(ll)
+    })
+    final <- rbindlist(ll)
+} else {
+    final <- data.table()
+}
 
 fwrite(final, r_out_res_log10p_1_annotated_tsv_path)
 cat(" - done!\n")
@@ -179,7 +184,7 @@ print(paste0("for all umaskvars  nrow(sel) = ", nrow(sel)))
 
 cat("Creating annotated_snps_with_sample_ids.tsv (3) ")
 resList <- lapply( (1:nrow(sel)), function(i){
-        if (i %% (nrow(sel) %/% 100) == 0) {
+        if (nrow(sel)>100 && i %% (nrow(sel) %/% 100) == 0) {
             cat(".")
         }
         selV <- sel$V1[i]

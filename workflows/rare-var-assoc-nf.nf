@@ -108,7 +108,8 @@ workflow RARE_VAR_ASSOC_NF {
         ch_bgen_bgi,
         ch_qc_sample,
         ch_controls,
-        ch_cases
+        ch_cases,
+        Channel.of(params.rscript_annotate_options)
     )
     ch_r_out_fam  = RSCRIPT_ANNOTATE.out.out_fam
     ch_r_out_sample  = RSCRIPT_ANNOTATE.out.out_sample

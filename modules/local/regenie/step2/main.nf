@@ -45,8 +45,8 @@ process REGENIE_STEP2 {
 
     output:
     // TODO nf-core: Named file extensions MUST be emitted for ALL output channels
-    tuple val(meta), path("*.masks.bed"), emit: masks_bed
-    tuple val(meta), path("*.masks.bim"), emit: masks_bim
+    tuple val(meta), path("*_masks.bed"), emit: masks_bed
+    tuple val(meta), path("*_masks.bim"), emit: masks_bim
     tuple val(meta), path("*_masks.fam"), emit: masks_fam
     tuple val(meta), path("*_masks.snplist"), emit: masks_snplist
     tuple val(meta), path("*_Y1.regenie"), emit: y1_regenie
