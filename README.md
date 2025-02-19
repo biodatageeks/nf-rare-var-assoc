@@ -57,6 +57,18 @@ nextflow run psuszyns/rare-var-assoc-nf -profile docker \
     --outdir /mnt/zgmvol/_forge/psuszynski/nf_results_run_1
 ```
 
+### Run with test profile
+
+```bash
+nextflow run . -profile podman,test --outdir out1
+```
+
+### Run nf-test
+
+```bash
+nf-test test --profile podman
+```
+
 > [!WARNING]
 > Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_; see [docs](https://nf-co.re/docs/usage/getting_started/configuration#custom-configuration-files).
 

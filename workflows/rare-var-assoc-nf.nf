@@ -131,7 +131,7 @@ workflow RARE_VAR_ASSOC_NF {
     REGENIE_STEP1 (
         ch_bed,
         ch_bim,
-        ch_fam,
+        ch_r_out_fam,
         ch_id_2,
         ch_snplist_2,
         ch_phenotype,
