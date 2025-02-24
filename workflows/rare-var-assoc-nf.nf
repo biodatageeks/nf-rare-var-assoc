@@ -3,6 +3,7 @@
     IMPORT MODULES / SUBWORKFLOWS / FUNCTIONS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
+include { RENAME                 } from '../modules/local/rename'
 include { RSCRIPT_BUILDREPORTS   } from '../modules/local/rscript/buildreports'
 include { REGENIE_STEP2          } from '../modules/local/regenie/step2'
 include { REGENIE_STEP1          } from '../modules/local/regenie/step1'
@@ -14,6 +15,8 @@ include { PLINK2_EXPORT_BGEN     } from '../modules/local/plink2/export_bgen'
 include { PLINK2_WRITE_SNPLIST as PLINK2_WRITE_SNPLIST_1 } from '../modules/local/plink2/write_snplist'
 include { PLINK2_WRITE_SNPLIST as PLINK2_WRITE_SNPLIST_2 } from '../modules/local/plink2/write_snplist'
 include { PLINK19_MAKEBED        } from '../modules/local/plink19/makebed'
+include { VEP_ANNOTATE           } from '../modules/local/vep/annotate'
+include { VEP_UPDATECACHE        } from '../modules/local/vep/updatecache'
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -37,9 +40,29 @@ workflow RARE_VAR_ASSOC_NF {
 
     ch_versions = Channel.empty()
     ch_multiqc_files = Channel.empty()
+    ch_vep_cachedir = Channel.fromPath("${projectDir}/../vep_cachedir", checkIfExists: true)
+
+
+    VEP_UPDATECACHE (
+        ch_vcf.map { t -> t[0] },
+        ch_vep_cachedir,
+        Channel.of(params.vep_updatecache_species),
+        Channel.of(params.vep_updatecache_options)
+    )
+    ch_vep_cachesubdir = VEP_UPDATECACHE.out.cachesubdir
+    ch_versions = ch_versions.mix(VEP_UPDATECACHE.out.versions.first())
+
+    VEP_ANNOTATE (
+        ch_vcf,
+        ch_vep_cachesubdir,
+        Channel.of(params.vep_annotate_species),
+        Channel.of(params.vep_annotate_options)
+    )
+    ch_vep_vcf  = VEP_ANNOTATE.out.vcf
+    ch_versions = ch_versions.mix(VEP_ANNOTATE.out.versions.first())
 
     PLINK19_MAKEBED (
-        ch_vcf
+        ch_vep_vcf
     )
     ch_bed  = PLINK19_MAKEBED.out.bed
     ch_bim  = PLINK19_MAKEBED.out.bim
@@ -100,7 +123,7 @@ workflow RARE_VAR_ASSOC_NF {
     // r_script_annotate_ch = Channel.fromPath("${projectDir}/modules/local/rscript/annotate/assets/test.R", checkIfExists: true)
     RSCRIPT_ANNOTATE (
         r_script_annotate_ch,
-        ch_vcf,
+        ch_vep_vcf,
         ch_bed,
         ch_bim,
         ch_fam,
@@ -119,10 +142,17 @@ workflow RARE_VAR_ASSOC_NF {
     ch_setlist  = RSCRIPT_ANNOTATE.out.setlist
     ch_versions = ch_versions.mix(RSCRIPT_ANNOTATE.out.versions.first())
 
+    renamed_file_name = ch_vcf.map { t -> "${t[0].id}.fam" }.first()
+    RENAME (
+        ch_r_out_fam,
+        renamed_file_name
+    )
+    ch_renamed_fam  = RENAME.out.output
+
     r_script_vcf2aaf_ch = Channel.fromPath(params.rscript_vcf2aaf_path, checkIfExists: true)
     RSCRIPT_VCFTOAAF (
         r_script_vcf2aaf_ch,
-        ch_vcf,
+        ch_vep_vcf,
         Channel.of(params.rscript_vcf2aaf_options)
     )
     ch_aaf  = RSCRIPT_VCFTOAAF.out.aaf
@@ -131,7 +161,7 @@ workflow RARE_VAR_ASSOC_NF {
     REGENIE_STEP1 (
         ch_bed,
         ch_bim,
-        ch_r_out_fam,
+        ch_renamed_fam,
         ch_id_2,
         ch_snplist_2,
         ch_phenotype,
@@ -164,7 +194,7 @@ workflow RARE_VAR_ASSOC_NF {
         r_script_buildreports_ch,
         ch_regenie_step2_masks_snplist,
         ch_regenie_step2_y1_regenie,
-        ch_vcf,
+        ch_vep_vcf,
         ch_phenotype,
         ch_annotations
     )

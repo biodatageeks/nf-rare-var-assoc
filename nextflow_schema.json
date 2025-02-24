@@ -211,6 +211,34 @@
                     "fa_icon": "fas fa-code",
                     "hidden": false
                 },
+                "vep_updatecache_options": {
+                    "type": "string",
+                    "description": "Options for VEP update cache.",
+                    "default": "--AUTO cf --ASSEMBLY GRCh38",
+                    "fa_icon": "fas fa-pen-line",
+                    "hidden": false
+                },
+                "vep_updatecache_species": {
+                    "type": "string",
+                    "description": "Species option for VEP update cache.",
+                    "default": "homo_sapiens",
+                    "fa_icon": "fas fa-pen-line",
+                    "hidden": false
+                },
+                "vep_annotate_options": {
+                    "type": "string",
+                    "description": "Options for VEP annotation.",
+                    "default": "--offline --no_stats --refseq --use_given_ref --exclude_predicted --compress_output bgzip --vcf --numbers --protein --total_length --force_overwrite --format vcf --regulatory --variant_class --symbol --biotype --distance 5000 --canonical --pubmed --mane",
+                    "fa_icon": "fas fa-pen-line",
+                    "hidden": false
+                },
+                "vep_annotate_species": {
+                    "type": "string",
+                    "description": "Species option for VEP annotation.",
+                    "default": "homo_sapiens",
+                    "fa_icon": "fas fa-pen-line",
+                    "hidden": false
+                },
                 "max_multiqc_email_size": {
                     "type": "string",
                     "description": "File size limit when attaching MultiQC reports to summary emails.",

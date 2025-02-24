@@ -15,16 +15,18 @@
 // TODO nf-core: Optional inputs are not currently supported by Nextflow. However, using an empty
 //               list (`[]`) instead of a file can be used to work around this issue.
 
-process RSCRIPT_ANNOTATE {
+process VEP_UPDATECACHE {
     tag "$meta.id"
-    label 'process_medium'
+    label 'process_long'
 
     // TODO nf-core: List required Conda package(s).
     //               Software MUST be pinned to channel (i.e. "bioconda"), version (i.e. "1.10").
     //               For Conda, the build (i.e. "h9402c20_2") must be EXCLUDED to support installation on different operating systems.
     // TODO nf-core: See section in main README for further information regarding finding and adding container addresses to the section below.
     conda "${moduleDir}/environment.yml"
-    container 'docker.io/psuszynski/r-ver:4.4.2.1'
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/ensembl-vep:113.3--pl5321h2a3209d_0':
+        'biocontainers/ensembl-vep:113.3--pl5321h2a3209d_0' }"
 
     input:
     // TODO nf-core: Where applicable all sample-specific information e.g. "id", "single_end", "read_group"
@@ -33,26 +35,15 @@ process RSCRIPT_ANNOTATE {
     //               https://github.com/nf-core/modules/blob/master/modules/nf-core/bwa/index/main.nf
     // TODO nf-core: Where applicable please provide/convert compressed files as input/output
     //               e.g. "*.fastq.gz" and NOT "*.fastq", "*.bam" and NOT "*.sam" etc.
-    path(r_script_ch)
-    tuple val(meta), path(vcf)
-    tuple val(meta), path(bed)
-    tuple val(meta), path(bim)
-    tuple val(meta), path(fam)
-    tuple val(meta), path(bgen)
-    tuple val(meta), path(bgen_bgi)
-    tuple val(meta), path(sample)
-    tuple val(meta), path(controls)
-    tuple val(meta), path(cases)
+    val(meta)
+    path(vep_cache)
+    val(species)
     val(input_args)
 
     output:
     // TODO nf-core: Named file extensions MUST be emitted for ALL output channels
-    tuple val(meta), path("*_phenotype.txt"), emit: phenotype
-    tuple val(meta), path("*.annotations"), emit: annotations
-    tuple val(meta), path("*.masks"), emit: masks
-    tuple val(meta), path("*.setlist"), emit: setlist
-    tuple val(meta), path("*_r_out.fam"), emit: out_fam
-    tuple val(meta), path("*_r_out.sample"), emit: out_sample
+    path("${vep_cache}/${species}"), emit: cachesubdir
+    // TODO nf-core: List additional required output channels/values here
     path "versions.yml"           , emit: versions
 
     when:
@@ -61,7 +52,6 @@ process RSCRIPT_ANNOTATE {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
-    def VERSION = '4.4.2-0.1'
     // TODO nf-core: Where possible, a command MUST be provided to obtain the version number of the software e.g. 1.10
     //               If the software is unable to output a version number on the command-line then it can be manually specified
     //               e.g. https://github.com/nf-core/modules/blob/master/modules/nf-core/homer/annotatepeaks/main.nf
@@ -71,25 +61,15 @@ process RSCRIPT_ANNOTATE {
     //               using the Nextflow "task" variable e.g. "--threads $task.cpus"
     // TODO nf-core: Please replace the example samtools command below with your module's command
     // TODO nf-core: Please indent the command appropriately (4 spaces!!) to help with readability ;)
+
+    // find ${vep_cache}/ -maxdepth 0 -empty -exec sh -c 'vep_install --CACHEDIR ${vep_cache} --SPECIES $species $args $input_args' \\;
+    // find ${vep_cache}/ -maxdepth 1 -type d -name "$species" | grep -q "." || sh -c 'vep_install --CACHEDIR ${vep_cache} --SPECIES $species $args $input_args'
     """
-    Rscript \\
-        ${r_script_ch} \\
-        ${fam} \\
-        ${controls} \\
-        ${cases} \\
-        ${vcf} \\
-        ${sample} \\
-        ${prefix}_r_out.fam \\
-        ${prefix}_r_out.sample \\
-        ${prefix}_phenotype.txt \\
-        ${prefix}.annotations \\
-        ${prefix}.masks \\
-        ${prefix}.setlist \\
-        $input_args
+    if [ ! -d "${vep_cache}/$species" ]; then sh -c 'vep_install --CACHEDIR ${vep_cache} --SPECIES $species $args $input_args'; fi
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        rscriptannotate: ${VERSION}
+        vep: \$( echo \$(vep --help 2>&1) | sed 's/^.*Versions:.*ensembl-vep : //;s/ .*\$//')
     END_VERSIONS
     """
 
@@ -101,16 +81,10 @@ process RSCRIPT_ANNOTATE {
     //               Simple example: https://github.com/nf-core/modules/blob/818474a292b4860ae8ff88e149fbcda68814114d/modules/nf-core/bcftools/annotate/main.nf#L47-L63
     //               Complex example: https://github.com/nf-core/modules/blob/818474a292b4860ae8ff88e149fbcda68814114d/modules/nf-core/bedtools/split/main.nf#L38-L54
     """
-    touch ${prefix}_phenotype.txt
-    touch ${prefix}.annotations
-    touch ${prefix}.masks
-    touch ${prefix}.setlist
-    touch ${prefix}.fam
-    touch ${prefix}.sample
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        rscriptannotate: ${VERSION}
+        vep: \$( echo \$(vep --help 2>&1) | sed 's/^.*Versions:.*ensembl-vep : //;s/ .*\$//')
     END_VERSIONS
     """
 }
