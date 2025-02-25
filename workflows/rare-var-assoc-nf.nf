@@ -3,6 +3,7 @@
     IMPORT MODULES / SUBWORKFLOWS / FUNCTIONS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
+include { MERGE_RESULTS          } from '../modules/local/merge_results'
 include { RENAME                 } from '../modules/local/rename'
 include { RSCRIPT_BUILDREPORTS   } from '../modules/local/rscript/buildreports'
 include { REGENIE_STEP2          } from '../modules/local/regenie/step2'
@@ -19,6 +20,7 @@ include { VEP_ANNOTATE           } from '../modules/local/vep/annotate'
 include { VEP_UPDATECACHE        } from '../modules/local/vep/updatecache'
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
+include { REPORTING              } from '../subworkflows/local/reporting'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_rare-var-assoc-nf_pipeline'
@@ -186,14 +188,14 @@ workflow RARE_VAR_ASSOC_NF {
     ch_regenie_step2_masks_bim  = REGENIE_STEP2.out.masks_bim
     ch_regenie_step2_masks_fam  = REGENIE_STEP2.out.masks_fam
     ch_regenie_step2_masks_snplist  = REGENIE_STEP2.out.masks_snplist
-    ch_regenie_step2_y1_regenie  = REGENIE_STEP2.out.y1_regenie
+    ch_regenie_step2_regenie_out  = REGENIE_STEP2.out.regenie_out
     ch_versions = ch_versions.mix(REGENIE_STEP2.out.versions.first())
 
     r_script_buildreports_ch = Channel.fromPath(params.rscript_buildreports_path, checkIfExists: true)
     RSCRIPT_BUILDREPORTS (
         r_script_buildreports_ch,
         ch_regenie_step2_masks_snplist,
-        ch_regenie_step2_y1_regenie,
+        ch_regenie_step2_regenie_out,
         ch_vep_vcf,
         ch_phenotype,
         ch_annotations
@@ -202,6 +204,22 @@ workflow RARE_VAR_ASSOC_NF {
     ch_res_log10p_1_annotated  = RSCRIPT_BUILDREPORTS.out.res_log10p_1_annotated
     ch_annotated_snps_with_sample_ids  = RSCRIPT_BUILDREPORTS.out.annotated_snps_with_sample_ids
     ch_versions = ch_versions.mix(RSCRIPT_BUILDREPORTS.out.versions.first())
+
+    REGENIE_STEP2.out.regenie_out
+        .transpose()
+        .map { prefix, fl -> tuple(RegenieUtil.getPhenotype(prefix, fl), fl) }
+        .set { ch_regenie_step2_by_phenotype }
+
+    MERGE_RESULTS (
+        ch_regenie_step2_by_phenotype.groupTuple()
+    )
+    ch_results_merged = MERGE_RESULTS.out.results_merged
+
+    REPORTING (
+        ch_results_merged,
+        ch_phenotype,
+        ch_masks
+    )
 
 
     //
@@ -214,7 +232,6 @@ workflow RARE_VAR_ASSOC_NF {
             sort: true,
             newLine: true
         ).set { ch_collated_versions }
-
 
     //
     // MODULE: MultiQC
@@ -255,6 +272,11 @@ workflow RARE_VAR_ASSOC_NF {
     emit:multiqc_report = MULTIQC.out.report.toList() // channel: /path/to/multiqc_report.html
     versions       = ch_versions                 // channel: [ path(versions.yml) ]
 
+}
+
+workflow.onComplete {
+    println "Pipeline completed at: $workflow.complete"
+    println "Execution status: ${ workflow.success ? 'OK' : 'failed' }"
 }
 
 /*

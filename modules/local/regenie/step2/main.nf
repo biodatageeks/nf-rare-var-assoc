@@ -49,7 +49,7 @@ process REGENIE_STEP2 {
     tuple val(meta), path("*_masks.bim"), emit: masks_bim
     tuple val(meta), path("*_masks.fam"), emit: masks_fam
     tuple val(meta), path("*_masks.snplist"), emit: masks_snplist
-    tuple val(meta), path("*_Y1.regenie"), emit: y1_regenie
+    tuple val(meta), path("*.regenie"), emit: regenie_out
     tuple val(meta), path("*.log"), emit: log
     path "versions.yml"           , emit: versions
 

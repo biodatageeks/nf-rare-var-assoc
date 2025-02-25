@@ -1,0 +1,226 @@
+# Copied from: https://github.com/genepi/nf-gwas/blob/main/reports/gene_level_report_template.Rmd
+# Original authors:
+#    Sebastian Schönherr
+#    Lukas Forer
+#    Johanna Schachtl-Riess
+#    Silvia Di Maio
+#
+# Modified by:
+#    Piotr Suszyński
+
+---
+title: "Report: `r params$project`"
+output:
+  rmdformats::robobook:
+    self_contained: true
+    thumbnails: false
+    lightbox: true
+    gallery: false
+    highlight: tango
+    toc_depth: 3
+params:
+  project: test-gene-level
+  date: 2022-05-27
+  version: v0.4.2
+  regenie_out: ../../../../../results/regenie_step2/pims_step2_Y1.regenie
+  regenie_filename: pims_step2_Y1.regenie.all.gz
+  phenotype: Y1
+  covariates:
+  condition_list:
+  phenotype_file: ../../../../../results/rscript_annotate/pims_phenotype.txt
+  plot_ylimit: 0
+  mask_file: ../../../../../results/rscript_annotate/pims.masks
+  manhattan_annotation_enabled: true
+  annotation_min_log10p: 1
+  r_functions: ./functions.R
+  rmd_pheno_stats: ./child_phenostatistics.Rmd
+---
+
+```{r setup, include=FALSE}
+library(DT)
+library(data.table)
+library(R.utils)
+library(ggplot2)
+library(skimr)
+library(kableExtra)
+library(dplyr)
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, error = TRUE, cache=FALSE)
+source(params$r_functions)
+```
+
+
+## Project Summary
+
+| Parameter        | Value                       |
+|------------------|-----------------------------|
+| Project          | `r params$project`          |
+| Pipeline Version | `r params$version`          |
+| Date             | `r params$date`             |
+| Phenotype File   | `r params$phenotype_file`   |
+| Phenotype        | `r params$phenotype`        |
+| Covariates       | `r params$covariates`       |
+| Condition list   | `r params$condition_list`   |
+| Mask File        | `r params$mask_file`        |
+| Regenie Output   | `r params$regenie_filename` |
+
+
+## Phenotype Statistics
+
+```{r child=params$rmd_pheno_stats}
+
+```
+
+## Gene-based settings
+
+```{r}
+regenieTable <- fread(params$regenie_out, header=TRUE, tmpdir="temp")
+regenieTable <- regenieTable %>% tidyr::separate(ID,
+                                                 into=c("Set", "Mask", "AAF"),
+                                                 sep="\\.",
+                                                 extra="merge")
+regenieTable$joint <- ifelse(grepl("BURDEN", regenieTable$TEST), "yes", "no")
+regenieTable_burdenJoint <- select(filter(regenieTable, joint == "yes"), c(CHROM:Set,TEST,CHISQ:joint))
+regenieTable <- filter(regenieTable, joint == "no")
+regenieTable <- regenieTable %>% tidyr::unite(.,
+                                              "Settings",
+                                              TEST, AAF, Mask,
+                                              sep = ".",
+                                              remove = FALSE)
+```
+
+### Tests
+
+```{r}
+gene_tests <- unique(regenieTable$TEST)
+kable(gene_tests,
+      col.names = c("Tests"))
+```
+
+
+### AAF cutoffs
+
+```{r}
+aaf_cutoffs <- unique(regenieTable$AAF)
+kable(aaf_cutoffs,
+      col.names = c("AAF cutoffs"))
+```
+
+### Masks
+```{r}
+masks <- read.table(params$mask_file, header=FALSE)
+names(masks) <- c("Mask", "Annotations")
+kable(masks)
+```
+
+### Joint tests for burden masks
+https://github.com/genepi/nf-gwas/blob/main/reports/functions.R
+```{r, results='asis'}
+if(nrow(regenieTable_burdenJoint) > 0) {
+test_joint <- unique(regenieTable_burdenJoint$TEST)
+test_joint <- as.data.frame(test_joint)
+test_joint <- test_joint %>% tidyr::separate(test_joint, into=c("Model", "Test", "Joint"), sep="-", extra="merge")
+cat("The following joint tests were used for burden masks:", unique(test_joint$Joint), ".")
+} else {
+    cat("No joint test was performed for burden masks and AAF thresholds.")
+}
+
+```
+
+
+```{r, eval=nrow(regenieTable_burdenJoint) > 0, results='asis', dpi=300}
+cat('\n\n')
+cat('## Joint test(s) for burden masks and AAF thresholds')
+cat('\n\n')
+if(params$plot_ylimit == 0) {
+  limit = NULL
+  } else {
+    limit = c(0, params$plot_ylimit )
+    cat(paste("Please note that the Y-axis limit has been set to '", params$plot_ylimit,"'. Please use the 'plot_ylimit' parameter to adapt this behaviour."))
+  }
+
+for (test in unique(regenieTable_burdenJoint$TEST)){
+  regenieTable_tmp01 <- regenieTable_burdenJoint[regenieTable_burdenJoint$TEST == test, ]
+  cat('\n\n')
+  cat('### Test: ', unique(regenieTable_tmp01$TEST))
+  cat('\n\n')
+  #manhattan plot
+  cat('\n\n')
+  cat('**Manhattan Plot**')
+  cat('\n\n')
+  df_prep <- manhattan_prep(regenieTable_tmp01)
+  plot <- manhattan_plot(df_prep, ymax = params$plot_ylimit, hlines = FALSE)
+  #annotatate plot (if it is enabled)
+  if(!params$manhattan_annotation_enabled) {
+    plot
+    } else {
+      plot <- plot + ggrepel::geom_text_repel(data = df_prep %>% group_by(Set) %>%
+                             top_n(1, LOG10P) %>%
+                               slice(1) %>%
+                             filter(LOG10P > params$annotation_min_log10p),
+                            aes(label=Set), color = 1, fontface = "italic")
+    }
+  print(plot)
+  #qqplot
+  cat('\n\n')
+  cat('**QQ Plot**')
+  cat('\n\n')
+  pp <- qq_plot(df=regenieTable_tmp01)
+  print(pp)
+}
+
+```
+
+
+```{r, results='asis', dpi=300}
+for (test in unique(regenieTable$TEST)){
+  regenieTable_tmp01 <- regenieTable[regenieTable$TEST == test, ]
+  cat('\n\n')
+  cat('## Test: ', unique(regenieTable_tmp01$TEST))
+  cat('\n\n')
+  for (settings in unique(regenieTable_tmp01$Settings)) {
+    regenieTable_tmp02 <- regenieTable_tmp01[regenieTable_tmp01$Settings == settings, ]
+    annotations <- masks[masks$Mask == unique(regenieTable_tmp02$Mask),]$Annotations
+    cat('\n\n')
+    cat('### AAF cutoff: ', unique(regenieTable_tmp02$AAF), ', Mask: ', unique(regenieTable_tmp02$Mask), ' (', annotations, '), (Test: ', unique(regenieTable_tmp02$TEST), ')',
+        sep = "")
+    cat('\n\n')
+    #note for manual ylim setting (if ymax is defined)
+    if(params$plot_ylimit == 0) {
+      limit = NULL
+      } else {
+        limit = c(0, params$plot_ylimit )
+        cat(paste("Please note that the Y-axis limit has been set to '", params$plot_ylimit,"'. Please use the 'plot_ylimit' parameter to adapt this behaviour."))
+      }
+    #manhattan plot
+    cat('\n\n')
+    cat('**Manhattan Plot**')
+    cat('\n\n')
+    df_prep <- manhattan_prep(regenieTable_tmp02)
+    plot <- manhattan_plot(df_prep, ymax = params$plot_ylimit, hlines = FALSE)
+    #annotatate plot (if it is enabled)
+    if(!params$manhattan_annotation_enabled) {
+      plot
+      } else {
+        plot <- plot + ggrepel::geom_text_repel(data = df_prep %>% group_by(Set) %>%
+                             top_n(1, LOG10P) %>%
+                               slice(1) %>%
+                             filter(LOG10P > params$annotation_min_log10p),
+                            aes(label=Set), color = 1, fontface = "italic")
+      }
+    print(plot)
+    #qqplot
+    cat('\n\n')
+    cat('**QQ Plot**')
+    cat('\n\n')
+    pp <- qq_plot(df=regenieTable_tmp02)
+    print(pp)
+  }
+}
+```
+
+
+------------------------------------------------------------------------
+
+<small>
+This report has been created with **[rare-var-assoc-nf `r params$version`](https://github.com/biodatageeks/rare-var-assoc-nf)**, a nextflow pipeline developed by [Piotr Suszyński](mailto:piotr.suszynski.dokt@pw.edu.pl), [Anna Lewan] and [Tomasz Gambin](mailto:tomasz.gambin@pw.edu.pl), Politechnika Warszawska. The Manhattan and QQ plots reporting was adapted from **[nf-gwas `r params$version`](https://github.com/genepi/nf-gwas)**, a nextflow pipeline developed by [Sebastian Schönherr](mailto:sebastian.schoenherr@i-med.ac.at), [Lukas Forer](mailto:lukas.forer@i-med.ac.at) and [Johanna Schachtl-Riess](mailto:johanna.schachtl-riess@i-med.ac.at), Institute of Genetic Epidemiology, Medical University of Innsbruck.
+</small>

@@ -163,16 +163,16 @@ output:
           type: file
           description: masks_snplist file
           pattern: "*_masks.snplist"
-  - y1_regenie:
+  - regenie_out:
       - meta:
           type: map
           description: |
             Groovy Map containing sample information
             e.g. `[ id:'sample1', single_end:false ]`
-      - "*_Y1.regenie":
+      - "*.regenie":
           type: file
-          description: Y1 regenie file
-          pattern: "*_Y1.regenie"
+          description: regenie out file
+          pattern: "*.regenie"
   - log:
       - meta:
           type: map

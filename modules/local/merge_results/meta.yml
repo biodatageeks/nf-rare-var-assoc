@@ -1,0 +1,44 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "mergeresults"
+## TODO nf-core: Add a description of the module and list keywords
+description: write your description here
+keywords:
+  - sort
+  - example
+  - genomics
+tools:
+  - "mergeresults":
+      ## TODO nf-core: Add a description and other details for the software below
+      description: "R is a free software environment for statistical computing and graphics."
+      homepage: "None"
+      documentation: "None"
+      tool_dev_url: "None"
+      doi: ""
+      licence: ['GPL v2-or-later']
+      identifier:
+
+input:
+  - - csv_concat_py_script:
+        type: file
+
+  - - phenotype:
+        type: str
+
+    - regenie_chromosomes:
+        type: file
+
+output:
+  - results_merged:
+      - phenotype:
+          type: str
+
+      - "*.regenie.gz":
+          type: file
+          description: merged regenie output
+          pattern: "*.regenie.gz"
+
+authors:
+  - "@psuszyns"
+maintainers:
+  - "@psuszyns"
