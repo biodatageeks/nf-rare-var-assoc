@@ -10,7 +10,7 @@ args = parser.parse_args()
 
 dfs = []
 for input_path in args.inputs:
-    df = pd.read_csv(input_path, sep=args.input_sep)
+    df = pd.read_csv(input_path, sep=args.input_sep, comment='#')
     dfs.append(df)
 
-pd.concat(dfs).to_csv(args.output, sep=args.output_sep)
+pd.concat(dfs).to_csv(args.output, sep=args.output_sep, index=False)

@@ -7,3 +7,4 @@ dependencies:
   - conda-forge::pandas=2.2.3
   - conda-forge::numpy=2.2.3
   - conda-forge::argparse=1.4.0
+  - conda-forge::py-bgzip=0.5.0

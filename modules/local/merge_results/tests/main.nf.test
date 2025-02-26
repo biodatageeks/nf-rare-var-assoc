@@ -24,7 +24,7 @@ nextflow_process {
                 regenie_step2_out = Channel.of( ['chr1', f1], ['chr2', f2], ['chr1', f3], ['chr2', f4])
                 input[1] = regenie_step2_out
                   .transpose()
-                  .map { prefix, file -> tuple(file.baseName.replaceAll(prefix + "_", '').replaceAll('.regenie', ''), file) }.groupTuple()
+                  .map { prefix, file -> tuple(file.baseName.replaceAll(prefix + "_", '').replaceAll('.regenie', ''), file) }.groupTuple().view()
                 """
             }
         }
@@ -64,12 +64,12 @@ nextflow_process {
                 """
                 input[0] = file('${projectDir}/modules/local/merge_results/assets/csv_concat.py', checkIfExists: true)
 
-                f1 = file('${projectDir}/modules/local/merge_results/tests/assets/fileA.csv')
-                f2 = file('${projectDir}/modules/local/merge_results/tests/assets/fileB.csv')
+                f1 = file('${projectDir}/modules/local/merge_results/tests/assets/chr1_A.csv')
+                f2 = file('${projectDir}/modules/local/merge_results/tests/assets/chr2_A.csv')
 
-                input[1] = Channel.of( ['chr1', f1], ['chr1', f2])
+                input[1] = Channel.of( ['chr1', f1], ['chr2', f2])
                   .transpose()
-                  .map { prefix, file -> tuple(file.baseName, file) }.groupTuple()
+                  .map { prefix, file -> tuple(file.baseName.replaceAll(prefix + "_", ''), file) }.groupTuple()
                 """
             }
         }
@@ -79,7 +79,7 @@ nextflow_process {
             with(process.out) {
 
                 with(results_merged){
-                    assert size() == 2
+                    assert size() == 1
 
                     def lines = path(get(0).get(1)).readLinesGzip()
 

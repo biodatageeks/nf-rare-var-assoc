@@ -4,7 +4,7 @@ process RSCRIPT_MANHATTAN_QQ_PLOTS {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    container 'docker.io/psuszynski/r-ver:4.4.2.2'
+    container 'docker.io/psuszynski/r-ver:4.4.2.5'
 
     input:
     tuple val(phenotype), path(regenie_merged)
