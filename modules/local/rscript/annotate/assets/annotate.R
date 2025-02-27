@@ -85,7 +85,7 @@ out_csq_file <- paste0(tmp_dir, "csq_split.tsv")
 fwrite(dd2, csq_file, sep="\t", col.names=F, quote=F)
 cmd <- paste0("cat ", csq_file, " | awk '{split($0,a,\"|\"); print a[2],a[3],a[4]}' > ", out_csq_file)
 system(cmd)
-dd3 <- fread(out_csq_file, fill=T, header=F)
+dd3 <- fread(out_csq_file, fill=3, header=F)
 setnames(dd3, c("Consequence", "Impact", "Symbol"))
 dd[,Consequence:=dd3$Consequence]
 dd[,Impact:=dd3$Impact]

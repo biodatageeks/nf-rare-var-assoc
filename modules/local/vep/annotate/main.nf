@@ -62,9 +62,12 @@ process VEP_ANNOTATE {
     // TODO nf-core: Please replace the example samtools command below with your module's command
     // TODO nf-core: Please indent the command appropriately (4 spaces!!) to help with readability ;)
     """
+    (if [[ "${input_vcf}" =~ \\.gz\$ ]]; then zcat ${input_vcf}; else cat ${input_vcf}; fi) | \\
+        sed -E 's/22:([0-9]{8}):([ATCG]+):([ATCG]+)/chr22_\\1_\\2_\\3/g' > ${prefix}_with_underscores.vcf
+
     vep \\
         --dir ${vep_cache}/.. \\
-        -i ${input_vcf} \\
+        -i ${prefix}_with_underscores.vcf \\
         -o ${prefix}_vep.vcf.gz \\
         --fork ${task.cpus} \\
         --species $species \\

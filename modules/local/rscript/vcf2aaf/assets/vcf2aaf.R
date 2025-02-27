@@ -39,5 +39,6 @@ pos_col <- paste(chrom_num_col, vars$POS, vars$REF, vars$ALT, sep="_")
 af_col <- stringr::str_extract(vars$INFO, regex(paste0(default_tag_name, "=([\\.0-9]+)"), ignore_case = T), group = 1)
 af_nfe_col <- stringr::str_extract(vars$INFO, regex(paste0(tag_name, "=([\\.0-9]+)"), ignore_case = T), group = 1)
 
+# should we do: coalesce(na_if(af_nfe_col, "0"), af_col, "0") ?
 aafs <- data.table(pos=pos_col, af=coalesce(af_nfe_col, af_col, "0"))
 fwrite(aafs, out_aaf_path, sep="\t", col.names=F, quote=F)
