@@ -239,6 +239,48 @@
                     "fa_icon": "fas fa-pen-line",
                     "hidden": false
                 },
+                "py_script_csv_concat_path": {
+                    "type": "string",
+                    "description": "Path to csv_concat.py script.",
+                    "default": "${projectDir}/modules/local/merge_results/assets/csv_concat.py",
+                    "fa_icon": "fas fa-code",
+                    "hidden": false
+                },
+                "project_date": {
+                    "type": "string",
+                    "description": "project date",
+                    "default": "`date`",
+                    "fa_icon": "fas fa-calendar",
+                    "hidden": false
+                },
+                "phenotypes_apply_rint": {
+                    "type": "boolean",
+                    "description": "phenotypes_apply_rint",
+                    "default": "false",
+                    "fa_icon": "fas fa-check",
+                    "hidden": false
+                },
+                "manhattan_annotation_enabled": {
+                    "type": "boolean",
+                    "description": "manhattan_annotation_enabled",
+                    "default": "true",
+                    "fa_icon": "fas fa-check",
+                    "hidden": false
+                },
+                "plot_ylimit": {
+                    "type": "integer",
+                    "description": "plot_ylimit",
+                    "default": "0",
+                    "fa_icon": "fas fa-chart-simple",
+                    "hidden": false
+                },
+                "annotation_min_log10p": {
+                    "type": "number",
+                    "description": "annotation_min_log10p",
+                    "default": "1",
+                    "fa_icon": "fas fa-plus-minus",
+                    "hidden": false
+                },
                 "max_multiqc_email_size": {
                     "type": "string",
                     "description": "File size limit when attaching MultiQC reports to summary emails.",

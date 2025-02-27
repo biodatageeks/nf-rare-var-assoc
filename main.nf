@@ -13,9 +13,9 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { RARE_VAR_ASSOC_NF  } from './workflows/rare-var-assoc-nf'
-include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_rare-var-assoc-nf_pipeline'
-include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_rare-var-assoc-nf_pipeline'
+include { RARE_VAR_ASSOC          } from './workflows/rare-var-assoc'
+include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_rare-var-assoc_pipeline'
+include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_rare-var-assoc_pipeline'
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     NAMED WORKFLOWS FOR PIPELINE
@@ -25,7 +25,7 @@ include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_rare
 //
 // WORKFLOW: Run main analysis pipeline depending on type of input
 //
-workflow PSUSZYNS_RARE_VAR_ASSOC_NF {
+workflow PSUSZYNS_RARE_VAR_ASSOC {
 
     take:
     input_vcf // channel: samplesheet read in from --input
@@ -37,13 +37,13 @@ workflow PSUSZYNS_RARE_VAR_ASSOC_NF {
     //
     // WORKFLOW: Run pipeline
     //
-    RARE_VAR_ASSOC_NF (
+    RARE_VAR_ASSOC (
         input_vcf,
         input_controls,
         input_cases
     )
     emit:
-    multiqc_report = RARE_VAR_ASSOC_NF.out.multiqc_report // channel: /path/to/multiqc_report.html
+    multiqc_report = RARE_VAR_ASSOC.out.multiqc_report // channel: /path/to/multiqc_report.html
 }
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -71,7 +71,7 @@ workflow {
     //
     // WORKFLOW: Run main workflow
     //
-    PSUSZYNS_RARE_VAR_ASSOC_NF (
+    PSUSZYNS_RARE_VAR_ASSOC (
         PIPELINE_INITIALISATION.out.input_vcf,
         PIPELINE_INITIALISATION.out.input_controls,
         PIPELINE_INITIALISATION.out.input_cases
@@ -82,7 +82,7 @@ workflow {
     PIPELINE_COMPLETION (
         params.outdir,
         params.monochrome_logs,
-        PSUSZYNS_RARE_VAR_ASSOC_NF.out.multiqc_report
+        PSUSZYNS_RARE_VAR_ASSOC.out.multiqc_report
     )
 }
 

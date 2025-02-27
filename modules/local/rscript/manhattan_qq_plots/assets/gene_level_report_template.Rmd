@@ -1,13 +1,3 @@
-# Copied from: https://github.com/genepi/nf-gwas/blob/main/reports/gene_level_report_template.Rmd
-# Original authors:
-#    Sebastian Schönherr
-#    Lukas Forer
-#    Johanna Schachtl-Riess
-#    Silvia Di Maio
-#
-# Modified by:
-#    Piotr Suszyński
-
 ---
 title: "Report: `r params$project`"
 output:
@@ -25,8 +15,6 @@ params:
   regenie_out: ../../../../../results/regenie_step2/pims_step2_Y1.regenie
   regenie_filename: pims_step2_Y1.regenie.all.gz
   phenotype: Y1
-  covariates:
-  condition_list:
   phenotype_file: ../../../../../results/rscript_annotate/pims_phenotype.txt
   plot_ylimit: 0
   mask_file: ../../../../../results/rscript_annotate/pims.masks
@@ -35,6 +23,18 @@ params:
   r_functions: ./functions.R
   rmd_pheno_stats: ./child_phenostatistics.Rmd
 ---
+
+<!--
+Copied from: https://github.com/genepi/nf-gwas/blob/main/reports/gene_level_report_template.Rmd
+ Original authors:
+    Sebastian Schönherr
+    Lukas Forer
+    Johanna Schachtl-Riess
+    Silvia Di Maio
+
+ Modified by:
+    Piotr Suszyński
+-->
 
 ```{r setup, include=FALSE}
 library(DT)
@@ -58,8 +58,6 @@ source(params$r_functions)
 | Date             | `r params$date`             |
 | Phenotype File   | `r params$phenotype_file`   |
 | Phenotype        | `r params$phenotype`        |
-| Covariates       | `r params$covariates`       |
-| Condition list   | `r params$condition_list`   |
 | Mask File        | `r params$mask_file`        |
 | Regenie Output   | `r params$regenie_filename` |
 

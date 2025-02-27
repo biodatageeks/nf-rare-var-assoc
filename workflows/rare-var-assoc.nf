@@ -23,7 +23,7 @@ include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { REPORTING              } from '../subworkflows/local/reporting'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
-include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_rare-var-assoc-nf_pipeline'
+include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_rare-var-assoc_pipeline'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -31,7 +31,7 @@ include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_rare
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-workflow RARE_VAR_ASSOC_NF {
+workflow RARE_VAR_ASSOC {
 
     take:
     ch_vcf // channel: vcf read in from --input
@@ -205,20 +205,22 @@ workflow RARE_VAR_ASSOC_NF {
     ch_annotated_snps_with_sample_ids  = RSCRIPT_BUILDREPORTS.out.annotated_snps_with_sample_ids
     ch_versions = ch_versions.mix(RSCRIPT_BUILDREPORTS.out.versions.first())
 
-    REGENIE_STEP2.out.regenie_out
+    ch_regenie_step2_regenie_out.map { t -> [t[0].id, t[1]] }
         .transpose()
-        .map { prefix, fl -> tuple(RegenieUtil.getPhenotype(prefix, fl), fl) }
+        .map { prefix, fl -> tuple(RegenieUtil.getPhenotypeByChunk(prefix, fl), fl) }
         .set { ch_regenie_step2_by_phenotype }
 
+    py_script_csv_concat_ch = Channel.fromPath(params.py_script_csv_concat_path, checkIfExists: true)
     MERGE_RESULTS (
+        py_script_csv_concat_ch,
         ch_regenie_step2_by_phenotype.groupTuple()
     )
     ch_results_merged = MERGE_RESULTS.out.results_merged
 
     REPORTING (
         ch_results_merged,
-        ch_phenotype,
-        ch_masks
+        ch_masks,
+        ch_phenotype
     )
 
 

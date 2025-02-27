@@ -5,6 +5,7 @@ channels:
   - bioconda
 dependencies:
   - "bioconda::conda-forge::r-base=4.4.2"
+  - conda-forge::pandoc=3.6.3
   - r-rmarkdown=2.16
   - r-ggplot2=3.3.6
   - r-dplyr=1.1.0

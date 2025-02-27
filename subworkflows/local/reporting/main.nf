@@ -4,8 +4,8 @@ workflow REPORTING {
 
     take:
     results_merged
-    phenotypes_file
     masks_file
+    phenotype_file
 
     main:
     gwas_report_template = file("$baseDir/modules/local/rscript/manhattan_qq_plots/assets/gene_level_report_template.Rmd", checkIfExists: true)
@@ -19,10 +19,10 @@ workflow REPORTING {
 
     RSCRIPT_MANHATTAN_QQ_PLOTS (
         results_merged,
-        phenotypes_file,
         gwas_report_template,
         r_functions_file,
         masks_file,
+        phenotype_file,
         rmd_pheno_stats_file
     )
 }

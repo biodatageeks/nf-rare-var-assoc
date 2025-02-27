@@ -140,7 +140,7 @@ nextflow_process {
                 """
                 input[0] = file('${projectDir}/modules/local/rscript/buildreports/assets/build_reports.R', checkIfExists: true)
                 input[1] = REGENIE_STEP2.out.masks_snplist
-                input[2] = REGENIE_STEP2.out.y1_regenie
+                input[2] = REGENIE_STEP2.out.regenie_out
                 input[3] = [
                     [ id:'test', single_end:false ], // meta map
                     file('${projectDir}/assets/medium_data/1000g_lpa_hg38_vep.vcf', checkIfExists: true)

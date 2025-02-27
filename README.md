@@ -60,7 +60,7 @@ nextflow run psuszyns/rare-var-assoc-nf -profile docker \
 ### Run with test profile
 
 ```bash
-nextflow run . -profile podman,test --outdir out1
+nextflow run . -profile podman,test --outdir results
 ```
 
 ### Run nf-test

@@ -2,7 +2,7 @@ process MERGE_RESULTS {
     label 'process_single'
 
     conda "${moduleDir}/environment.yml"
-    container 'docker.io/psuszynski/r-ver:4.4.2.5'
+    container 'docker.io/psuszynski/r-ver:4.4.2.8'
 
     input:
     path(csv_concat_py_script)
