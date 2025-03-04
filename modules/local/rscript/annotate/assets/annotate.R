@@ -36,9 +36,6 @@ if (length(args)<=8) {
   stop("Provide the path to the output annotations file", call.=FALSE)
 }
 if (length(args)<=9) {
-  stop("Provide the path to the output masks file", call.=FALSE)
-}
-if (length(args)<=10) {
   stop("Provide the path to the output setlist file", call.=FALSE)
 }
 
@@ -52,8 +49,7 @@ r_out_fam_path <- args[6]
 r_out_sample_path <- args[7]
 r_out_phenotype_path <- args[8]
 r_out_annotations_path <- args[9]
-r_out_masks_path <- args[10]
-r_out_setlist_path <- args[11]
+r_out_setlist_path <- args[10]
 
 filter_annotations_threshold <- 50
 if (length(args) > 11) {
@@ -99,15 +95,6 @@ dd[,key := paste0(CHROM, '_', POS, '_', REF,  '_',ALT )]
 dd_final <- dd[,c("key","Symbol", "Consequence"),with=F]
 anno_file <- r_out_annotations_path
 fwrite(dd_final, anno_file, sep="\t", col.names=F, quote=F )
-
-masks_file <- r_out_masks_path
-# masks <- data.table(mask="Mask1", csq="missense_variant")
-masks <- data.table(mask=c("Mask_High", "Mask_Mod", "Mask_HighMod"), csq=c(
-    "stop_gained,stop_lost,start_lost,stop_gained&splice_region_variant,stop_gained&frameshift_variant,stop_gained&NMD_transcript_variant,frameshift_variant,frameshift_variant&NMD_transcript_variant,frameshift_variant&splice_region_variant,splice_donor_variant,splice_acceptor_variant,splice_donor_variant&NMD_transcript_variant,splice_donor_variant&splice_donor_region_variant&intron_variant,splice_acceptor_variant&non_coding_transcript_variant,splice_donor_variant&non_coding_transcript_variant",
-    "missense_variant,missense_variant&splice_region_variant,missense_variant&splice_region_variant&NMD_transcript_variant,missense_variant&NMD_transcript_variant,inframe_insertion,inframe_deletion,inframe_deletion&splice_region_variant",
-    "stop_gained,stop_lost,start_lost,stop_gained&splice_region_variant,stop_gained&frameshift_variant,stop_gained&NMD_transcript_variant,frameshift_variant,frameshift_variant&NMD_transcript_variant,frameshift_variant&splice_region_variant,splice_donor_variant,splice_acceptor_variant,splice_donor_variant&NMD_transcript_variant,splice_donor_variant&splice_donor_region_variant&intron_variant,splice_acceptor_variant&non_coding_transcript_variant,splice_donor_variant&non_coding_transcript_variant,missense_variant,missense_variant&splice_region_variant,missense_variant&splice_region_variant&NMD_transcript_variant,missense_variant&NMD_transcript_variant,inframe_insertion,inframe_deletion,inframe_deletion&splice_region_variant"
-))
-fwrite(masks , masks_file, sep="\t", col.names=F, quote=F )
 
 
 unique_genes <- sort(unique(dd_final$Symbol))

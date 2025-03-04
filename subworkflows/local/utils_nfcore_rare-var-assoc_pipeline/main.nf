@@ -91,21 +91,21 @@ workflow PIPELINE_INITIALISATION {
 
     Channel.fromPath(params.input_vcf, checkIfExists: true)
         .map { files ->
-            tuple( [id: 'pims'], files ) // Add meta component
+            tuple( [id: params.project_name], files ) // Add meta component
         }
         .set { ch_input_vcf }
 
 
     Channel.fromPath(params.input_controls, checkIfExists: true)
         .map { files ->
-            tuple( [id: 'pims'], files ) // Add meta component
+            tuple( [id: params.project_name], files ) // Add meta component
         }
         .set { ch_input_controls }
 
 
     Channel.fromPath(params.input_cases, checkIfExists: true)
         .map { files ->
-            tuple( [id: 'pims'], files ) // Add meta component
+            tuple( [id: params.project_name], files ) // Add meta component
         }
         .set { ch_input_cases }
 

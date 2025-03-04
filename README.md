@@ -54,7 +54,8 @@ nextflow run psuszyns/rare-var-assoc-nf -profile docker \
     --input_vcf /mnt/zgmvol/_forge/psuszynski/nf_input_data/pims.vcf \
     --input_controls /mnt/zgmvol/_forge/psuszynski/nf_input_data/kontr \
     --input_cases /mnt/zgmvol/_forge/psuszynski/nf_input_data/tes \
-    --outdir /mnt/zgmvol/_forge/psuszynski/nf_results_run_1
+    --outdir /mnt/zgmvol/_forge/psuszynski/nf_results_run_1 \
+    --project_name 'pims'
 ```
 
 ### Run with test profile

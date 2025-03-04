@@ -37,6 +37,19 @@
                     "description": "Path to the cases file.",
                     "fa_icon": "fas fa-briefcase-medical"
                 },
+                "input_masks": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/tab-separated-values",
+                    "description": "Path to the masks file.",
+                    "fa_icon": "fas fa-briefcase-medical"
+                },
+                "project_name": {
+                    "type": "string",
+                    "description": "Project name.",
+                    "fa_icon": "fas fa-file-signature"
+                },
                 "outdir": {
                     "type": "string",
                     "format": "directory-path",

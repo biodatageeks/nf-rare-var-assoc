@@ -126,7 +126,7 @@ nextflow_process {
                     input[2] = RSCRIPT_ANNOTATE.out.phenotype
                     input[3] = RSCRIPT_ANNOTATE.out.annotations
                     input[4] = RSCRIPT_ANNOTATE.out.setlist
-                    input[5] = RSCRIPT_ANNOTATE.out.masks
+                    input[5] = file("${projectDir}/assets/default.masks", checkIfExists: true)
                     input[6] = RSCRIPT_VCFTOAAF.out.aaf
                     input[7] = REGENIE_STEP1.out.pred_list
                     input[8] = '--bt --ref-first --firth --approx --bsize 200 --lowmem --aaf-bins 0.01,0.05,0.1,1 --write-mask --write-mask-snplist --vc-tests skato'

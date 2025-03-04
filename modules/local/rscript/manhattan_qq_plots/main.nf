@@ -30,7 +30,7 @@ process RSCRIPT_MANHATTAN_QQ_PLOTS {
     """
     Rscript -e "require( 'rmarkdown' ); render('${gwas_report_template}', \\
         params = list( \\
-          project = '${meta.id}', \\
+          project = '${params.project_name}', \\
           date = '${params.project_date}', \\
           version = '${workflow.manifest.version}', \\
           regenie_out='${regenie_merged}', \\

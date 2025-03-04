@@ -43,6 +43,7 @@ workflow RARE_VAR_ASSOC {
     ch_versions = Channel.empty()
     ch_multiqc_files = Channel.empty()
     ch_vep_cachedir = Channel.fromPath("${projectDir}/../vep_cachedir", checkIfExists: true)
+    ch_masks = Channel.fromPath(params.input_masks, checkIfExists: true)
 
 
     VEP_UPDATECACHE (
@@ -140,7 +141,6 @@ workflow RARE_VAR_ASSOC {
     ch_r_out_sample  = RSCRIPT_ANNOTATE.out.out_sample
     ch_phenotype  = RSCRIPT_ANNOTATE.out.phenotype
     ch_annotations  = RSCRIPT_ANNOTATE.out.annotations
-    ch_masks  = RSCRIPT_ANNOTATE.out.masks
     ch_setlist  = RSCRIPT_ANNOTATE.out.setlist
     ch_versions = ch_versions.mix(RSCRIPT_ANNOTATE.out.versions.first())
 

@@ -44,7 +44,8 @@ process PLINK2_WRITE_SNPLIST {
     output:
     // TODO nf-core: Named file extensions MUST be emitted for ALL output channels
     tuple val(meta), path("*.snplist"), emit: snplist
-    tuple val(meta), path("*.id"), emit: id, optional: true
+    tuple val(meta), path("*${out_name_part}.id"), emit: id, optional: true
+    tuple val(meta), path("*${out_name_part}.mindrem.id"), emit: mindremid, optional: true
     tuple val(meta), path("*.log"), emit: log
     path "versions.yml"           , emit: versions
 

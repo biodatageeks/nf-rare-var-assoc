@@ -49,7 +49,6 @@ process RSCRIPT_ANNOTATE {
     // TODO nf-core: Named file extensions MUST be emitted for ALL output channels
     tuple val(meta), path("*_phenotype.txt"), emit: phenotype
     tuple val(meta), path("*.annotations"), emit: annotations
-    tuple val(meta), path("*.masks"), emit: masks
     tuple val(meta), path("*.setlist"), emit: setlist
     tuple val(meta), path("*_r_out.fam"), emit: out_fam
     tuple val(meta), path("*_r_out.sample"), emit: out_sample
@@ -83,7 +82,6 @@ process RSCRIPT_ANNOTATE {
         ${prefix}_r_out.sample \\
         ${prefix}_phenotype.txt \\
         ${prefix}.annotations \\
-        ${prefix}.masks \\
         ${prefix}.setlist \\
         $input_args
 
