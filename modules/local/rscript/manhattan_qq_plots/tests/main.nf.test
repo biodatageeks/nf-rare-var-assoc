@@ -27,10 +27,7 @@ nextflow_process {
                 ]
                 input[1] = file("${projectDir}/modules/local/rscript/manhattan_qq_plots/assets/gene_level_report_template.Rmd", checkIfExists: true)
                 input[2] = file("${projectDir}/modules/local/rscript/manhattan_qq_plots/assets/functions.R", checkIfExists: true)
-                input[3] = [
-                    [ id:'test', single_end:false ], // meta map
-                    file('${projectDir}/modules/local/rscript/manhattan_qq_plots/tests/assets/masks.txt', checkIfExists: true)
-                ]
+                input[3] = file('${projectDir}/modules/local/rscript/manhattan_qq_plots/tests/assets/masks.txt', checkIfExists: true)
                 input[4] = [
                     [ id:'test', single_end:false ], // meta map
                     file('${projectDir}/modules/local/rscript/manhattan_qq_plots/tests/assets/phenotype.txt', checkIfExists: true)

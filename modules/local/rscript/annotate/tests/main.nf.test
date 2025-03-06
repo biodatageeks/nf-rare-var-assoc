@@ -25,7 +25,7 @@ nextflow_process {
                     """
                     input[0] = [
                         [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/medium_data/1000g_lpa_hg38_vep.vcf', checkIfExists: true)
+                        file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true)
                     ]
                     """
                 }
@@ -59,7 +59,7 @@ nextflow_process {
                 input[0] = file('${projectDir}/modules/local/rscript/annotate/assets/annotate.R', checkIfExists: true)
                 input[1] = [
                     [ id:'test', single_end:false ], // meta map
-                    file('${projectDir}/assets/medium_data/1000g_lpa_hg38_vep.vcf', checkIfExists: true)
+                    file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true)
                 ]
                 input[2] = PLINK19_MAKEBED.out.bed
                 input[3] = PLINK19_MAKEBED.out.bim
@@ -69,11 +69,11 @@ nextflow_process {
                 input[7] = PLINK2_EXPORT_BGEN.out.sample
                 input[8] = [
                     [ id:'test', single_end:false ], // meta map
-                    file('${projectDir}/assets/medium_data/controls.txt', checkIfExists: true)
+                    file('${projectDir}/assets/medium_data/1kGP_controls.txt', checkIfExists: true)
                 ]
                 input[9] = [
                     [ id:'test', single_end:false ], // meta map
-                    file('${projectDir}/assets/medium_data/cases.txt', checkIfExists: true)
+                    file('${projectDir}/assets/medium_data/1kGP_cases.txt', checkIfExists: true)
                 ]
                 input[10] = '5'
                 """
@@ -89,6 +89,105 @@ nextflow_process {
             )
         }
 
+    }
+
+    test("minimal dataset") {
+        setup {
+            // Run the required setup processes
+            run("PLINK19_MAKEBED") {
+                script "../../../plink19/makebed/main.nf"
+                process {
+                    """
+                    input[0] = [
+                        [ id:'test', single_end:false ],
+                        file('${projectDir}/assets/small_data/minimal.vcf', checkIfExists: true)
+                    ]
+                    """
+                }
+            }
+
+            run("PLINK2_EXPORT_BGEN") {
+                script "../../../plink2/export_bgen/main.nf"
+                process {
+                    """
+                    input[0] = PLINK19_MAKEBED.out.bed
+                    input[1] = PLINK19_MAKEBED.out.bim
+                    input[2] = PLINK19_MAKEBED.out.fam
+                    input[3] = 'pvcf.norm_zlib'
+                    input[4] = '--1 --export bgen-1.2 bits=8 id-paste=iid ref-first'
+                    """
+                }
+            }
+
+            run("BGENIX") {
+                script "../../../bgenix/main.nf"
+                process {
+                    """
+                    input[0] = PLINK2_EXPORT_BGEN.out.bgen
+                    input[1] = '-clobber'
+                    """
+                }
+            }
+        }
+
+        when {
+            process {
+                """
+                input[0] = file('${projectDir}/modules/local/rscript/annotate/assets/annotate.R')
+                input[1] = [ [ id:'test' ], file('${projectDir}/assets/small_data/minimal.vcf', checkIfExists: true) ]
+                input[2] = PLINK19_MAKEBED.out.bed
+                input[3] = PLINK19_MAKEBED.out.bim
+                input[4] = PLINK19_MAKEBED.out.fam
+                input[5] = PLINK2_EXPORT_BGEN.out.bgen
+                input[6] = BGENIX.out.bgen_bgi
+                input[7] = PLINK2_EXPORT_BGEN.out.sample
+                input[8] = [ [ id:'test' ], file('${projectDir}/assets/small_data/minimal_controls.txt', checkIfExists: true) ]
+                input[9] = [ [ id:'test' ], file('${projectDir}/assets/small_data/minimal_cases.txt', checkIfExists: true) ]
+                input[10] = '1 True'
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                {
+
+                    def annotations = path(process.out.annotations.get(0).get(1)).readLines()
+                    // missense_variant appears twice - should be preserved
+                    assert annotations[0] == "1_1000_A_G\tGENE1\tmissense_variant"
+                    assert annotations[1] == "1_1001_A_G\tGENE2\tmissense_variant"
+                    // regulatory_region_variant appears once - should be NULL
+                    assert annotations[2] == "1_2000_C_T\tREG_ENSR00001234567\tNULL"
+                    // intergenic_variant appears three times - should be preserved
+                    assert annotations[3] == "1_3000_G_A\tINT_1_3000_d1\tintergenic_variant"
+                    assert annotations[4] == "1_3001_G_A\tINT_1_3001_d1\tintergenic_variant"
+                    assert annotations[5] == "1_3002_G_A\tINT_1_3002_d1\tintergenic_variant"
+                    // enhancer_variant appears once - should be NULL
+                    assert annotations[6] == "1_4000_T_C\tREG_ENSR00002345678\tNULL"
+                    // TF_binding_site_variant appears twice - should be preserved
+                    assert annotations[7] == "1_5000_A_T\tREG_ENSR00003456789\tTF_binding_site_variant"
+                    assert annotations[8] == "1_5001_A_T\tREG_ENSR00003456790\tTF_binding_site_variant"
+
+                    //def annotations = path(process.out.annotations.get(0).get(1)).readLines()
+                    // missense_variant appears twice - should be preserved
+                    //assert annotations[0] == "1_1000_A_G\tGENE1\tmissense_variant\tTranscript\tgenic\tMODERATE"
+                    //assert annotations[1] == "1_1001_A_G\tGENE2\tmissense_variant\tTranscript\tgenic\tMODERATE"
+                    // regulatory_region_variant appears once - should be NULL
+                    //assert annotations[2] == "1_2000_C_T\tREG_ENSR00001234567\tNULL\tRegulatoryFeature\tregulatory\tLOW"
+                    // intergenic_variant appears three times - should be preserved
+                    //assert annotations[3] == "1_3000_G_A\tINT__3000_d1\tintergenic_variant\t\tintergenic\tMODIFIER"
+                    //assert annotations[4] == "1_3001_G_A\tINT__3001_d1\tintergenic_variant\t\tintergenic\tMODIFIER"
+                    //assert annotations[5] == "1_3002_G_A\tINT__3002_d1\tintergenic_variant\t\tintergenic\tMODIFIER"
+                    // enhancer_variant appears once - should be NULL
+                    //assert annotations[6] == "1_4000_T_C\tREG_ENSR00002345678\tNULL\tRegulatoryFeature\tregulatory\tLOW"
+                    // TF_binding_site_variant appears twice - should be preserved
+                    //assert annotations[7] == "1_5000_A_T\tREG_ENSR00003456789\tTF_binding_site_variant\tRegulatoryFeature\tregulatory\tMODERATE"
+                    //assert annotations[8] == "1_5001_A_T\tREG_ENSR00003456790\tTF_binding_site_variant\tRegulatoryFeature\tregulatory\tMODERATE"
+                },
+                { assert path(process.out.phenotype.get(0).get(1)).readLines().size() == 4 }
+            )
+        }
     }
 
 }

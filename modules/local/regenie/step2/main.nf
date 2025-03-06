@@ -38,7 +38,7 @@ process REGENIE_STEP2 {
     tuple val(meta), path(phenotype)
     tuple val(meta), path(annotations)
     tuple val(meta), path(setlist)
-    tuple val(meta), path(masks)
+    path(masks)
     tuple val(meta), path(aaf)
     tuple val(meta), path(step1_pred_list)
     val(input_args)

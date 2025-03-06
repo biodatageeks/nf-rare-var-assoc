@@ -1,0 +1,15 @@
+##fileformat=VCFv4.2
+##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
+##INFO=<ID=CSQ,Number=.,Type=String,Description="Consequence annotations from Ensembl VEP. Format: Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|Existing_variation|DISTANCE|STRAND|FLAGS|SYMBOL_SOURCE|HGNC_ID|REGULATORY_FEATURE_ID|CANONICAL|MANE">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	sample1	sample2	sample3
+1	1000	.	A	G	100	PASS	AF=0.5;CSQ=G|missense_variant|MODERATE|GENE1|ENSG00000123456|Transcript|ENST00000123456|protein_coding|1/5||||||||||rs1234|||||||||YES|	GT:GQ	0/1:99	1/1:99	0/0:99
+1	1001	.	A	G	100	PASS	AF=0.5;CSQ=G|missense_variant|MODERATE|GENE2|ENSG00000123457|Transcript|ENST00000123457|protein_coding|1/5||||||||||rs1235|||||||||YES|	GT:GQ	0/1:99	1/1:99	0/0:99
+1	2000	.	C	T	100	PASS	AF=0.3;CSQ=T|regulatory_region_variant|LOW||||ENSR00001234567|promoter||||||||||||||||||ENSR00001234567||	GT:GQ	0/0:99	0/1:99	1/1:99
+1	3000	.	G	A	100	PASS	AF=0.4;CSQ=A|intergenic_variant|MODIFIER||||||||||||||||||5000|||||||||	GT:GQ	1/1:99	0/1:99	0/0:99
+1	3001	.	G	A	100	PASS	AF=0.4;CSQ=A|intergenic_variant|MODIFIER||||||||||||||||||5001|||||||||	GT:GQ	1/1:99	0/1:99	0/0:99
+1	3002	.	G	A	100	PASS	AF=0.4;CSQ=A|intergenic_variant|MODIFIER||||||||||||||||||5002|||||||||	GT:GQ	1/1:99	0/1:99	0/0:99
+1	4000	.	T	C	100	PASS	AF=0.2;CSQ=C|enhancer_variant|LOW||||ENSR00002345678|enhancer||||||||||||||||||ENSR00002345678||	GT:GQ	0/1:99	0/0:99	1/1:99
+1	5000	.	A	T	100	PASS	AF=0.6;CSQ=T|TF_binding_site_variant|MODERATE||||ENSR00003456789|TF_binding_site||||||||||||||||||ENSR00003456789||	GT:GQ	0/0:99	1/1:99	0/1:99
+1	5001	.	A	T	100	PASS	AF=0.6;CSQ=T|TF_binding_site_variant|MODERATE||||ENSR00003456790|TF_binding_site||||||||||||||||||ENSR00003456790||	GT:GQ	0/0:99	1/1:99	0/1:99

@@ -25,7 +25,7 @@ nextflow_process {
                     """
                     input[0] = [
                         [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/medium_data/1000g_lpa_hg38_vep.vcf', checkIfExists: true)
+                        file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true)
                     ]
                     """
                 }
@@ -70,7 +70,7 @@ nextflow_process {
                     input[0] = file('${projectDir}/modules/local/rscript/annotate/assets/annotate.R', checkIfExists: true)
                     input[1] = [
                         [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/medium_data/1000g_lpa_hg38_vep.vcf', checkIfExists: true)
+                        file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true)
                     ]
                     input[2] = PLINK19_MAKEBED.out.bed
                     input[3] = PLINK19_MAKEBED.out.bim
@@ -80,11 +80,11 @@ nextflow_process {
                     input[7] = PLINK2_EXPORT_BGEN.out.sample
                     input[8] = [
                         [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/medium_data/controls.txt', checkIfExists: true)
+                        file('${projectDir}/assets/medium_data/1kGP_controls.txt', checkIfExists: true)
                     ]
                     input[9] = [
                         [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/medium_data/cases.txt', checkIfExists: true)
+                        file('${projectDir}/assets/medium_data/1kGP_cases.txt', checkIfExists: true)
                     ]
                     input[10] = '5'
                     """
@@ -97,9 +97,9 @@ nextflow_process {
                     input[0] = file('${projectDir}/modules/local/rscript/vcf2aaf/assets/vcf2aaf.R', checkIfExists: true)
                     input[1] = [
                         [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/medium_data/1000g_lpa_hg38_vep.vcf', checkIfExists: true)
+                        file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true)
                     ]
-                    input[2] = 'GNOMADAF swegenAF'
+                    input[2] = 'AF_EUR AF'
                     """
                 }
             }
@@ -143,7 +143,7 @@ nextflow_process {
                 input[2] = REGENIE_STEP2.out.regenie_out
                 input[3] = [
                     [ id:'test', single_end:false ], // meta map
-                    file('${projectDir}/assets/medium_data/1000g_lpa_hg38_vep.vcf', checkIfExists: true)
+                    file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true)
                 ]
                 input[4] = RSCRIPT_ANNOTATE.out.phenotype
                 input[5] = RSCRIPT_ANNOTATE.out.annotations

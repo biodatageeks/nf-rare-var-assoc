@@ -10,7 +10,7 @@ process RSCRIPT_MANHATTAN_QQ_PLOTS {
     tuple val(phenotype), path(regenie_merged)
     path(gwas_report_template)
     path(r_functions_file)
-    tuple val(meta), path(mask_file)
+    path(mask_file)
     tuple val(meta), path(phenotype_file)
     path(rmd_pheno_stats_file)
 

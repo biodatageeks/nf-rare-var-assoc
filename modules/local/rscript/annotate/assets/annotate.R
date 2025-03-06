@@ -1,47 +1,22 @@
-# required.packages <- c("data.table", "R.utils")
-# new.packages <- required.packages[!(required.packages %in% installed.packages()[,"Package"])]
-# if(length(new.packages)) install.packages(new.packages)
-
-
 library("data.table")
-library("R.utils")
+library("dplyr")
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args)<=0) {
-  stop("Provide the path to the input fam file", call.=FALSE)
-}
-if (length(args)<=1) {
-  stop("Provide the path to the input controls file", call.=FALSE)
-}
-if (length(args)<=2) {
-  stop("Provide the path to the input cases file", call.=FALSE)
-}
-if (length(args)<=3) {
-  stop("Provide the path to the input vcf file", call.=FALSE)
-}
-if (length(args)<=4) {
-  stop("Provide the path to the input sample file", call.=FALSE)
-}
-if (length(args)<=5) {
-  stop("Provide the path to the output fam file", call.=FALSE)
-}
-if (length(args)<=6) {
-  stop("Provide the path to the output sample file", call.=FALSE)
-}
-if (length(args)<=7) {
-  stop("Provide the path to the output phenotype file", call.=FALSE)
-}
-if (length(args)<=8) {
-  stop("Provide the path to the output annotations file", call.=FALSE)
-}
-if (length(args)<=9) {
-  stop("Provide the path to the output setlist file", call.=FALSE)
-}
+if (length(args) <= 0) stop("Provide the path to the input fam file", call.=FALSE)
+if (length(args) <= 1) stop("Provide the path to the input controls file", call.=FALSE)
+if (length(args) <= 2) stop("Provide the path to the input cases file", call.=FALSE)
+if (length(args) <= 3) stop("Provide the path to the input vcf file", call.=FALSE)
+if (length(args) <= 4) stop("Provide the path to the input sample file", call.=FALSE)
+if (length(args) <= 5) stop("Provide the path to the output fam file", call.=FALSE)
+if (length(args) <= 6) stop("Provide the path to the output sample file", call.=FALSE)
+if (length(args) <= 7) stop("Provide the path to the output phenotype file", call.=FALSE)
+if (length(args) <= 8) stop("Provide the path to the output annotations file", call.=FALSE)
+if (length(args) <= 9) stop("Provide the path to the output setlist file", call.=FALSE)
 
 r_in_fam_path <- args[1]
-r_in_controls_path = args[2]
-r_in_cases_path = args[3]
+r_in_controls_path <- args[2]
+r_in_cases_path <- args[3]
 r_in_vcf_path <- args[4]
 r_in_sample_path <- args[5]
 
@@ -52,16 +27,14 @@ r_out_annotations_path <- args[9]
 r_out_setlist_path <- args[10]
 
 filter_annotations_threshold <- 50
-if (length(args) > 11) {
-  filter_annotations_threshold <- as.numeric(args[12])
-}
+include_intergenic <- FALSE  # Default to excluding intergenic variants
+if (length(args) > 10) filter_annotations_threshold <- as.numeric(args[11])
+if (length(args) > 11) include_intergenic <- as.logical(args[12])
+
 cat(paste0("filter_annotations_threshold = ", filter_annotations_threshold, "\n"))
+cat(paste0("include_intergenic = ", include_intergenic, "\n"))
 
-
-tmp_dir = "./"
-
-study_name <- "pims"
-
+# Process fam and phenotype files
 fam <- fread(r_in_fam_path, header=F)
 controls <- fread(r_in_controls_path, header=F)
 cases <- fread(r_in_cases_path, header=F)
@@ -72,87 +45,121 @@ pheno <- fam[,c(1:2, 6)]
 colnames(pheno) <- c("FID", "IID", "Y1")
 fwrite(pheno, r_out_phenotype_path, sep="\t", quote=F, col.names=T)
 
-
+# Process VCF
 dd <- fread(r_in_vcf_path, skip="#CHROM")
 dd[, c("A", "CSQ") := tstrsplit(INFO, "CSQ=", fixed=TRUE)]
 dd2 <- dd[,"CSQ",with=F]
-csq_file <- paste0(tmp_dir, "csq.tsv")
-out_csq_file <- paste0(tmp_dir, "csq_split.tsv")
-fwrite(dd2, csq_file, sep="\t", col.names=F, quote=F)
-cmd <- paste0("cat ", csq_file, " | awk '{split($0,a,\"|\"); print a[2],a[3],a[4]}' > ", out_csq_file)
-system(cmd)
-dd3 <- fread(out_csq_file, fill=3, header=F)
-setnames(dd3, c("Consequence", "Impact", "Symbol"))
-dd[,Consequence:=dd3$Consequence]
-dd[,Impact:=dd3$Impact]
-dd[,Symbol:=dd3$Symbol]
+
+get_csq_format <- function(vcf_path) {
+    header <- fread(vcf_path, skip=0, nrows=4000, header=F, sep="\n", colClasses="character")[[1]]
+    csq_line <- header[grep("##INFO=<ID=CSQ", header, fixed=TRUE)]
+    if (length(csq_line) == 0) stop("No CSQ format found in VCF header")
+    
+    # Extract field names
+    csq_fields <- strsplit(sub(".*Format: ", "", sub("\">$", "", csq_line)), "\\|")[[1]]
+    
+    required_fields <- c("Consequence", "SYMBOL", "Feature_type", "Feature", "DISTANCE")
+    return(list(
+        fields = csq_fields,
+        indices = sapply(required_fields, function(f) which(csq_fields == f))
+    ))
+}
+
+# Function to create variant identifier based on available information
+create_variant_id <- function(row, feature_type) {
+    if (!is.na(row$SYMBOL) && nzchar(row$SYMBOL)) {
+        return(row$SYMBOL)
+    } else if (!is.na(row$Feature) && feature_type == "RegulatoryFeature") {
+        return(paste0("REG_", row$Feature))
+    } else if (row$Consequence == "intergenic_variant" && include_intergenic) {
+        # For intergenic variants, include distance to nearest gene if available
+        distance_info <- if (!is.na(row$DISTANCE)) paste0("_d", row$DISTANCE) else ""
+        return(paste0("INT_", row$CHROM, "_", row$POS, distance_info))
+    } else {
+        return(NA)
+    }
+}
+
+csq_info <- get_csq_format(r_in_vcf_path)
+processed_csq <- sapply(dd2$CSQ, function(csq_entry) {
+    # Split the CSQ entry by pipe character
+    fields <- strsplit(csq_entry, "\\|")[[1]]
+    expected_fields <- length(csq_info$fields)
+    
+    # Pad or trim to match expected length
+    if (length(fields) < expected_fields) {
+        fields <- c(fields, rep("", expected_fields - length(fields)))
+    } else if (length(fields) > expected_fields) {
+        fields <- fields[1:expected_fields]
+    }
+    # Select only the required fields using indices and combine with tab separator
+    paste(fields[csq_info$indices], collapse="\t")
+})
+
+out_csq_file <- "./csq_split.tsv"
+writeLines(processed_csq, out_csq_file)
+dd3 <- fread(out_csq_file, fill=length(csq_info$indices), header=F)
+field_names <- names(csq_info$indices)
+setnames(dd3, field_names)
+
+# Update main data table with annotations
+dd[, (field_names) := dd3[, field_names, with = FALSE]]
 
 cn <- colnames(dd)
 cn[1] <- "CHROM"
 setnames(dd, cn)
-dd[,key := paste0(CHROM, '_', POS, '_', REF,  '_',ALT )]
 
-dd_final <- dd[,c("key","Symbol", "Consequence"),with=F]
-anno_file <- r_out_annotations_path
-fwrite(dd_final, anno_file, sep="\t", col.names=F, quote=F )
+# Create comprehensive variant identifiers
+dd[, Symbol := sapply(1:nrow(dd), function(i) {
+    create_variant_id(dd[i,], dd$Feature_type[i])
+})]
 
+dd[, key := paste0(CHROM, '_', POS, '_', REF, '_', ALT)]
 
-unique_genes <- sort(unique(dd_final$Symbol))
+# Create annotations with only required columns
+anno <- dd[!is.na(Symbol), c("key", "Symbol", "Consequence"), with=F]
 
-library(parallel)
-system.time(res <- lapply(unique_genes, function(gene){
-    print(gene)
-    data.table(symbol=gene,
-               chrom=dd$CHROM[dd$Symbol==gene][1],
-               pos=dd$POS[dd$Symbol==gene][1],
-               variants= paste(dd$key[dd$Symbol==gene],collapse=","))
+# Filter out chrM and chrY, replace : with _
+anno <- anno[!grepl("^chrM|^chrY", key)]
+anno$key <- gsub(":", "_", anno$key)
 
+# remove multiallelic
+anno <- anno[!grepl(",", key)]
+
+# Setlist creation with grouping by Symbol
+unique_features <- unique(anno$Symbol)
+setlist <- rbindlist(lapply(unique_features, function(feature) {
+    feature_rows <- dd[Symbol == feature]
+    data.table(
+        symbol = feature,
+        chrom = feature_rows$CHROM[1],
+        pos = feature_rows$POS[1],
+        variants = paste(feature_rows$key, collapse=",")
+    )
 }))
+# Filter and process setlist (same chrM/chrY filtering as annotations)
+setlist <- setlist[!grepl("^chrM|^chrY", chrom)]
+setlist$variants <- gsub(":", "_", setlist$variants)
 
-setlist <- rbindlist(res)
-set_list_file <- r_out_setlist_path
-fwrite(setlist , set_list_file, sep="\t", col.names=F, quote=F )
+# Compute and display Consequence value counts
+cat("\n")
+cat("Consequence value counts:\n")
+consequence_counts <- sort(table(anno$Consequence), decreasing = TRUE)
+for (conseq in names(consequence_counts)) {
+    cat(sprintf("%s: %d\n", conseq, consequence_counts[conseq]))
+}
+cat("\n")
 
+# Replace all consequences that appear <= threshold frequency
+freq_table <- table(anno$Consequence)
+threshold_freq <- sort(freq_table)[min(filter_annotations_threshold, length(freq_table))]
+anno$Consequence[freq_table[anno$Consequence] <= threshold_freq] <- "NULL"
 
-
-# cmd <- paste0("cp ", plink_out_dir, study_name, ".bim", " ", tmp_dir, study_name, "-with-chrM.bim")
-# system(cmd)
-cmd <- paste0("cp ", r_out_setlist_path, " ", tmp_dir, study_name, ".setlist-with-chrM")
-system(cmd)
-cmd <- paste0("cp ", r_out_annotations_path, " ", tmp_dir, study_name, ".annotations_with_semicolon")
-system(cmd)
-
-
-
-# cmd <- paste0("grep -v chrM ", tmp_dir, study_name, "-with-chrM.bim", " > ", tmp_dir, study_name, ".bim")
-# system(cmd)
-# cmd <- paste0("grep -v chrM ", tmp_dir, study_name, "-with-chrM.setlist", " | grep -v chrY | sed -r 's/:/_/g' | sed 1d > ", r_out_setlist_path)
-cmd <- paste0("grep -v chrM ", tmp_dir, study_name, ".setlist-with-chrM", " | grep -v chrY | sed -r 's/:/_/g' > ", r_out_setlist_path)
-system(cmd)
-cmd <- paste0("grep -v chrM ", tmp_dir, study_name, ".annotations_with_semicolon", " | sed -r 's/:/_/g' > ", r_out_annotations_path)
-system(cmd)
-
-
-anno <- fread(r_out_annotations_path, header=F)
-cat(paste0("read ", nrow(anno), " rows from ", r_out_annotations_path, "\n"))
-cat("sort(table(anno$V3)):\n")
-print(sort(table(anno$V3)))
-
-anno$V3[anno$V3 %in% names(head(sort(table(anno$V3)), filter_annotations_threshold))] <- "NULL"
-fwrite(anno, r_out_annotations_path, sep="\t", col.names=F, quote=F )
-
-
-
+# Write final annotations file and setlist file
+fwrite(anno, r_out_annotations_path, sep="\t", col.names=F, quote=F)
+fwrite(setlist, r_out_setlist_path, sep="\t", col.names=F, quote=F)
 
 # need to set missing to 0 in *.sample file
 dd <- fread(r_in_sample_path)
 dd$missing <- 0
-fwrite(dd, file=r_out_sample_path, sep="\t", quote=F)
-
-# remove multiallelic
-dd <- fread(r_out_annotations_path, header=F)
-cat(paste0("read ", nrow(dd), " rows from ", r_out_annotations_path, "\n"))
-
-dd2 <- dd[!grepl(",", dd$V1),]
-cat(paste0("writing ", nrow(dd2), " rows to ", r_out_annotations_path, "\n"))
-fwrite(dd2, r_out_annotations_path, sep="\t", col.names=F, quote=F)
+fwrite(dd, r_out_sample_path, sep="\t", quote=F)
