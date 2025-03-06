@@ -178,7 +178,7 @@
                 "rscript_annotate_options": {
                     "type": "string",
                     "description": "Options for annotate.R script.",
-                    "default": "",
+                    "default": "--filter-threshold 50 --include-intergenic FALSE",
                     "fa_icon": "fas fa-code",
                     "hidden": false
                 },

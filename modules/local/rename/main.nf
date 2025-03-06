@@ -3,7 +3,7 @@ process RENAME {
     label 'process_single'
 
     conda "${moduleDir}/environment.yml"
-    container 'docker.io/psuszynski/r-ver:4.4.2.1'
+    container 'docker.io/psuszynski/r-ver:4.4.2.9'
 
     input:
     tuple val(meta), path(input_path)

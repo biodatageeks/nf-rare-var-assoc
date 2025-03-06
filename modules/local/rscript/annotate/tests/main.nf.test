@@ -75,7 +75,7 @@ nextflow_process {
                     [ id:'test', single_end:false ], // meta map
                     file('${projectDir}/assets/medium_data/1kGP_cases.txt', checkIfExists: true)
                 ]
-                input[10] = '5'
+                input[10] = '--filter-threshold 5 --include-intergenic FALSE'
                 """
             }
         }
@@ -143,7 +143,7 @@ nextflow_process {
                 input[7] = PLINK2_EXPORT_BGEN.out.sample
                 input[8] = [ [ id:'test' ], file('${projectDir}/assets/small_data/minimal_controls.txt', checkIfExists: true) ]
                 input[9] = [ [ id:'test' ], file('${projectDir}/assets/small_data/minimal_cases.txt', checkIfExists: true) ]
-                input[10] = '1 True'
+                input[10] = '--filter-threshold 1 --include-intergenic TRUE'
                 """
             }
         }
@@ -169,21 +169,23 @@ nextflow_process {
                     assert annotations[7] == "1_5000_A_T\tREG_ENSR00003456789\tTF_binding_site_variant"
                     assert annotations[8] == "1_5001_A_T\tREG_ENSR00003456790\tTF_binding_site_variant"
 
-                    //def annotations = path(process.out.annotations.get(0).get(1)).readLines()
-                    // missense_variant appears twice - should be preserved
-                    //assert annotations[0] == "1_1000_A_G\tGENE1\tmissense_variant\tTranscript\tgenic\tMODERATE"
-                    //assert annotations[1] == "1_1001_A_G\tGENE2\tmissense_variant\tTranscript\tgenic\tMODERATE"
-                    // regulatory_region_variant appears once - should be NULL
-                    //assert annotations[2] == "1_2000_C_T\tREG_ENSR00001234567\tNULL\tRegulatoryFeature\tregulatory\tLOW"
-                    // intergenic_variant appears three times - should be preserved
-                    //assert annotations[3] == "1_3000_G_A\tINT__3000_d1\tintergenic_variant\t\tintergenic\tMODIFIER"
-                    //assert annotations[4] == "1_3001_G_A\tINT__3001_d1\tintergenic_variant\t\tintergenic\tMODIFIER"
-                    //assert annotations[5] == "1_3002_G_A\tINT__3002_d1\tintergenic_variant\t\tintergenic\tMODIFIER"
-                    // enhancer_variant appears once - should be NULL
-                    //assert annotations[6] == "1_4000_T_C\tREG_ENSR00002345678\tNULL\tRegulatoryFeature\tregulatory\tLOW"
-                    // TF_binding_site_variant appears twice - should be preserved
-                    //assert annotations[7] == "1_5000_A_T\tREG_ENSR00003456789\tTF_binding_site_variant\tRegulatoryFeature\tregulatory\tMODERATE"
-                    //assert annotations[8] == "1_5001_A_T\tREG_ENSR00003456790\tTF_binding_site_variant\tRegulatoryFeature\tregulatory\tMODERATE"
+                    def setlist = path(process.out.setlist.get(0).get(1)).readLines()
+                    assert setlist[0] == "GENE1\t1\t1000\t1_1000_A_G"
+                    assert setlist[1] == "GENE2\t1\t1001\t1_1001_A_G"
+                    assert setlist[2] == "REG_ENSR00001234567\t1\t2000\t1_2000_C_T"
+                    assert setlist[3] == "INT_1_3000_d1\t1\t3000\t1_3000_G_A"
+                    assert setlist[4] == "INT_1_3001_d1\t1\t3001\t1_3001_G_A"
+                    assert setlist[5] == "INT_1_3002_d1\t1\t3002\t1_3002_G_A"
+                    assert setlist[6] == "REG_ENSR00002345678\t1\t4000\t1_4000_T_C"
+                    assert setlist[7] == "REG_ENSR00003456789\t1\t5000\t1_5000_A_T"
+                    assert setlist[8] == "REG_ENSR00003456790\t1\t5001\t1_5001_A_T"
+
+                    def phenotype = path(process.out.phenotype.get(0).get(1)).readLines()
+                    assert phenotype[0] == "FID\tIID\tY1"
+                    assert phenotype[1] == "sample1\tsample1\t0"
+                    assert phenotype[2] == "sample2\tsample2\t1"
+                    assert phenotype[3] == "sample3\tsample3\t0"
+
                 },
                 { assert path(process.out.phenotype.get(0).get(1)).readLines().size() == 4 }
             )

@@ -1,38 +1,71 @@
 library("data.table")
 library("dplyr")
+library("optparse")
 
-args <- commandArgs(trailingOnly = TRUE)
+# Define command line options
+option_list <- list(
+  make_option(c("--fam-path"), type="character", default=NULL,
+              help="Path to input fam file", metavar="character"),
+  make_option(c("--controls-path"), type="character", default=NULL,
+              help="Path to input controls file", metavar="character"),
+  make_option(c("--cases-path"), type="character", default=NULL,
+              help="Path to input cases file", metavar="character"),
+  make_option(c("--vcf-path"), type="character", default=NULL,
+              help="Path to input VCF file", metavar="character"),
+  make_option(c("--sample-path"), type="character", default=NULL,
+              help="Path to input sample file", metavar="character"),
+  
+  make_option(c("--out-fam-path"), type="character", default=NULL,
+              help="Path to output fam file", metavar="character"),
+  make_option(c("--out-sample-path"), type="character", default=NULL,
+              help="Path to output sample file", metavar="character"),
+  make_option(c("--out-pheno-path"), type="character", default=NULL,
+              help="Path to output phenotype file", metavar="character"),
+  make_option(c("--out-anno-path"), type="character", default=NULL,
+              help="Path to output annotations file", metavar="character"),
+  make_option(c("--out-setlist-path"), type="character", default=NULL,
+              help="Path to output setlist file", metavar="character"),
+  make_option(c("--filter-threshold"), type="integer", default=50,
+              help="Filter annotations threshold [default=50]", metavar="integer"),
+  make_option(c("--include-intergenic"), type="logical", default=FALSE,
+              help="Include intergenic variants [default=FALSE]", metavar="logical")
+)
 
-if (length(args) <= 0) stop("Provide the path to the input fam file", call.=FALSE)
-if (length(args) <= 1) stop("Provide the path to the input controls file", call.=FALSE)
-if (length(args) <= 2) stop("Provide the path to the input cases file", call.=FALSE)
-if (length(args) <= 3) stop("Provide the path to the input vcf file", call.=FALSE)
-if (length(args) <= 4) stop("Provide the path to the input sample file", call.=FALSE)
-if (length(args) <= 5) stop("Provide the path to the output fam file", call.=FALSE)
-if (length(args) <= 6) stop("Provide the path to the output sample file", call.=FALSE)
-if (length(args) <= 7) stop("Provide the path to the output phenotype file", call.=FALSE)
-if (length(args) <= 8) stop("Provide the path to the output annotations file", call.=FALSE)
-if (length(args) <= 9) stop("Provide the path to the output setlist file", call.=FALSE)
+# Parse arguments
+opt_parser <- OptionParser(option_list=option_list)
+opt <- parse_args(opt_parser)
 
-r_in_fam_path <- args[1]
-r_in_controls_path <- args[2]
-r_in_cases_path <- args[3]
-r_in_vcf_path <- args[4]
-r_in_sample_path <- args[5]
+# Check for required arguments and assign to variables
+if (is.null(opt$`fam-path`)) stop("Input fam file path is required")
+if (is.null(opt$`controls-path`)) stop("Input controls file path is required")
+if (is.null(opt$`cases-path`)) stop("Input cases file path is required")
+if (is.null(opt$`vcf-path`)) stop("Input VCF file path is required")
+if (is.null(opt$`sample-path`)) stop("Input sample file path is required")
 
-r_out_fam_path <- args[6]
-r_out_sample_path <- args[7]
-r_out_phenotype_path <- args[8]
-r_out_annotations_path <- args[9]
-r_out_setlist_path <- args[10]
+if (is.null(opt$`out-fam-path`)) stop("Output fam file path is required")
+if (is.null(opt$`out-sample-path`)) stop("Output sample file path is required")
+if (is.null(opt$`out-pheno-path`)) stop("Output phenotype file path is required")
+if (is.null(opt$`out-anno-path`)) stop("Output annotations file path is required")
+if (is.null(opt$`out-setlist-path`)) stop("Output setlist file path is required")
 
-filter_annotations_threshold <- 50
-include_intergenic <- FALSE  # Default to excluding intergenic variants
-if (length(args) > 10) filter_annotations_threshold <- as.numeric(args[11])
-if (length(args) > 11) include_intergenic <- as.logical(args[12])
+r_in_fam_path <- opt$`fam-path`
+r_in_controls_path <- opt$`controls-path`
+r_in_cases_path <- opt$`cases-path`
+r_in_vcf_path <- opt$`vcf-path`
+r_in_sample_path <- opt$`sample-path`
+
+r_out_fam_path <- opt$`out-fam-path`
+r_out_sample_path <- opt$`out-sample-path`
+r_out_phenotype_path <- opt$`out-pheno-path`
+r_out_annotations_path <- opt$`out-anno-path`
+r_out_setlist_path <- opt$`out-setlist-path`
+
+filter_annotations_threshold <- opt$`filter-threshold`
+include_intergenic <- opt$`include-intergenic`
 
 cat(paste0("filter_annotations_threshold = ", filter_annotations_threshold, "\n"))
 cat(paste0("include_intergenic = ", include_intergenic, "\n"))
+
 
 # Process fam and phenotype files
 fam <- fread(r_in_fam_path, header=F)

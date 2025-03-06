@@ -24,7 +24,7 @@ process RSCRIPT_BUILDREPORTS {
     //               For Conda, the build (i.e. "h9402c20_2") must be EXCLUDED to support installation on different operating systems.
     // TODO nf-core: See section in main README for further information regarding finding and adding container addresses to the section below.
     conda "${moduleDir}/environment.yml"
-    container 'docker.io/psuszynski/r-ver:4.4.2.1'
+    container 'docker.io/psuszynski/r-ver:4.4.2.9'
 
     input:
     // TODO nf-core: Where applicable all sample-specific information e.g. "id", "single_end", "read_group"

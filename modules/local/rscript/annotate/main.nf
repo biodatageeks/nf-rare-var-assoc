@@ -3,7 +3,7 @@ process RSCRIPT_ANNOTATE {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    container 'docker.io/psuszynski/r-ver:4.4.2.1'
+    container 'docker.io/psuszynski/r-ver:4.4.2.9'
 
     input:
     path(r_script_ch)
@@ -31,21 +31,22 @@ process RSCRIPT_ANNOTATE {
 
     script:
     def prefix = task.ext.prefix ?: "${meta.id}"
-    def VERSION = '4.4.2-0.1'
+    def VERSION = '4.4.2-0.2'
     """
     Rscript \\
         ${r_script_ch} \\
-        ${fam} \\
-        ${controls} \\
-        ${cases} \\
-        ${vcf} \\
-        ${sample} \\
-        ${prefix}_r_out.fam \\
-        ${prefix}_r_out.sample \\
-        ${prefix}_phenotype.txt \\
-        ${prefix}.annotations \\
-        ${prefix}.setlist \\
+        --fam-path ${fam} \\
+        --controls-path ${controls} \\
+        --cases-path ${cases} \\
+        --vcf-path ${vcf} \\
+        --sample-path ${sample} \\
+        --out-fam-path ${prefix}_r_out.fam \\
+        --out-sample-path ${prefix}_r_out.sample \\
+        --out-pheno-path ${prefix}_phenotype.txt \\
+        --out-anno-path ${prefix}.annotations \\
+        --out-setlist-path ${prefix}.setlist \\
         $input_args
+
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
