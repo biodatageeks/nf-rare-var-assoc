@@ -37,7 +37,7 @@ process RSCRIPT_ANNOTATE {
         ${r_script_ch} \\
         --fam-path ${fam} \\
         --controls-path ${controls} \\
-        --cases-path ${cases} \\
+        --cases-paths ${cases} \\
         --vcf-path ${vcf} \\
         --sample-path ${sample} \\
         --out-fam-path ${prefix}_r_out.fam \\
