@@ -16,6 +16,7 @@ process RSCRIPT_ANNOTATE {
     tuple val(meta), path(sample)
     tuple val(meta), path(controls)
     tuple val(meta), path(cases)
+    path(masks)
     val(input_args)
 
     output:
@@ -40,6 +41,7 @@ process RSCRIPT_ANNOTATE {
         --cases-paths ${cases} \\
         --vcf-path ${vcf} \\
         --sample-path ${sample} \\
+        --masks-path ${masks} \\
         --out-fam-path ${prefix}_r_out.fam \\
         --out-sample-path ${prefix}_r_out.sample \\
         --out-pheno-path ${prefix}_phenotype.txt \\

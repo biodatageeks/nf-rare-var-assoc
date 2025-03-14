@@ -75,7 +75,8 @@ nextflow_process {
                     [ id:'test', single_end:false ], // meta map
                     file('${projectDir}/assets/medium_data/1kGP_cases.txt', checkIfExists: true)
                 ]
-                input[10] = '--filter-threshold 5 --include-intergenic FALSE'
+                input[10] = file('${projectDir}/assets/default.masks', checkIfExists: true)
+                input[11] = '--min_top_annotations 50 --quantile_threshold 0.25 --include-intergenic FALSE'
                 """
             }
         }
@@ -143,7 +144,8 @@ nextflow_process {
                 input[7] = PLINK2_EXPORT_BGEN.out.sample
                 input[8] = [ [ id:'test' ], file('${projectDir}/assets/small_data/minimal_controls.txt', checkIfExists: true) ]
                 input[9] = [ [ id:'test' ], file('${projectDir}/assets/small_data/minimal_cases.txt', checkIfExists: true) ]
-                input[10] = '--filter-threshold 1 --include-intergenic TRUE'
+                input[10] = file('${projectDir}/assets/default.masks', checkIfExists: true)
+                input[11] = '--min_top_annotations 50 --quantile_threshold 0.25 --include-intergenic TRUE'
                 """
             }
         }

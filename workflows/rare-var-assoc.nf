@@ -135,6 +135,7 @@ workflow RARE_VAR_ASSOC {
         ch_qc_sample,
         ch_controls,
         ch_cases,
+        ch_masks,
         Channel.of(params.rscript_annotate_options)
     )
     ch_r_out_fam  = RSCRIPT_ANNOTATE.out.out_fam

@@ -14,6 +14,8 @@ option_list <- list(
               help="Path to input VCF file", metavar="character"),
   make_option(c("--sample-path"), type="character", default=NULL,
               help="Path to input sample file", metavar="character"),
+  make_option(c("--masks-path"), type="character", default=NULL,
+              help="Path to input masks file", metavar="character"),
   
   make_option(c("--out-fam-path"), type="character", default=NULL,
               help="Path to output fam file", metavar="character"),
@@ -25,8 +27,10 @@ option_list <- list(
               help="Path to output annotations file", metavar="character"),
   make_option(c("--out-setlist-path"), type="character", default=NULL,
               help="Path to output setlist file", metavar="character"),
-  make_option(c("--filter-threshold"), type="integer", default=50,
-              help="Filter annotations threshold [default=50]", metavar="integer"),
+  make_option(c("--min_top_annotations"), type="integer", default=50,
+              help="Filter annotations threshold - keep at least that many [default=50]", metavar="integer"),
+  make_option(c("--quantile_threshold"), type="double", default=0.25,
+              help="Filter annotations threshold - keep based on the quantile of the frequency table [default=0.25]", metavar="double"),
   make_option(c("--include-intergenic"), type="logical", default=FALSE,
               help="Include intergenic variants [default=FALSE]", metavar="logical")
 )
@@ -41,6 +45,7 @@ if (is.null(opt$`controls-path`)) stop("Input controls file path is required")
 if (is.null(opt$`cases-paths`)) stop("At least one cases file is required")
 if (is.null(opt$`vcf-path`)) stop("Input VCF file path is required")
 if (is.null(opt$`sample-path`)) stop("Input sample file path is required")
+if (is.null(opt$`masks-path`)) stop("Input masks file path is required")
 
 if (is.null(opt$`out-fam-path`)) stop("Output fam file path is required")
 if (is.null(opt$`out-sample-path`)) stop("Output sample file path is required")
@@ -53,6 +58,7 @@ r_in_controls_path <- opt$`controls-path`
 r_in_cases_paths <- opt$`cases-paths`    # List of cases file paths
 r_in_vcf_path <- opt$`vcf-path`
 r_in_sample_path <- opt$`sample-path`
+r_in_masks_path <- opt$`masks-path`
 
 r_out_fam_path <- opt$`out-fam-path`
 r_out_sample_path <- opt$`out-sample-path`
@@ -60,10 +66,12 @@ r_out_phenotype_path <- opt$`out-pheno-path`
 r_out_annotations_path <- opt$`out-anno-path`
 r_out_setlist_path <- opt$`out-setlist-path`
 
-filter_annotations_threshold <- opt$`filter-threshold`
 include_intergenic <- opt$`include-intergenic`
+quantile_threshold <- opt$`quantile_threshold`  # Keep consequences above Nth percentile (adjustable)
+min_top_annotations <- opt$`min_top_annotations`   # Ensure at least N top annotations are kept, if available
 
-cat(paste0("filter_annotations_threshold = ", filter_annotations_threshold, "\n"))
+cat(paste0("quantile_threshold = ", quantile_threshold, "\n"))
+cat(paste0("min_top_annotations = ", min_top_annotations, "\n"))
 cat(paste0("include_intergenic = ", include_intergenic, "\n"))
 cat("Number of cases files:", length(r_in_cases_paths), "\n")
 
@@ -216,19 +224,52 @@ setlist <- rbindlist(lapply(unique_features, function(feature) {
 setlist <- setlist[!grepl("^chrM|^chrY", chrom)]
 setlist$variants <- gsub(":", "_", setlist$variants)
 
+
+# Read and parse the mask file
+mask_data <- read.table(r_in_masks_path, sep="\t", header=FALSE, col.names=c("Mask", "Annotations"), 
+                        stringsAsFactors=FALSE)
+
+# Extract all unique annotations, treating '&' combinations as single units
+important_annotations <- unique(unlist(strsplit(mask_data$Annotations, ",")))
+
 # Compute and display Consequence value counts
 cat("\n")
 cat("Consequence value counts:\n")
-consequence_counts <- sort(table(anno$Consequence), decreasing = TRUE)
+consequence_counts <- sort(table(anno$Consequence), decreasing=TRUE)
 for (conseq in names(consequence_counts)) {
     cat(sprintf("%s: %d\n", conseq, consequence_counts[conseq]))
 }
 cat("\n")
 
-# Replace all consequences that appear <= threshold frequency
+# Calculate frequency table
 freq_table <- table(anno$Consequence)
-threshold_freq <- sort(freq_table)[min(filter_annotations_threshold, length(freq_table))]
-anno$Consequence[freq_table[anno$Consequence] <= threshold_freq] <- "NULL"
+sorted_freqs <- sort(freq_table, decreasing=TRUE)
+
+# Determine which consequences to keep
+# a. Keep all biologically important annotations
+keep_important <- names(freq_table) %in% important_annotations
+
+# b. Apply quantile threshold
+threshold_freq <- quantile(freq_table, probs=quantile_threshold, names=FALSE)
+keep_quantile <- freq_table >= threshold_freq
+
+# c. Ensure at least 50 top annotations (if available)
+n_consequences <- length(freq_table)
+n_to_keep <- min(min_top_annotations, n_consequences)  # Don't exceed total unique consequences
+keep_top <- names(sorted_freqs)[1:n_to_keep]  # Top N by frequency
+keep_top_logical <- names(freq_table) %in% keep_top
+
+# Combine filters: keep if important OR above quantile OR in top 50
+keep <- keep_important | keep_quantile | keep_top_logical
+
+# Replace consequences not meeting criteria with "NULL"
+anno$Consequence[!keep[match(anno$Consequence, names(freq_table))]] <- "NULL"
+
+# Report kept consequences
+kept_consequences <- unique(anno$Consequence[anno$Consequence != "NULL"])
+cat("Kept consequences (after filtering):\n")
+cat(paste(kept_consequences, collapse=", "), "\n")
+
 
 # Write final annotations file and setlist file
 fwrite(anno, r_out_annotations_path, sep="\t", col.names=F, quote=F)
