@@ -25,8 +25,8 @@ process VEP_ANNOTATE {
     // TODO nf-core: See section in main README for further information regarding finding and adding container addresses to the section below.
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/ensembl-vep:113.3--pl5321h2a3209d_0':
-        'biocontainers/ensembl-vep:113.3--pl5321h2a3209d_0' }"
+        'https://depot.galaxyproject.org/singularity/ensembl-vep:release_113.4':
+        'docker.io/ensemblorg/ensembl-vep:release_113.4' }"
 
     input:
     // TODO nf-core: Where applicable all sample-specific information e.g. "id", "single_end", "read_group"
