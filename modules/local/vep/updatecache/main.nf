@@ -65,7 +65,7 @@ process VEP_UPDATECACHE {
     // find ${vep_cache}/ -maxdepth 0 -empty -exec sh -c 'vep_install --CACHEDIR ${vep_cache} --SPECIES $species $args $input_args' \\;
     // find ${vep_cache}/ -maxdepth 1 -type d -name "$species" | grep -q "." || sh -c 'vep_install --CACHEDIR ${vep_cache} --SPECIES $species $args $input_args'
     """
-    if [ ! -d "${vep_cache}/$species" ]; then sh -c 'vep_install --CACHEDIR ${vep_cache} --SPECIES $species $args $input_args'; fi
+    if [ ! -d "${vep_cache}/$species" ]; then sh -c 'vep_install --CACHEDIR ${vep_cache} --SPECIES $species $args $input_args && vep_convert_cache --dir ${vep_cache} --species $species --version all'; fi
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

@@ -59,6 +59,7 @@ workflow RARE_VAR_ASSOC {
         ch_vcf,
         ch_vep_cachesubdir,
         Channel.of(params.vep_annotate_species),
+        Channel.of(params.vep_fasta_path),
         Channel.of(params.vep_annotate_options)
     )
     ch_vep_vcf  = VEP_ANNOTATE.out.vcf

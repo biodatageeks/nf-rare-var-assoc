@@ -252,6 +252,12 @@
                     "fa_icon": "fas fa-pen-line",
                     "hidden": false
                 },
+                "vep_fasta_path": {
+                    "type": "string",
+                    "description": "FASTA subpath for VEP annotation.",
+                    "fa_icon": "fas fa-pen-line",
+                    "hidden": false
+                },
                 "py_script_csv_concat_path": {
                     "type": "string",
                     "description": "Path to csv_concat.py script.",

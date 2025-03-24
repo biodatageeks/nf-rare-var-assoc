@@ -27,7 +27,8 @@ nextflow_process {
                 ]
                 input[1] = file('${projectDir}/../vep_cachedir/homo_sapiens_refseq', checkIfExists: true)
                 input[2] = 'homo_sapiens'
-                input[3] = '--offline --no_stats --refseq --use_given_ref --exclude_predicted --compress_output bgzip --vcf --numbers --protein --total_length --force_overwrite --format vcf --regulatory --variant_class --symbol --biotype --distance 5000 --canonical --pubmed --mane'
+                input[3] = '113_GRCh38/Homo_sapiens.GRCh38.dna.toplevel.fa.gz'
+                input[4] = '--offline --no_stats --refseq --use_given_ref --exclude_predicted --compress_output bgzip --vcf --numbers --protein --total_length --force_overwrite --format vcf --regulatory --variant_class --symbol --biotype --distance 5000 --canonical --pubmed --mane'
                 """
             }
         }

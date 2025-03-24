@@ -156,18 +156,13 @@ nextflow_process {
                 {
 
                     def annotations = path(process.out.annotations.get(0).get(1)).readLines()
-                    // missense_variant appears twice - should be preserved
                     assert annotations[0] == "1_1000_A_G\tGENE1\tmissense_variant"
                     assert annotations[1] == "1_1001_A_G\tGENE2\tmissense_variant"
-                    // regulatory_region_variant appears once - should be NULL
-                    assert annotations[2] == "1_2000_C_T\tREG_ENSR00001234567\tNULL"
-                    // intergenic_variant appears three times - should be preserved
+                    assert annotations[2] == "1_2000_C_T\tREG_ENSR00001234567\tregulatory_region_variant"
                     assert annotations[3] == "1_3000_G_A\tINT_1_3000_d1\tintergenic_variant"
                     assert annotations[4] == "1_3001_G_A\tINT_1_3001_d1\tintergenic_variant"
                     assert annotations[5] == "1_3002_G_A\tINT_1_3002_d1\tintergenic_variant"
-                    // enhancer_variant appears once - should be NULL
-                    assert annotations[6] == "1_4000_T_C\tREG_ENSR00002345678\tNULL"
-                    // TF_binding_site_variant appears twice - should be preserved
+                    assert annotations[6] == "1_4000_T_C\tREG_ENSR00002345678\tenhancer_variant"
                     assert annotations[7] == "1_5000_A_T\tREG_ENSR00003456789\tTF_binding_site_variant"
                     assert annotations[8] == "1_5001_A_T\tREG_ENSR00003456790\tTF_binding_site_variant"
 

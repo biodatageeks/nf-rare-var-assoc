@@ -17,7 +17,7 @@
 
 process VEP_ANNOTATE {
     tag "$meta.id"
-    label 'process_single'
+    label 'process_medium'
 
     // TODO nf-core: List required Conda package(s).
     //               Software MUST be pinned to channel (i.e. "bioconda"), version (i.e. "1.10").
@@ -38,6 +38,7 @@ process VEP_ANNOTATE {
     tuple val(meta), path(input_vcf)
     path(vep_cache)
     val(species)
+    val(fasta_path)
     val(input_args)
 
     output:
@@ -67,6 +68,7 @@ process VEP_ANNOTATE {
 
     vep \\
         --dir ${vep_cache}/.. \\
+        --fasta ${vep_cache}/${fasta_path} \\
         -i ${prefix}_with_underscores.vcf \\
         -o ${prefix}_vep.vcf.gz \\
         --fork ${task.cpus} \\
