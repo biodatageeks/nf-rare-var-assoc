@@ -26,7 +26,7 @@ process VEP_ANNOTATE {
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/ensembl-vep:release_113.4':
-        'docker.io/ensemblorg/ensembl-vep:release_113.4' }"
+        'docker.io/psuszynski/ensembl-vep:113.4.1' }"
 
     input:
     // TODO nf-core: Where applicable all sample-specific information e.g. "id", "single_end", "read_group"
