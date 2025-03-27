@@ -13,8 +13,8 @@ include { RSCRIPT_ANNOTATE       } from '../modules/local/rscript/annotate'
 include { BGENIX                 } from '../modules/local/bgenix'
 include { QCTOOL                 } from '../modules/local/qctool'
 include { PLINK2_EXPORT_BGEN     } from '../modules/local/plink2/export_bgen'
-include { PLINK2_WRITE_SNPLIST as PLINK2_WRITE_SNPLIST_1 } from '../modules/local/plink2/write_snplist'
-include { PLINK2_WRITE_SNPLIST as PLINK2_WRITE_SNPLIST_2 } from '../modules/local/plink2/write_snplist'
+include { PLINK2_WRITE_SNPLIST   } from '../modules/local/plink2/write_snplist'
+include { PLINK2_MAKEBED         } from '../modules/local/plink2/makebed'
 include { PLINK19_MAKEBED        } from '../modules/local/plink19/makebed'
 include { VEP_ANNOTATE           } from '../modules/local/vep/annotate'
 include { VEP_UPDATECACHE        } from '../modules/local/vep/updatecache'
@@ -68,32 +68,34 @@ workflow RARE_VAR_ASSOC {
     PLINK19_MAKEBED (
         ch_vep_vcf
     )
-    ch_bed  = PLINK19_MAKEBED.out.bed
-    ch_bim  = PLINK19_MAKEBED.out.bim
-    ch_fam  = PLINK19_MAKEBED.out.fam
-    ch_nosex  = PLINK19_MAKEBED.out.nosex
+    ch_initial_bed  = PLINK19_MAKEBED.out.bed
+    ch_initial_bim  = PLINK19_MAKEBED.out.bim
+    ch_initial_fam  = PLINK19_MAKEBED.out.fam
+    ch_initial_nosex  = PLINK19_MAKEBED.out.nosex
     ch_versions = ch_versions.mix(PLINK19_MAKEBED.out.versions.first())
 
-    PLINK2_WRITE_SNPLIST_1 (
-        ch_bed,
-        ch_bim,
-        ch_fam,
-        Channel.of('snps_pass'),
-        Channel.of(params.plink2_write_snplist_options)
+    PLINK2_MAKEBED (
+        ch_initial_bed,
+        ch_initial_bim,
+        ch_initial_fam,
+        Channel.of('filter_pass'),
+        Channel.of(params.plink2_makebed_options)
     )
-    ch_snplist_1  = PLINK2_WRITE_SNPLIST_1.out.snplist
-    ch_versions = ch_versions.mix(PLINK2_WRITE_SNPLIST_1.out.versions.first())
+    ch_bed  = PLINK2_MAKEBED.out.out_bed
+    ch_bim  = PLINK2_MAKEBED.out.out_bim
+    ch_fam  = PLINK2_MAKEBED.out.out_fam
+    ch_versions = ch_versions.mix(PLINK2_MAKEBED.out.versions.first())
 
-    PLINK2_WRITE_SNPLIST_2 (
+    PLINK2_WRITE_SNPLIST (
         ch_bed,
         ch_bim,
         ch_fam,
-        Channel.of('qc_pass'),
+        Channel.of('writesnp_pass'),
         Channel.of(params.plink2_write_snplist_qc_options)
     )
-    ch_snplist_2  = PLINK2_WRITE_SNPLIST_2.out.snplist
-    ch_id_2  = PLINK2_WRITE_SNPLIST_2.out.id
-    ch_versions = ch_versions.mix(PLINK2_WRITE_SNPLIST_2.out.versions.first())
+    ch_snplist  = PLINK2_WRITE_SNPLIST.out.snplist
+    ch_id  = PLINK2_WRITE_SNPLIST.out.id
+    ch_versions = ch_versions.mix(PLINK2_WRITE_SNPLIST.out.versions.first())
 
     PLINK2_EXPORT_BGEN (
         ch_bed,
@@ -146,7 +148,7 @@ workflow RARE_VAR_ASSOC {
     ch_setlist  = RSCRIPT_ANNOTATE.out.setlist
     ch_versions = ch_versions.mix(RSCRIPT_ANNOTATE.out.versions.first())
 
-    renamed_file_name = ch_vcf.map { t -> "${t[0].id}.fam" }.first()
+    renamed_file_name = ch_vcf.map { t -> "${t[0].id}_filter_pass.fam" }.first()
     RENAME (
         ch_r_out_fam,
         renamed_file_name
@@ -166,8 +168,8 @@ workflow RARE_VAR_ASSOC {
         ch_bed,
         ch_bim,
         ch_renamed_fam,
-        ch_id_2,
-        ch_snplist_2,
+        ch_id,
+        ch_snplist,
         ch_phenotype,
         Channel.of(params.regenie_step1_options)
     )

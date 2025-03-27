@@ -26,7 +26,7 @@ process PLINK2_EXPORT_BGEN {
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/plink2:2.00a5.10--h4ac6f70_0':
-        'biocontainers/plink2:2.00a5.10--h4ac6f70_0' }"
+        'docker.io/psuszynski/plink:2.0-alpha.6.9' }"
 
     input:
     // TODO nf-core: Where applicable all sample-specific information e.g. "id", "single_end", "read_group"

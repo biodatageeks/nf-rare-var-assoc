@@ -140,9 +140,9 @@
                     "fa_icon": "fas fa-bed",
                     "hidden": false
                 },
-                "plink2_write_snplist_options": {
+                "plink2_makebed_options": {
                     "type": "string",
-                    "description": "Options to pass to plink2 write-snplist call.",
+                    "description": "Options to pass to plink2 makebed call.",
                     "default": "--mac 100",
                     "fa_icon": "fas fa-pen-to-square",
                     "hidden": false

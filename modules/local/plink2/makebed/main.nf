@@ -15,7 +15,7 @@
 // TODO nf-core: Optional inputs are not currently supported by Nextflow. However, using an empty
 //               list (`[]`) instead of a file can be used to work around this issue.
 
-process PLINK2_WRITE_SNPLIST {
+process PLINK2_MAKEBED {
     tag "$meta.id"
     label 'process_single'
 
@@ -42,10 +42,9 @@ process PLINK2_WRITE_SNPLIST {
     val(input_args)
 
     output:
-    // TODO nf-core: Named file extensions MUST be emitted for ALL output channels
-    tuple val(meta), path("*.snplist"), emit: snplist
-    tuple val(meta), path("*${out_name_part}.id"), emit: id, optional: true
-    tuple val(meta), path("*${out_name_part}.mindrem.id"), emit: mindremid, optional: true
+    tuple val(meta), path("*.bed"), emit: out_bed
+    tuple val(meta), path("*.bim"), emit: out_bim
+    tuple val(meta), path("*.fam"), emit: out_fam
     tuple val(meta), path("*.log"), emit: log
     path "versions.yml"           , emit: versions
 
@@ -74,7 +73,7 @@ process PLINK2_WRITE_SNPLIST {
         --bed ${bed} \\
         --bim ${bim} \\
         --fam ${fam} \\
-        --write-snplist \\
+        --make-bed \\
         --out ${prefix}_${out_name_part}
 
     cat <<-END_VERSIONS > versions.yml
@@ -91,7 +90,9 @@ process PLINK2_WRITE_SNPLIST {
     //               Simple example: https://github.com/nf-core/modules/blob/818474a292b4860ae8ff88e149fbcda68814114d/modules/nf-core/bcftools/annotate/main.nf#L47-L63
     //               Complex example: https://github.com/nf-core/modules/blob/818474a292b4860ae8ff88e149fbcda68814114d/modules/nf-core/bedtools/split/main.nf#L38-L54
     """
-    touch ${prefix}_${out_name_part}.snplist
+    touch ${prefix}_${out_name_part}.bed
+    touch ${prefix}_${out_name_part}.bim
+    touch ${prefix}_${out_name_part}.fam
     touch ${prefix}_${out_name_part}.log
 
     cat <<-END_VERSIONS > versions.yml
