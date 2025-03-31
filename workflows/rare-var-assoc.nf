@@ -3,8 +3,9 @@
     IMPORT MODULES / SUBWORKFLOWS / FUNCTIONS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
-include { MERGE_RESULTS          } from '../modules/local/merge_results'
-include { RENAME                 } from '../modules/local/rename'
+include { DOWNLOAD_FILE          } from '../modules/local/cmds/download_file'
+include { MERGE_RESULTS          } from '../modules/local/cmds/merge_results'
+include { RENAME                 } from '../modules/local/cmds/rename'
 include { RSCRIPT_BUILDREPORTS   } from '../modules/local/rscript/buildreports'
 include { REGENIE_STEP2          } from '../modules/local/regenie/step2'
 include { REGENIE_STEP1          } from '../modules/local/regenie/step1'
@@ -18,7 +19,12 @@ include { PLINK2_MAKEBED         } from '../modules/local/plink2/makebed'
 include { PLINK19_MAKEBED        } from '../modules/local/plink19/makebed'
 include { VEP_ANNOTATE           } from '../modules/local/vep/annotate'
 include { VEP_UPDATECACHE        } from '../modules/local/vep/updatecache'
-include { MULTIQC                } from '../modules/nf-core/multiqc/main'
+include { BCFTOOLS_VIEW          } from '../modules/local/bcftools/view'
+include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_1 } from '../modules/local/bcftools/index'
+include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_2 } from '../modules/local/bcftools/index'
+include { BCFTOOLS_ANNOTATE      } from '../modules/nf-core/bcftools/annotate'
+include { BCFTOOLS_NORM          } from '../modules/nf-core/bcftools/norm'
+include { MULTIQC                } from '../modules/nf-core/multiqc'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { REPORTING              } from '../subworkflows/local/reporting'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -34,29 +40,69 @@ include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_rare
 workflow RARE_VAR_ASSOC {
 
     take:
-    ch_vcf // channel: vcf read in from --input
+    ch_input_vcf // channel: vcf read in from --input
     ch_controls // channel: controls read in from --input
     ch_cases // channel: cases read in from --input
 
     main:
 
+    vep_cachedir = "${projectDir}/../vep_cachedir"
     ch_versions = Channel.empty()
     ch_multiqc_files = Channel.empty()
-    ch_vep_cachedir = Channel.fromPath("${projectDir}/../vep_cachedir", checkIfExists: true)
+    ch_vep_cachedir = Channel.fromPath(vep_cachedir, checkIfExists: true)
     ch_masks = Channel.fromPath(params.input_masks, checkIfExists: true)
+    ch_rename_chr = Channel.fromPath("${projectDir}/assets/rename_chr.txt", checkIfExists: true)
+    ch_meta = ch_input_vcf.map { t -> t[0] }
 
 
     VEP_UPDATECACHE (
-        ch_vcf.map { t -> t[0] },
+        ch_meta,
         ch_vep_cachedir,
         Channel.of(params.vep_updatecache_species),
-        Channel.of(params.vep_updatecache_options)
+        Channel.of(params.vep_updatecache_options),
+        Channel.of(params.vep_cache_url)
     )
     ch_vep_cachesubdir = VEP_UPDATECACHE.out.cachesubdir
     ch_versions = ch_versions.mix(VEP_UPDATECACHE.out.versions.first())
 
+    // DOWNLOAD_FILE (
+    //     ch_input_vcf.map { t -> [t[0], params.ref_fasta_url] },
+    //     Channel.of("fa.gz")
+    // )
+    // ch_ref_fasta = DOWNLOAD_FILE.out.output_file
+    ch_ref_fasta = Channel.fromPath("${vep_cachedir}/${params.vep_updatecache_species}/${params.vep_fasta_path}", checkIfExists: true)
+
+    BCFTOOLS_INDEX_1 (
+        ch_input_vcf
+    )
+    ch_input_vcf_tbi = BCFTOOLS_INDEX_1.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_INDEX_1.out.versions.first())
+
+    BCFTOOLS_ANNOTATE (
+        ch_input_vcf
+            .join(ch_input_vcf_tbi, by: 0)  // Join by the first element (meta)
+            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], []) },
+        Channel.of([]),
+        ch_rename_chr
+    )
+    ch_annotated_vcf = BCFTOOLS_ANNOTATE.out.vcf
+    ch_annotated_vcf_tbi = BCFTOOLS_ANNOTATE.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_ANNOTATE.out.versions.first())
+    
+    BCFTOOLS_NORM (
+        ch_annotated_vcf
+            .join(ch_annotated_vcf_tbi, by: 0)  // Join by the first element (meta)
+            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) },
+        ch_ref_fasta.map { t -> [[], t] }
+    )
+    ch_normalized_vcf = BCFTOOLS_NORM.out.vcf
+    ch_normalized_vcf_tbi = BCFTOOLS_NORM.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_NORM.out.versions.first())
+
     VEP_ANNOTATE (
-        ch_vcf,
+        ch_normalized_vcf
+            .join(ch_normalized_vcf_tbi, by: 0)  // Join by the first element (meta)
+            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) },
         ch_vep_cachesubdir,
         Channel.of(params.vep_annotate_species),
         Channel.of(params.vep_fasta_path),
@@ -64,6 +110,16 @@ workflow RARE_VAR_ASSOC {
     )
     ch_vep_vcf  = VEP_ANNOTATE.out.vcf
     ch_versions = ch_versions.mix(VEP_ANNOTATE.out.versions.first())
+
+    BCFTOOLS_INDEX_2 (
+        ch_vep_vcf
+    )
+    ch_vep_vcf_tbi = BCFTOOLS_INDEX_2.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_INDEX_2.out.versions.first())
+
+    ch_vep_vcf_with_index = ch_vep_vcf
+        .join(ch_vep_vcf_tbi, by: 0)
+        .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) }
 
     PLINK19_MAKEBED (
         ch_vep_vcf
@@ -97,6 +153,17 @@ workflow RARE_VAR_ASSOC {
     ch_id  = PLINK2_WRITE_SNPLIST.out.id
     ch_versions = ch_versions.mix(PLINK2_WRITE_SNPLIST.out.versions.first())
 
+    BCFTOOLS_VIEW (
+        ch_vep_vcf_with_index,
+        Channel.of([]),                     // No regions file
+        Channel.of([]),                     // No targets file
+        ch_id.map { t -> t[1] },            // Samples file
+        ch_snplist.map { t -> t[1] }        // SNPs file
+    )
+    ch_filtered_vcf  = BCFTOOLS_VIEW.out.vcf
+    ch_versions = ch_versions.mix(BCFTOOLS_VIEW.out.versions.first())
+    
+
     PLINK2_EXPORT_BGEN (
         ch_bed,
         ch_bim,
@@ -129,7 +196,7 @@ workflow RARE_VAR_ASSOC {
     // r_script_annotate_ch = Channel.fromPath("${projectDir}/modules/local/rscript/annotate/assets/test.R", checkIfExists: true)
     RSCRIPT_ANNOTATE (
         r_script_annotate_ch,
-        ch_vep_vcf,
+        ch_filtered_vcf,
         ch_bed,
         ch_bim,
         ch_fam,
@@ -148,7 +215,7 @@ workflow RARE_VAR_ASSOC {
     ch_setlist  = RSCRIPT_ANNOTATE.out.setlist
     ch_versions = ch_versions.mix(RSCRIPT_ANNOTATE.out.versions.first())
 
-    renamed_file_name = ch_vcf.map { t -> "${t[0].id}_filter_pass.fam" }.first()
+    renamed_file_name = ch_meta.map { t -> "${t.id}_filter_pass.fam" }.first()
     RENAME (
         ch_r_out_fam,
         renamed_file_name
@@ -158,7 +225,7 @@ workflow RARE_VAR_ASSOC {
     r_script_vcf2aaf_ch = Channel.fromPath(params.rscript_vcf2aaf_path, checkIfExists: true)
     RSCRIPT_VCFTOAAF (
         r_script_vcf2aaf_ch,
-        ch_vep_vcf,
+        ch_filtered_vcf,
         Channel.of(params.rscript_vcf2aaf_options)
     )
     ch_aaf  = RSCRIPT_VCFTOAAF.out.aaf
@@ -200,7 +267,7 @@ workflow RARE_VAR_ASSOC {
         r_script_buildreports_ch,
         ch_regenie_step2_masks_snplist,
         ch_regenie_step2_regenie_out,
-        ch_vep_vcf,
+        ch_filtered_vcf,
         ch_phenotype,
         ch_annotations
     )

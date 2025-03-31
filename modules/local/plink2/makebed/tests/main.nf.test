@@ -39,7 +39,7 @@ nextflow_process {
                 input[1] = PLINK19_MAKEBED.out.bim
                 input[2] = PLINK19_MAKEBED.out.fam
                 input[3] = 'filter'
-                input[4] = '--set-missing-var-ids @:#:\\\\$r:\\\\$a --new-id-max-allele-len 120 truncate --rm-dup force-first list --geno 0.2 --mac 1 --maf 0.01 --hwe 1e-13 0.001'
+                input[4] = '--new-id-max-allele-len 120 truncate --rm-dup force-first list --geno 0.2 --mac 1 --maf 0.01 --hwe 1e-13 0.001'
                 """
             }
         }

@@ -39,6 +39,7 @@ process VEP_UPDATECACHE {
     path(vep_cache)
     val(species)
     val(input_args)
+    val(vep_cache_url)
 
     output:
     // TODO nf-core: Named file extensions MUST be emitted for ALL output channels
@@ -65,7 +66,15 @@ process VEP_UPDATECACHE {
     // find ${vep_cache}/ -maxdepth 0 -empty -exec sh -c 'vep_install --CACHEDIR ${vep_cache} --SPECIES $species $args $input_args' \\;
     // find ${vep_cache}/ -maxdepth 1 -type d -name "$species" | grep -q "." || sh -c 'vep_install --CACHEDIR ${vep_cache} --SPECIES $species $args $input_args'
     """
-    if [ ! -d "${vep_cache}/$species" ]; then sh -c 'perl /opt/vep/src/ensembl-vep/INSTALL.pl --CACHEDIR ${vep_cache} --SPECIES $species $args $input_args && perl /opt/vep/src/ensembl-vep/convert_cache.pl --dir ${vep_cache} --species $species --version all'; fi
+    if [ ! -d "${vep_cache}/$species" ]; then
+        if [ -z "${vep_cache_url}" ]; then
+            perl /opt/vep/src/ensembl-vep/INSTALL.pl --CACHEDIR ${vep_cache} --SPECIES $species $args $input_args
+            perl /opt/vep/src/ensembl-vep/convert_cache.pl --dir ${vep_cache} --species $species --version all
+        else
+            wget -O cache_file.tar.gz ${vep_cache_url}
+            tar -xzf cache_file.tar.gz -C ${vep_cache}/
+        fi
+    fi
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

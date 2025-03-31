@@ -1,0 +1,38 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "download_file"
+## TODO nf-core: Add a description of the module and list keywords
+description: write your description here
+keywords:
+  - sort
+  - example
+  - genomics
+tools:
+  - "download_file":
+      description: "Download file"
+      homepage: "None"
+      documentation: "None"
+      tool_dev_url: "None"
+      doi: ""
+      identifier:
+
+input:
+  - - url:
+        type: string
+        description: url
+
+  - - extension:
+        type: string
+        description: |
+          output file extension
+
+output:
+  - output_file:
+    - ".${extension}":
+        type: file
+        description: output file
+
+authors:
+  - "@psuszyns"
+maintainers:
+  - "@psuszyns"

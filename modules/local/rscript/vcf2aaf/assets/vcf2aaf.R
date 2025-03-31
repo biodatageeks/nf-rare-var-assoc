@@ -33,7 +33,7 @@ default_tag_name <- args[4]  # default_tag_name = "AF"
 
 vars <- fread(vcf_path, skip="#CHROM", sep="\t")
 
-chrom_num_col <- stringr::str_extract(vars[["#CHROM"]], regex("(chr[0-9XY]+)", ignore_case = T), group = 1)
+chrom_num_col <- stringr::str_extract(vars[["#CHROM"]], regex("([0-9XY]+)", ignore_case = T), group = 1)
 pos_col <- paste(chrom_num_col, vars$POS, vars$REF, vars$ALT, sep="_")
 
 af_col <- stringr::str_extract(vars$INFO, regex(paste0(default_tag_name, "=([\\.0-9]+)"), ignore_case = T), group = 1)

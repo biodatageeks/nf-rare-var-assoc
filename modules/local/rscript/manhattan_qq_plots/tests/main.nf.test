@@ -23,7 +23,7 @@ nextflow_process {
                 """
                 input[0] = [
                     'Y1', // phenotype
-                    file('${projectDir}/modules/local/merge_results/tests/assets/chr1_Y1.regenie.gz', checkIfExists: true)
+                    file('${projectDir}/modules/local/cmds/merge_results/tests/assets/chr1_Y1.regenie.gz', checkIfExists: true)
                 ]
                 input[1] = file("${projectDir}/modules/local/rscript/manhattan_qq_plots/assets/gene_level_report_template.Rmd", checkIfExists: true)
                 input[2] = file("${projectDir}/modules/local/rscript/manhattan_qq_plots/assets/functions.R", checkIfExists: true)

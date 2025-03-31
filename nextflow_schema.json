@@ -261,7 +261,7 @@
                 "py_script_csv_concat_path": {
                     "type": "string",
                     "description": "Path to csv_concat.py script.",
-                    "default": "${projectDir}/modules/local/merge_results/assets/csv_concat.py",
+                    "default": "${projectDir}/modules/local/cmds/merge_results/assets/csv_concat.py",
                     "fa_icon": "fas fa-code",
                     "hidden": false
                 },

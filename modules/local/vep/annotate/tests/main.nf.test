@@ -23,7 +23,8 @@ nextflow_process {
                 """
                 input[0] = [
                     [ id:'test', single_end:false ], // meta map
-                    file('${projectDir}/assets/medium_data/1000g_lpa_hg38.vcf', checkIfExists: true)
+                    file('${projectDir}/assets/medium_data/1000g_lpa_hg38.vcf', checkIfExists: true),
+                    []
                 ]
                 input[1] = file('${projectDir}/../vep_cachedir/homo_sapiens_refseq', checkIfExists: true)
                 input[2] = 'homo_sapiens'

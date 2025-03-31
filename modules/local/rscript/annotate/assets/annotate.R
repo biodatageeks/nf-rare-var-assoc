@@ -203,7 +203,7 @@ dd[, key := paste0(CHROM, '_', POS, '_', REF, '_', ALT)]
 anno <- dd[!is.na(Symbol), c("key", "Symbol", "Consequence"), with=F]
 
 # Filter out chrM and chrY, replace : with _
-anno <- anno[!grepl("^chrM|^chrY", key)]
+anno <- anno[!grepl("^chrM|^chrY|^M|^Y", key)]
 anno$key <- gsub(":", "_", anno$key)
 
 # remove multiallelic
@@ -221,7 +221,7 @@ setlist <- rbindlist(lapply(unique_features, function(feature) {
     )
 }))
 # Filter and process setlist (same chrM/chrY filtering as annotations)
-setlist <- setlist[!grepl("^chrM|^chrY", chrom)]
+setlist <- setlist[!grepl("^chrM|^chrY|^M|^Y", chrom)]
 setlist$variants <- gsub(":", "_", setlist$variants)
 
 
