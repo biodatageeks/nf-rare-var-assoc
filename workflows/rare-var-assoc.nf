@@ -60,17 +60,17 @@ workflow RARE_VAR_ASSOC {
         ch_vep_cachedir,
         Channel.of(params.vep_updatecache_species),
         Channel.of(params.vep_updatecache_options),
-        Channel.of(params.vep_cache_url)
+        Channel.of(params.vep_cache_url),
+        Channel.of(tuple(params.ref_fasta_url, params.vep_fasta_path))
     )
     ch_vep_cachesubdir = VEP_UPDATECACHE.out.cachesubdir
     ch_versions = ch_versions.mix(VEP_UPDATECACHE.out.versions.first())
 
     // DOWNLOAD_FILE (
-    //     ch_input_vcf.map { t -> [t[0], params.ref_fasta_url] },
+    //     ch_meta.map { t -> [t, params.ref_fasta_url] },
     //     Channel.of("fa.gz")
     // )
     // ch_ref_fasta = DOWNLOAD_FILE.out.output_file
-    ch_ref_fasta = Channel.fromPath("${vep_cachedir}/${params.vep_updatecache_species}/${params.vep_fasta_path}", checkIfExists: true)
 
     BCFTOOLS_INDEX_1 (
         ch_input_vcf
@@ -93,7 +93,7 @@ workflow RARE_VAR_ASSOC {
         ch_annotated_vcf
             .join(ch_annotated_vcf_tbi, by: 0)  // Join by the first element (meta)
             .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) },
-        ch_ref_fasta.map { t -> [[], t] }
+        ch_vep_cachesubdir.map { t -> [[], "${t}/${params.vep_fasta_path}"] }
     )
     ch_normalized_vcf = BCFTOOLS_NORM.out.vcf
     ch_normalized_vcf_tbi = BCFTOOLS_NORM.out.tbi

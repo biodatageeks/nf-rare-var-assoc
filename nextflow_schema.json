@@ -224,6 +224,20 @@
                     "fa_icon": "fas fa-code",
                     "hidden": false
                 },
+                "ref_fasta_url": {
+                    "type": "string",
+                    "description": "Reference genome fasta file for download.",
+                    "default": "https://ftp.ensembl.org/pub/release-113/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.toplevel.fa.gz",
+                    "fa_icon": "fas fa-pen-line",
+                    "hidden": false
+                },
+                "vep_cache_url": {
+                    "type": "string",
+                    "description": "VEP cache for download.",
+                    "default": "https://ftp.ensembl.org/pub/release-113/variation/indexed_vep_cache/homo_sapiens_refseq_vep_113_GRCh38.tar.gz",
+                    "fa_icon": "fas fa-pen-line",
+                    "hidden": false
+                },
                 "vep_updatecache_options": {
                     "type": "string",
                     "description": "Options for VEP update cache.",

@@ -6,7 +6,7 @@ process VEP_ANNOTATE {
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/ensembl-vep:release_113.4':
-        'docker.io/psuszynski/ensembl-vep:113.4.2' }"
+        'docker.io/psuszynski/ensembl-vep:113.4.3' }"
 
     input:
     tuple val(meta), path(input_vcf), path(input_vcf_tbi)
