@@ -19,7 +19,8 @@ include { PLINK2_MAKEBED         } from '../modules/local/plink2/makebed'
 include { PLINK19_MAKEBED        } from '../modules/local/plink19/makebed'
 include { VEP_ANNOTATE           } from '../modules/local/vep/annotate'
 include { VEP_UPDATECACHE        } from '../modules/local/vep/updatecache'
-include { BCFTOOLS_VIEW          } from '../modules/local/bcftools/view'
+include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_1 } from '../modules/local/bcftools/view'
+include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_2 } from '../modules/local/bcftools/view'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_1 } from '../modules/local/bcftools/index'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_2 } from '../modules/local/bcftools/index'
 include { BCFTOOLS_ANNOTATE      } from '../modules/nf-core/bcftools/annotate'
@@ -36,6 +37,23 @@ include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_rare
     RUN MAIN WORKFLOW
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
+
+process JOIN_CASES_AND_CONTROLS {
+    label 'process_single'
+
+    input:
+    path(cases)
+    path(controls)
+
+    output:
+    path("all.samples"), emit: output_file
+
+    script:
+    """
+    cut -f1 ${cases} > all.samples
+    cut -f1 ${controls} >> all.samples
+    """
+}
 
 workflow RARE_VAR_ASSOC {
 
@@ -71,6 +89,12 @@ workflow RARE_VAR_ASSOC {
     //     Channel.of("fa.gz")
     // )
     // ch_ref_fasta = DOWNLOAD_FILE.out.output_file
+    
+    JOIN_CASES_AND_CONTROLS (
+        ch_cases.map { t -> t[1] },
+        ch_controls.map { t -> t[1] }
+    )
+    ch_all_samples = JOIN_CASES_AND_CONTROLS.out.output_file
 
     BCFTOOLS_INDEX_1 (
         ch_input_vcf
@@ -78,9 +102,23 @@ workflow RARE_VAR_ASSOC {
     ch_input_vcf_tbi = BCFTOOLS_INDEX_1.out.tbi
     ch_versions = ch_versions.mix(BCFTOOLS_INDEX_1.out.versions.first())
 
-    BCFTOOLS_ANNOTATE (
+    BCFTOOLS_VIEW_1 (
         ch_input_vcf
-            .join(ch_input_vcf_tbi, by: 0)  // Join by the first element (meta)
+            .join(ch_input_vcf_tbi, by: 0)                    // Join by the first element (meta)
+            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) },
+        Channel.of([]),                                       // No regions file
+        Channel.of([]),                                       // No targets file
+        ch_all_samples,                                       // Samples file
+        Channel.of([]),                                       // SNPs file
+        Channel.of("--output-type z --write-index=tbi")       // input args
+    )
+    ch_all_samples_vcf  = BCFTOOLS_VIEW_1.out.vcf
+    ch_all_samples_vcf_tbi  = BCFTOOLS_VIEW_1.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_VIEW_1.out.versions.first())
+
+    BCFTOOLS_ANNOTATE (
+        ch_all_samples_vcf
+            .join(ch_all_samples_vcf_tbi, by: 0)  // Join by the first element (meta)
             .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], []) },
         Channel.of([]),
         ch_rename_chr
@@ -153,15 +191,16 @@ workflow RARE_VAR_ASSOC {
     ch_id  = PLINK2_WRITE_SNPLIST.out.id
     ch_versions = ch_versions.mix(PLINK2_WRITE_SNPLIST.out.versions.first())
 
-    BCFTOOLS_VIEW (
+    BCFTOOLS_VIEW_2 (
         ch_vep_vcf_with_index,
         Channel.of([]),                     // No regions file
         Channel.of([]),                     // No targets file
         ch_id.map { t -> t[1] },            // Samples file
-        ch_snplist.map { t -> t[1] }        // SNPs file
+        ch_snplist.map { t -> t[1] },       // SNPs file
+        Channel.of("--output-type v")       // input args
     )
-    ch_filtered_vcf  = BCFTOOLS_VIEW.out.vcf
-    ch_versions = ch_versions.mix(BCFTOOLS_VIEW.out.versions.first())
+    ch_filtered_vcf  = BCFTOOLS_VIEW_2.out.vcf
+    ch_versions = ch_versions.mix(BCFTOOLS_VIEW_2.out.versions.first())
     
 
     PLINK2_EXPORT_BGEN (

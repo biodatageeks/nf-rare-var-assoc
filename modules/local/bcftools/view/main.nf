@@ -15,6 +15,7 @@ process BCFTOOLS_VIEW {
     path(targets)
     path(samples)
     path(snplist)
+    val(input_args)
 
     output:
     tuple val(meta), path("*.{vcf,vcf.gz,bcf,bcf.gz}"), emit: vcf
@@ -26,7 +27,7 @@ process BCFTOOLS_VIEW {
     task.ext.when == null || task.ext.when
 
     script:
-    def args = task.ext.args ?: ''
+    def args = (task.ext.args ?: '') + ' ' + input_args
     def prefix = task.ext.prefix ?: "${meta.id}"
     def regions_file  = regions ? "--regions-file ${regions}" : ""
     def targets_file = targets ? "--targets-file ${targets}" : ""
@@ -39,6 +40,7 @@ process BCFTOOLS_VIEW {
                     args.contains("--output-type v") || args.contains("-Ov") ? "vcf" :
                     "vcf"
     """
+    echo "args:"
     echo ${args}
 
     if [ -s "${samples}" ]; then
