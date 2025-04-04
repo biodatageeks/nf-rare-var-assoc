@@ -83,12 +83,6 @@ workflow RARE_VAR_ASSOC {
     )
     ch_vep_cachesubdir = VEP_UPDATECACHE.out.cachesubdir
     ch_versions = ch_versions.mix(VEP_UPDATECACHE.out.versions.first())
-
-    // DOWNLOAD_FILE (
-    //     ch_meta.map { t -> [t, params.ref_fasta_url] },
-    //     Channel.of("fa.gz")
-    // )
-    // ch_ref_fasta = DOWNLOAD_FILE.out.output_file
     
     JOIN_CASES_AND_CONTROLS (
         ch_cases.map { t -> t[1] },
@@ -159,19 +153,11 @@ workflow RARE_VAR_ASSOC {
         .join(ch_vep_vcf_tbi, by: 0)
         .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) }
 
-    PLINK19_MAKEBED (
-        ch_vep_vcf
-    )
-    ch_initial_bed  = PLINK19_MAKEBED.out.bed
-    ch_initial_bim  = PLINK19_MAKEBED.out.bim
-    ch_initial_fam  = PLINK19_MAKEBED.out.fam
-    ch_initial_nosex  = PLINK19_MAKEBED.out.nosex
-    ch_versions = ch_versions.mix(PLINK19_MAKEBED.out.versions.first())
-
     PLINK2_MAKEBED (
-        ch_initial_bed,
-        ch_initial_bim,
-        ch_initial_fam,
+        tuple([], []),
+        tuple([], []),
+        tuple([], []),
+        ch_vep_vcf,        
         Channel.of('filter_pass'),
         Channel.of(params.plink2_makebed_options)
     )

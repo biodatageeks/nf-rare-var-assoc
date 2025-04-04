@@ -45,7 +45,7 @@ process BCFTOOLS_VIEW {
 
     if [ -s "${samples}" ]; then
         if [ \$(head -1 ${samples} | cut -c 1) == '#' ]; then
-            cut -f1 ${samples} | tail -n +2 > samples_transformed.txt
+            cut -f2 ${samples} | tail -n +2 > samples_transformed.txt
         else
             ln ${samples} samples_transformed.txt
         fi
