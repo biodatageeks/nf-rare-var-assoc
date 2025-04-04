@@ -19,14 +19,20 @@ nextflow_process {
         // You can find more information about how to use a 'setup' method in the docs (https://nf-co.re/docs/contributing/modules#steps-for-creating-nf-test-for-chained-modules).
 
         setup {
-            run("PLINK19_MAKEBED") {
-                script "../../../plink19/makebed/main.nf"
+            run("PLINK2_MAKEBED") {
+                script "../../../plink2/makebed/main.nf"
                 process {
                     """
                     input[0] = [
                         [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true)
+                        [],  // bed
+                        [],  // bim
+                        [],  // fam
+                        file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true),
+                        []   // frq
                     ]
+                    input[1] = 'filter'
+                    input[2] = '--mac 1 --double-id --vcf-half-call missing'
                     """
                 }
             }
@@ -34,11 +40,9 @@ nextflow_process {
                 script "../../../plink2/export_bgen/main.nf"
                 process {
                     """
-                    input[0] = PLINK19_MAKEBED.out.bed
-                    input[1] = PLINK19_MAKEBED.out.bim
-                    input[2] = PLINK19_MAKEBED.out.fam
-                    input[3] = 'pvcf.norm_zlib'
-                    input[4] = '--1 --export bgen-1.2 bits=8 id-paste=iid ref-first'
+                    input[0] = PLINK2_MAKEBED.out.out_bed_bim_fam
+                    input[1] = 'pvcf.norm_zlib'
+                    input[2] = '--1 --export bgen-1.2 bits=8 id-paste=iid ref-first'
                     """
                 }
             }
@@ -46,11 +50,9 @@ nextflow_process {
                 script "../../../plink2/write_snplist/main.nf"
                 process {
                     """
-                    input[0] = PLINK19_MAKEBED.out.bed
-                    input[1] = PLINK19_MAKEBED.out.bim
-                    input[2] = PLINK19_MAKEBED.out.fam
-                    input[3] = 'qc_pass'
-                    input[4] = '--maf 0.01 --mac 1 --geno 0.1 --hwe 1e-15 --write-samples'
+                    input[0] = PLINK2_MAKEBED.out.out_bed_bim_fam
+                    input[1] = 'qc_pass'
+                    input[2] = '--maf 0.01 --mac 1 --geno 0.1 --hwe 1e-15 --write-samples'
                     """
                 }
             }
@@ -72,22 +74,20 @@ nextflow_process {
                         [ id:'test', single_end:false ], // meta map
                         file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true)
                     ]
-                    input[2] = PLINK19_MAKEBED.out.bed
-                    input[3] = PLINK19_MAKEBED.out.bim
-                    input[4] = PLINK19_MAKEBED.out.fam
-                    input[5] = PLINK2_EXPORT_BGEN.out.bgen
-                    input[6] = BGENIX.out.bgen_bgi
-                    input[7] = PLINK2_EXPORT_BGEN.out.sample
-                    input[8] = [
+                    input[2] = PLINK2_MAKEBED.out.out_bed_bim_fam
+                    input[3] = PLINK2_EXPORT_BGEN.out.bgen
+                    input[4] = BGENIX.out.bgen_bgi
+                    input[5] = PLINK2_EXPORT_BGEN.out.sample
+                    input[6] = [
                         [ id:'test', single_end:false ], // meta map
                         file('${projectDir}/assets/medium_data/1kGP_controls.txt', checkIfExists: true)
                     ]
-                    input[9] = [
+                    input[7] = [
                         [ id:'test', single_end:false ], // meta map
                         file('${projectDir}/assets/medium_data/1kGP_cases.txt', checkIfExists: true)
                     ]
-                    input[10] = file('${projectDir}/assets/default.masks', checkIfExists: true)
-                    input[11] = '--min_top_annotations 50 --quantile_threshold 0.25 --include-intergenic FALSE'
+                    input[8] = file('${projectDir}/assets/default.masks', checkIfExists: true)
+                    input[9] = '--min_top_annotations 50 --quantile_threshold 0.25 --include-intergenic FALSE'
                     """
                 }
             }
@@ -108,13 +108,11 @@ nextflow_process {
                 script "../../../regenie/step1/main.nf"
                 process {
                     """
-                    input[0] = PLINK19_MAKEBED.out.bed
-                    input[1] = PLINK19_MAKEBED.out.bim
-                    input[2] = PLINK19_MAKEBED.out.fam
-                    input[3] = PLINK2_WRITE_SNPLIST.out.id
-                    input[4] = PLINK2_WRITE_SNPLIST.out.snplist
-                    input[5] = RSCRIPT_ANNOTATE.out.phenotype
-                    input[6] = '--bt --bsize 100 --lowmem'
+                    input[0] = PLINK2_MAKEBED.out.out_bed_bim_fam
+                    input[1] = PLINK2_WRITE_SNPLIST.out.id
+                    input[2] = PLINK2_WRITE_SNPLIST.out.snplist
+                    input[3] = RSCRIPT_ANNOTATE.out.phenotype
+                    input[4] = '--bt --bsize 100 --lowmem'
                     """
                 }
             }

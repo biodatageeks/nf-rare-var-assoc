@@ -8,17 +8,12 @@ process PLINK2_MAKEBED {
         params.cpu_support_avx2 ? 'docker.io/psuszynski/plink:2.0-alpha.6.9': 'docker.io/psuszynski/plink:2.0-alpha.6.9.noavx2' }"
 
     input:
-    tuple val(meta), path(bed)
-    tuple val(meta), path(bim)
-    tuple val(meta), path(fam)
-    tuple val(meta), path(vcf)
+    tuple val(meta), path(bed), path(bim), path(fam), path(vcf), path(frq)
     val(out_name_part)
     val(input_args)
 
     output:
-    tuple val(meta), path("*.bed"), emit: out_bed
-    tuple val(meta), path("*.bim"), emit: out_bim
-    tuple val(meta), path("*.fam"), emit: out_fam
+    tuple val(meta), path("*.bed"), path("*.bim"), path("*.fam"), emit: out_bed_bim_fam
     tuple val(meta), path("*.log"), emit: log
     path "versions.yml"           , emit: versions
 
@@ -30,10 +25,11 @@ process PLINK2_MAKEBED {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def mem_mb = task.memory.toMega()
 
-    def bed_input = bed ? "--bed ${bed}": ""
-    def bim_input = bim ? "--bim ${bim}": ""
-    def fam_input = fam ? "--fam ${fam}": ""
-    def vcf_input = vcf ? "--vcf ${vcf}": ""
+    def bed_input = bed ? "--bed ${bed}" : ""
+    def bim_input = bim ? "--bim ${bim}" : ""
+    def fam_input = fam ? "--fam ${fam}" : ""
+    def vcf_input = vcf ? "--vcf ${vcf}" : ""
+    def frq_input = frq ? "--read-freq ${frq}" : ""
 
     """
     plink2 \\
@@ -45,6 +41,7 @@ process PLINK2_MAKEBED {
         ${bim_input} \\
         ${fam_input} \\
         ${vcf_input} \\
+        ${frq_input} \\
         --make-bed \\
         --out ${prefix}_${out_name_part}
 

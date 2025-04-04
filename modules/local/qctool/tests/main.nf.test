@@ -26,17 +26,11 @@ nextflow_process {
                     input[0] = [
                         [ id:'test', single_end:false ], // meta map
                         file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/plink/test.rnaseq.bed', checkIfExists: true),
-                    ]
-                    input[1] = [
-                        [ id:'test', single_end:false ], // meta map
                         file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/plink/test.rnaseq.bim', checkIfExists: true),
-                    ]
-                    input[2] = [
-                        [ id:'test', single_end:false ], // meta map
                         file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/plink/test.rnaseq.fam', checkIfExists: true),
                     ]
-                    input[3] = 'pvcf.norm_zlib'
-                    input[4] = '--1 --export bgen-1.2 bits=8 id-paste=iid ref-first'
+                    input[1] = 'pvcf.norm_zlib'
+                    input[2] = '--1 --export bgen-1.2 bits=8 id-paste=iid ref-first'
                     """
                 }
             }

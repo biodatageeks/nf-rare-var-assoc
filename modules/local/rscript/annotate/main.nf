@@ -8,9 +8,7 @@ process RSCRIPT_ANNOTATE {
     input:
     path(r_script_ch)
     tuple val(meta), path(vcf)
-    tuple val(meta), path(bed)
-    tuple val(meta), path(bim)
-    tuple val(meta), path(fam)
+    tuple val(meta), path(bed), path(bim), path(fam)
     tuple val(meta), path(bgen)
     tuple val(meta), path(bgen_bgi)
     tuple val(meta), path(sample)

@@ -1,0 +1,38 @@
+nextflow_process {
+
+    name "Test Process BCFTOOLS_VCF2FRQ"
+    script "../main.nf"
+    process "BCFTOOLS_VCF2FRQ"
+
+    tag "modules"
+    tag "modules_nfcore"
+    tag "bcftools"
+    tag "bcftools/vcf2frq"
+
+    test("sarscov2 - [vcf, tbi]") {
+
+        when {
+            process {
+                """
+                input[0] = [ 
+                    [ id:'out' ], // meta map
+                    file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true),
+                    []
+                ]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot(
+                    process.out.frq,
+                    process.out.versions
+                ).match() }
+            )
+        }
+
+    }
+
+}

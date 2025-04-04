@@ -18,28 +18,19 @@ nextflow_process {
         // add the 'setup' method here.
         // You can find more information about how to use a 'setup' method in the docs (https://nf-co.re/docs/contributing/modules#steps-for-creating-nf-test-for-chained-modules).
 
-        setup {
-            run("PLINK19_MAKEBED") {
-                script "../../../plink19/makebed/main.nf"
-                process {
-                    """
-                    input[0] = [
-                        [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/medium_data/1000g_lpa_hg38_vep.vcf', checkIfExists: true)
-                    ]
-                    """
-                }
-            }
-        }
-
         when {
             process {
                 """
-                input[0] = PLINK19_MAKEBED.out.bed
-                input[1] = PLINK19_MAKEBED.out.bim
-                input[2] = PLINK19_MAKEBED.out.fam
-                input[3] = 'filter'
-                input[4] = '--new-id-max-allele-len 120 truncate --rm-dup force-first list --geno 0.2 --mac 1 --maf 0.01 --hwe 1e-13 0.001'
+                input[0] = [
+                    [ id:'test', single_end:false ], // meta map
+                    file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/plink/test.rnaseq.bed', checkIfExists: true),
+                    file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/plink/test.rnaseq.bim', checkIfExists: true),
+                    file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/plink/test.rnaseq.fam', checkIfExists: true),
+                    [],
+                    []
+                ]
+                input[1] = 'filter'
+                input[2] = '--hwe 1e-13 0.001'
                 """
             }
         }

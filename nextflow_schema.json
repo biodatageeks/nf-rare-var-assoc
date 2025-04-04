@@ -140,10 +140,21 @@
                     "fa_icon": "fas fa-bed",
                     "hidden": false
                 },
-                "plink2_makebed_options": {
+                "plink2_makebed_options_1": {
                     "type": "string",
-                    "description": "Options to pass to plink2 makebed call.",
-                    "default": "--mac 100",
+                    "description": "Options to pass to plink2 makebed call 1.",
+                    "fa_icon": "fas fa-pen-to-square",
+                    "hidden": false
+                },
+                "plink2_makebed_options_2": {
+                    "type": "string",
+                    "description": "Options to pass to plink2 makebed call 2.",
+                    "fa_icon": "fas fa-pen-to-square",
+                    "hidden": false
+                },
+                "plink2_makebed_options_3": {
+                    "type": "string",
+                    "description": "Options to pass to plink2 makebed call 3.",
                     "fa_icon": "fas fa-pen-to-square",
                     "hidden": false
                 },

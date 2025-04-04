@@ -19,14 +19,20 @@ nextflow_process {
         // You can find more information about how to use a 'setup' method in the docs (https://nf-co.re/docs/contributing/modules#steps-for-creating-nf-test-for-chained-modules).
 
         setup {
-            run("PLINK19_MAKEBED") {
-                script "../../../plink19/makebed/main.nf"
+            run("PLINK2_MAKEBED") {
+                script "../../../plink2/makebed/main.nf"
                 process {
                     """
                     input[0] = [
                         [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/medium_data/1000g_lpa_hg38_vep.vcf', checkIfExists: true)
+                        [],  // bed
+                        [],  // bim
+                        [],  // fam
+                        file('${projectDir}/assets/medium_data/1000g_lpa_hg38_vep.vcf', checkIfExists: true),
+                        []   // frq
                     ]
+                    input[1] = 'filter'
+                    input[2] = '--mac 1 --double-id --vcf-half-call missing'
                     """
                 }
             }
@@ -35,11 +41,9 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = PLINK19_MAKEBED.out.bed
-                input[1] = PLINK19_MAKEBED.out.bim
-                input[2] = PLINK19_MAKEBED.out.fam
-                input[3] = 'snps_pass'
-                input[4] = '--mac 1'
+                input[0] = PLINK2_MAKEBED.out.out_bed_bim_fam
+                input[1] = 'snps_pass'
+                input[2] = '--mac 1'
                 """
             }
         }

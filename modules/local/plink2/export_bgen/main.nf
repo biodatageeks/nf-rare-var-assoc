@@ -35,9 +35,7 @@ process PLINK2_EXPORT_BGEN {
     //               https://github.com/nf-core/modules/blob/master/modules/nf-core/bwa/index/main.nf
     // TODO nf-core: Where applicable please provide/convert compressed files as input/output
     //               e.g. "*.fastq.gz" and NOT "*.fastq", "*.bam" and NOT "*.sam" etc.
-    tuple val(meta), path(bed)
-    tuple val(meta), path(bim)
-    tuple val(meta), path(fam)
+    tuple val(meta), path(bed), path(bim), path(fam)
     val(out_name_part)
     val(input_args)
 

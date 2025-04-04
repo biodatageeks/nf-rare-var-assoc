@@ -15,10 +15,12 @@ include { BGENIX                 } from '../modules/local/bgenix'
 include { QCTOOL                 } from '../modules/local/qctool'
 include { PLINK2_EXPORT_BGEN     } from '../modules/local/plink2/export_bgen'
 include { PLINK2_WRITE_SNPLIST   } from '../modules/local/plink2/write_snplist'
-include { PLINK2_MAKEBED         } from '../modules/local/plink2/makebed'
-include { PLINK19_MAKEBED        } from '../modules/local/plink19/makebed'
+include { PLINK2_MAKEBED as PLINK2_MAKEBED_1 } from '../modules/local/plink2/makebed'
+include { PLINK2_MAKEBED as PLINK2_MAKEBED_2 } from '../modules/local/plink2/makebed'
+include { PLINK2_MAKEBED as PLINK2_MAKEBED_3 } from '../modules/local/plink2/makebed'
 include { VEP_ANNOTATE           } from '../modules/local/vep/annotate'
 include { VEP_UPDATECACHE        } from '../modules/local/vep/updatecache'
+include { BCFTOOLS_VCF2FRQ       } from '../modules/local/bcftools/vcf2frq'
 include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_1 } from '../modules/local/bcftools/view'
 include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_2 } from '../modules/local/bcftools/view'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_1 } from '../modules/local/bcftools/index'
@@ -52,6 +54,25 @@ process JOIN_CASES_AND_CONTROLS {
     """
     cut -f1 ${cases} > all.samples
     cut -f1 ${controls} >> all.samples
+    """
+}
+
+process CHECK_X_CHROM_PRESENT {
+    input:
+    tuple val(meta), path(bed), path(bim), path(fam)
+
+    output:
+    tuple val(meta), env(has_x), path(bed), path(bim), path(fam), emit: has_x
+
+    script:
+    """
+    # Check if chromosome X (e.g., 23) exists in the .bim file
+    if grep -q "^23\\s" ${bim}; then
+        echo "true" > has_x.txt
+    else
+        echo "false" > has_x.txt
+    fi
+    has_x=\$(cat has_x.txt)
     """
 }
 
@@ -153,23 +174,56 @@ workflow RARE_VAR_ASSOC {
         .join(ch_vep_vcf_tbi, by: 0)
         .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) }
 
-    PLINK2_MAKEBED (
-        tuple([], []),
-        tuple([], []),
-        tuple([], []),
-        ch_vep_vcf,        
-        Channel.of('filter_pass'),
-        Channel.of(params.plink2_makebed_options)
+    BCFTOOLS_VCF2FRQ (
+        ch_vep_vcf_with_index
     )
-    ch_bed  = PLINK2_MAKEBED.out.out_bed
-    ch_bim  = PLINK2_MAKEBED.out.out_bim
-    ch_fam  = PLINK2_MAKEBED.out.out_fam
-    ch_versions = ch_versions.mix(PLINK2_MAKEBED.out.versions.first())
+    ch_frq = BCFTOOLS_VCF2FRQ.out.frq
+    ch_versions = ch_versions.mix(BCFTOOLS_VCF2FRQ.out.versions.first())
+
+    PLINK2_MAKEBED_1 (
+        ch_vep_vcf.map { t -> tuple(t[0], [], [], [], t[1], []) },
+        Channel.of('load_vcf'),
+        Channel.of(params.plink2_makebed_options_1)
+    )
+    ch_bed_bim_fam_1  = PLINK2_MAKEBED_1.out.out_bed_bim_fam
+    ch_versions = ch_versions.mix(PLINK2_MAKEBED_1.out.versions.first())
+
+
+    CHECK_X_CHROM_PRESENT (
+        ch_bed_bim_fam_1
+    )
+    ch_has_x  = CHECK_X_CHROM_PRESENT.out.has_x
+
+    // Split based on has_x
+    split_data = ch_has_x.branch {
+        with_x: it[1] == "true"
+        without_x: it[1] == "false"
+    }
+
+    // impute sex must be a separate step as per plink2 docs
+    PLINK2_MAKEBED_2 (
+        split_data.with_x
+            .join(ch_frq, by: 0)
+            .map { meta, has_x, bed, bim, fam, frq -> tuple(meta, bed, bim, fam, [], frq) },
+        Channel.of('impute_sex'),
+        Channel.of(params.plink2_makebed_options_2)
+    )
+    ch_bed_bim_fam_2  = PLINK2_MAKEBED_2.out.out_bed_bim_fam
+    ch_versions = ch_versions.mix(PLINK2_MAKEBED_2.out.versions.first())
+
+    combined_input = ch_bed_bim_fam_2
+        .mix(split_data.without_x.map { meta, has_x, bed, bim, fam -> tuple(meta, bed, bim, fam) })
+
+    PLINK2_MAKEBED_3 (
+        combined_input.map { meta, bed_file, bim_file, fam_file -> tuple(meta, bed_file, bim_file, fam_file, [], []) },
+        Channel.of('filter_pass'),
+        Channel.of(params.plink2_makebed_options_3)
+    )
+    ch_bed_bim_fam_3  = PLINK2_MAKEBED_3.out.out_bed_bim_fam
+    ch_versions = ch_versions.mix(PLINK2_MAKEBED_3.out.versions.first())
 
     PLINK2_WRITE_SNPLIST (
-        ch_bed,
-        ch_bim,
-        ch_fam,
+        ch_bed_bim_fam_3,
         Channel.of('writesnp_pass'),
         Channel.of(params.plink2_write_snplist_qc_options)
     )
@@ -190,9 +244,7 @@ workflow RARE_VAR_ASSOC {
     
 
     PLINK2_EXPORT_BGEN (
-        ch_bed,
-        ch_bim,
-        ch_fam,
+        ch_bed_bim_fam_3,
         Channel.of('pvcf.norm_zlib'),
         Channel.of(params.plink2_export_bgen_options)
     )
@@ -222,9 +274,7 @@ workflow RARE_VAR_ASSOC {
     RSCRIPT_ANNOTATE (
         r_script_annotate_ch,
         ch_filtered_vcf,
-        ch_bed,
-        ch_bim,
-        ch_fam,
+        ch_bed_bim_fam_3,
         ch_qc_bgen,
         ch_bgen_bgi,
         ch_qc_sample,
@@ -247,6 +297,10 @@ workflow RARE_VAR_ASSOC {
     )
     ch_renamed_fam  = RENAME.out.output
 
+    ch_bed_bim_fam_4 = ch_bed_bim_fam_3
+            .join(ch_renamed_fam, by: 0)
+            .map { meta, bed_file, bim_file, fam_file, new_fam_file -> tuple(meta, bed_file, bim_file, new_fam_file) }
+
     r_script_vcf2aaf_ch = Channel.fromPath(params.rscript_vcf2aaf_path, checkIfExists: true)
     RSCRIPT_VCFTOAAF (
         r_script_vcf2aaf_ch,
@@ -257,9 +311,7 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(RSCRIPT_VCFTOAAF.out.versions.first())
 
     REGENIE_STEP1 (
-        ch_bed,
-        ch_bim,
-        ch_renamed_fam,
+        ch_bed_bim_fam_4,
         ch_id,
         ch_snplist,
         ch_phenotype,
@@ -280,9 +332,7 @@ workflow RARE_VAR_ASSOC {
         ch_regenie_step1_pred_list,
         Channel.of(params.regenie_step2_options)
     )
-    ch_regenie_step2_masks_bed  = REGENIE_STEP2.out.masks_bed
-    ch_regenie_step2_masks_bim  = REGENIE_STEP2.out.masks_bim
-    ch_regenie_step2_masks_fam  = REGENIE_STEP2.out.masks_fam
+    ch_regenie_step2_masks_bed_bim_fam  = REGENIE_STEP2.out.masks_bed_bim_fam
     ch_regenie_step2_masks_snplist  = REGENIE_STEP2.out.masks_snplist
     ch_regenie_step2_regenie_out  = REGENIE_STEP2.out.regenie_out
     ch_versions = ch_versions.mix(REGENIE_STEP2.out.versions.first())
