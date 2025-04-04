@@ -39,9 +39,7 @@ process PLINK19_MAKEBED {
 
     output:
     // TODO nf-core: Named file extensions MUST be emitted for ALL output channels
-    tuple val(meta), path("*.bed"), emit: bed
-    tuple val(meta), path("*.bim"), emit: bim
-    tuple val(meta), path("*.fam"), emit: fam
+    tuple val(meta), path("*.bed"), path("*.bim"), path("*.fam"), emit: out_bed_bim_fam
     tuple val(meta), path("*.nosex"), emit: nosex
     tuple val(meta), path("*.log"), emit: log
     path "versions.yml"           , emit: versions

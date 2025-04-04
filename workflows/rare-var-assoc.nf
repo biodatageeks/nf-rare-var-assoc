@@ -18,6 +18,7 @@ include { PLINK2_WRITE_SNPLIST   } from '../modules/local/plink2/write_snplist'
 include { PLINK2_MAKEBED as PLINK2_MAKEBED_1 } from '../modules/local/plink2/makebed'
 include { PLINK2_MAKEBED as PLINK2_MAKEBED_2 } from '../modules/local/plink2/makebed'
 include { PLINK2_MAKEBED as PLINK2_MAKEBED_3 } from '../modules/local/plink2/makebed'
+include { PLINK19_MAKEBED        } from '../modules/local/plink19/makebed'
 include { VEP_ANNOTATE           } from '../modules/local/vep/annotate'
 include { VEP_UPDATECACHE        } from '../modules/local/vep/updatecache'
 include { BCFTOOLS_VCF2FRQ       } from '../modules/local/bcftools/vcf2frq'
@@ -180,14 +181,19 @@ workflow RARE_VAR_ASSOC {
     ch_frq = BCFTOOLS_VCF2FRQ.out.frq
     ch_versions = ch_versions.mix(BCFTOOLS_VCF2FRQ.out.versions.first())
 
-    PLINK2_MAKEBED_1 (
-        ch_vep_vcf.map { t -> tuple(t[0], [], [], [], t[1], []) },
-        Channel.of('load_vcf'),
-        Channel.of(params.plink2_makebed_options_1)
-    )
-    ch_bed_bim_fam_1  = PLINK2_MAKEBED_1.out.out_bed_bim_fam
-    ch_versions = ch_versions.mix(PLINK2_MAKEBED_1.out.versions.first())
+    //PLINK2_MAKEBED_1 (
+    //    ch_vep_vcf.map { t -> tuple(t[0], [], [], [], t[1], []) },
+    //    Channel.of('load_vcf'),
+    //    Channel.of(params.plink2_makebed_options_1)
+    //)
+    //ch_bed_bim_fam_1  = PLINK2_MAKEBED_1.out.out_bed_bim_fam
+    //ch_versions = ch_versions.mix(PLINK2_MAKEBED_1.out.versions.first())
 
+    PLINK19_MAKEBED (
+        ch_vep_vcf
+    )
+    ch_bed_bim_fam_1  = PLINK19_MAKEBED.out.out_bed_bim_fam
+    ch_versions = ch_versions.mix(PLINK19_MAKEBED.out.versions.first())
 
     CHECK_X_CHROM_PRESENT (
         ch_bed_bim_fam_1
