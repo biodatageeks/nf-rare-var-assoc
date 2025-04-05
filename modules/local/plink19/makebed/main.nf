@@ -17,7 +17,7 @@
 
 process PLINK19_MAKEBED {
     tag "$meta.id"
-    label 'process_single'
+    label 'process_high_memory'
 
     // TODO nf-core: List required Conda package(s).
     //               Software MUST be pinned to channel (i.e. "bioconda"), version (i.e. "1.10").
@@ -50,6 +50,7 @@ process PLINK19_MAKEBED {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
+    def mem_mb = task.memory.toMega()
     // TODO nf-core: Where possible, a command MUST be provided to obtain the version number of the software e.g. 1.10
     //               If the software is unable to output a version number on the command-line then it can be manually specified
     //               e.g. https://github.com/nf-core/modules/blob/master/modules/nf-core/homer/annotatepeaks/main.nf
@@ -62,6 +63,7 @@ process PLINK19_MAKEBED {
     """
     plink \\
         --threads ${task.cpus} \\
+        --memory $mem_mb \\
         --vcf ${vcf} \\
         $args \\
         --make-bed --out ${prefix}

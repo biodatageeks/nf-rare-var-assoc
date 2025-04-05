@@ -26,8 +26,8 @@ include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_1 } from '../modules/local/bcftools/vie
 include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_2 } from '../modules/local/bcftools/view'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_1 } from '../modules/local/bcftools/index'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_2 } from '../modules/local/bcftools/index'
+include { BCFTOOLS_NORM          } from '../modules/local/bcftools/norm'
 include { BCFTOOLS_ANNOTATE      } from '../modules/nf-core/bcftools/annotate'
-include { BCFTOOLS_NORM          } from '../modules/nf-core/bcftools/norm'
 include { MULTIQC                } from '../modules/nf-core/multiqc'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { REPORTING              } from '../subworkflows/local/reporting'
@@ -131,10 +131,21 @@ workflow RARE_VAR_ASSOC {
     ch_all_samples_vcf  = BCFTOOLS_VIEW_1.out.vcf
     ch_all_samples_vcf_tbi  = BCFTOOLS_VIEW_1.out.tbi
     ch_versions = ch_versions.mix(BCFTOOLS_VIEW_1.out.versions.first())
-
-    BCFTOOLS_ANNOTATE (
+    
+    BCFTOOLS_NORM (
         ch_all_samples_vcf
             .join(ch_all_samples_vcf_tbi, by: 0)  // Join by the first element (meta)
+            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) },
+        ch_vep_cachesubdir.map { t -> [[], "${t}/${params.vep_fasta_path}"] },
+        Channel.of("norm")
+    )
+    ch_normalized_vcf = BCFTOOLS_NORM.out.vcf
+    ch_normalized_vcf_tbi = BCFTOOLS_NORM.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_NORM.out.versions.first())
+
+    BCFTOOLS_ANNOTATE (
+        ch_normalized_vcf
+            .join(ch_normalized_vcf_tbi, by: 0)  // Join by the first element (meta)
             .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], []) },
         Channel.of([]),
         ch_rename_chr
@@ -142,20 +153,10 @@ workflow RARE_VAR_ASSOC {
     ch_annotated_vcf = BCFTOOLS_ANNOTATE.out.vcf
     ch_annotated_vcf_tbi = BCFTOOLS_ANNOTATE.out.tbi
     ch_versions = ch_versions.mix(BCFTOOLS_ANNOTATE.out.versions.first())
-    
-    BCFTOOLS_NORM (
-        ch_annotated_vcf
-            .join(ch_annotated_vcf_tbi, by: 0)  // Join by the first element (meta)
-            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) },
-        ch_vep_cachesubdir.map { t -> [[], "${t}/${params.vep_fasta_path}"] }
-    )
-    ch_normalized_vcf = BCFTOOLS_NORM.out.vcf
-    ch_normalized_vcf_tbi = BCFTOOLS_NORM.out.tbi
-    ch_versions = ch_versions.mix(BCFTOOLS_NORM.out.versions.first())
 
     VEP_ANNOTATE (
-        ch_normalized_vcf
-            .join(ch_normalized_vcf_tbi, by: 0)  // Join by the first element (meta)
+        ch_annotated_vcf
+            .join(ch_annotated_vcf_tbi, by: 0)  // Join by the first element (meta)
             .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) },
         ch_vep_cachesubdir,
         Channel.of(params.vep_annotate_species),

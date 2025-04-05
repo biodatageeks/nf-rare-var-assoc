@@ -46,5 +46,94 @@ nextflow_process {
 
     }
 
+    /*test("split-par - minimal_with_X vcf") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test', single_end:false ], // meta map
+                    [],  // bed
+                    [],  // bim
+                    [],  // fam
+                    file('${projectDir}/assets/small_data/minimal_with_X.vcf', checkIfExists: true),
+                    []   // frq
+                ]
+                input[1] = 'split_par'
+                input[2] = '--double-id --vcf-half-call missing --split-par b38'
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                // { assert snapshot(process.out).match() }
+                //TODO nf-core: Add all required assertions to verify the test output.
+                // See https://nf-co.re/docs/contributing/tutorials/nf-test_assertions for more information and examples.
+            )
+        }
+
+    }*/
+
+    /*test("impute-sex - minimal_with_X vcf") {
+
+        setup {
+            /*run("PLINK19_MAKEBED") {
+                script "../../../plink19/makebed/main.nf"
+                process {
+                    """
+                    input[0] = [
+                        [ id:'test', single_end:false ], // meta map
+                        file('${projectDir}/assets/small_data/minimal_with_X.vcf', checkIfExists: true)
+                    ]
+                    """
+                }
+            }*/
+            run("BCFTOOLS_VCF2FRQ") {
+                script "../../../bcftools/vcf2frq/main.nf"
+                process {
+                    """
+                    input[0] = [
+                        [ id:'test', single_end:false ], // meta map
+                        file('${projectDir}/assets/small_data/minimal_with_X.vcf', checkIfExists: true),
+                        []
+                    ]
+                    """
+                }
+            }
+        }
+
+        when {
+            // PLINK19_MAKEBED.out.out_bed_bim_fam[0],
+            // PLINK19_MAKEBED.out.out_bed_bim_fam[1],
+            // PLINK19_MAKEBED.out.out_bed_bim_fam[2],
+            // PLINK19_MAKEBED.out.out_bed_bim_fam[3],
+            process {
+                """
+                input[0] = [
+                    [ id:'test', single_end:false ],
+                    file('${projectDir}/modules/local/plink2/makebed/tests/assets/test.bed', checkIfExists: true),
+                    file('${projectDir}/modules/local/plink2/makebed/tests/assets/test.bim', checkIfExists: true),
+                    file('${projectDir}/modules/local/plink2/makebed/tests/assets/test.fam', checkIfExists: true),
+                    [],
+                    BCFTOOLS_VCF2FRQ.out.frq[1]   // frq
+                ]
+                input[1] = 'impute_sex'
+                input[2] = '--impute-sex'
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                // { assert snapshot(process.out).match() }
+                //TODO nf-core: Add all required assertions to verify the test output.
+                // See https://nf-co.re/docs/contributing/tutorials/nf-test_assertions for more information and examples.
+            )
+        }
+
+    }*/
 
 }

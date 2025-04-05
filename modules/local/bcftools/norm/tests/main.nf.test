@@ -25,6 +25,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
@@ -54,6 +55,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
@@ -87,6 +89,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
@@ -120,6 +123,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
@@ -153,6 +157,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
@@ -182,6 +187,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
@@ -211,6 +217,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
@@ -245,6 +252,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
@@ -274,6 +282,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
@@ -304,6 +313,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
@@ -334,6 +344,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
@@ -364,6 +375,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
@@ -393,6 +405,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
@@ -423,6 +436,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
@@ -453,6 +467,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
@@ -483,6 +498,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
@@ -514,6 +530,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
@@ -545,6 +562,7 @@ nextflow_process {
                     [ id:'genome' ], // meta map
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
                 ]
+                input[2] = ''
                 """
             }
         }
