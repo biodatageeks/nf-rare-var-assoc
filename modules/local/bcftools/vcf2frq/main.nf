@@ -23,9 +23,7 @@ process BCFTOOLS_VCF2FRQ {
     """
     bcftools query -f '%CHROM\\t%ID\\t%REF\\t%ALT\\t%INFO/AF\\t%INFO/AC\\n' $vcf | \\
     awk 'BEGIN {print "CHR\\tSNP\\tA1\\tA2\\tMAF\\tNCHROBS"} \\
-        {maf=\$5; a1=\$3; a2=\$4; if (\$5 > 0.5) {maf=1-\$5; a1=\$4; a2=\$3} \\
-        nchrom=(maf > 0 ? int(2*\$6/maf + 0.5) : 0); if (\$2==".") \$2=\$1"_"\$3"_"\$4; \\
-        print \$1"\\t"\$2"\\t"a1"\\t"a2"\\t"maf"\\t"nchrom}' > ${prefix}.frq
+        {print \$1"\\t"\$2"\\t"\$4"\\t"\$3"\\t"\$5"\\t"\$6}' > ${prefix}.frq
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
