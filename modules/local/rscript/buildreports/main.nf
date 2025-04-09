@@ -42,9 +42,9 @@ process RSCRIPT_BUILDREPORTS {
 
     output:
     // TODO nf-core: Named file extensions MUST be emitted for ALL output channels
-    tuple val(meta), path("*_annotated_snps.tsv"), emit: annotated_snps
-    tuple val(meta), path("*_res_log10p_1_annotated.tsv"), emit: res_log10p_1_annotated
-    tuple val(meta), path("*_annotated_snps_with_sample_ids.tsv"), emit: annotated_snps_with_sample_ids
+    tuple val(meta), path("*_annotated_snps.csv"), emit: annotated_snps
+    tuple val(meta), path("*_res_log10p_1_annotated.csv"), emit: res_log10p_1_annotated
+    tuple val(meta), path("*_annotated_snps_with_sample_ids.csv"), emit: annotated_snps_with_sample_ids
     path "versions.yml"           , emit: versions
 
     when:
@@ -71,9 +71,9 @@ process RSCRIPT_BUILDREPORTS {
         ${vcf} \\
         ${phenotype} \\
         ${annotations} \\
-        ${prefix}_annotated_snps.tsv \\
-        ${prefix}_res_log10p_1_annotated.tsv \\
-        ${prefix}_annotated_snps_with_sample_ids.tsv
+        ${prefix}_annotated_snps.csv \\
+        ${prefix}_res_log10p_1_annotated.csv \\
+        ${prefix}_annotated_snps_with_sample_ids.csv
 
 
     cat <<-END_VERSIONS > versions.yml
@@ -90,7 +90,9 @@ process RSCRIPT_BUILDREPORTS {
     //               Simple example: https://github.com/nf-core/modules/blob/818474a292b4860ae8ff88e149fbcda68814114d/modules/nf-core/bcftools/annotate/main.nf#L47-L63
     //               Complex example: https://github.com/nf-core/modules/blob/818474a292b4860ae8ff88e149fbcda68814114d/modules/nf-core/bedtools/split/main.nf#L38-L54
     """
-    touch ${prefix}_aaf.tsv
+    touch ${prefix}_annotated_snps.csv
+    touch ${prefix}_res_log10p_1_annotated.csv
+    touch ${prefix}_annotated_snps_with_sample_ids.csv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
