@@ -98,7 +98,7 @@ template:
   org: psuszyns
   name: rare-var-assoc-nf
   description: Rare variant association study using Regenie
-  author: "Tomasz Gambin, Anna Lewan, Piotr Suszy\u0144ski"
+  author: "Tomasz Gambin, Piotr Suszy\u0144ski"
   version: 1.0.0dev
   force: true
   outdir: rare-var-assoc-nf

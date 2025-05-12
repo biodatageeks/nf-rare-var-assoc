@@ -75,7 +75,7 @@ nf-test test --profile podman
 
 ## Credits
 
-psuszyns/rare-var-assoc-nf was originally written by Tomasz Gambin, Anna Lewan, Piotr Suszyński.
+psuszyns/rare-var-assoc-nf was originally written by Tomasz Gambin, Piotr Suszyński.
 
 We thank the following people for their extensive assistance in the development of this pipeline:
 
