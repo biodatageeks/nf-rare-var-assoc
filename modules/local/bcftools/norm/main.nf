@@ -9,7 +9,7 @@ process BCFTOOLS_NORM {
 
     input:
     tuple val(meta), path(vcf), path(tbi)
-    tuple val(meta2), path(fasta)
+    path(fasta)
     val(out_name_part)
 
     output:

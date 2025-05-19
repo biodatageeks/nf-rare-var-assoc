@@ -1,4 +1,4 @@
-process PLINK2_MAKEBED {
+process PLINK2_PROJECTION_SCORE {
     tag "$meta.id"
     label 'process_single'
 
@@ -8,12 +8,13 @@ process PLINK2_MAKEBED {
         params.cpu_support_avx2 ? 'docker.io/psuszynski/plink:2.0-alpha.6.9': 'docker.io/psuszynski/plink:2.0-alpha.6.9.noavx2' }"
 
     input:
-    tuple val(meta), path(bed), path(bim), path(fam), path(vcf), path(frq), path(remove)
+    tuple val(meta), path(bed), path(bim), path(fam), path(acount), path(eigenvec_allele)
+    val(score_options)
     val(out_name_part)
     val(input_args)
 
     output:
-    tuple val(meta), path("*.bed"), path("*.bim"), path("*.fam"), emit: out_bed_bim_fam
+    tuple val(meta), path("*.sscore"), emit: sscore
     tuple val(meta), path("*.log"), emit: log
     path "versions.yml"           , emit: versions
 
@@ -28,23 +29,17 @@ process PLINK2_MAKEBED {
     def bed_input = bed ? "--bed ${bed}" : ""
     def bim_input = bim ? "--bim ${bim}" : ""
     def fam_input = fam ? "--fam ${fam}" : ""
-    def vcf_input = vcf ? "--vcf ${vcf}" : ""
-    def frq_input = frq ? "--read-freq ${frq}" : ""
-    def remove_input = remove ? "--remove ${remove}" : ""
 
     """
     plink2 \\
         --threads ${task.cpus} \\
         --memory $mem_mb \\
-        $args \\
-        $input_args \\
+        $args $input_args \\
         ${bed_input} \\
         ${bim_input} \\
         ${fam_input} \\
-        ${vcf_input} \\
-        ${frq_input} \\
-        ${remove_input} \\
-        --make-bed \\
+        --read-freq ${acount} \\
+        --score ${eigenvec_allele} ${score_options} \\
         --out ${prefix}_${out_name_part}
 
     cat <<-END_VERSIONS > versions.yml
@@ -57,9 +52,7 @@ process PLINK2_MAKEBED {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    touch ${prefix}_${out_name_part}.bed
-    touch ${prefix}_${out_name_part}.bim
-    touch ${prefix}_${out_name_part}.fam
+    touch ${prefix}_${out_name_part}.sscore
     touch ${prefix}_${out_name_part}.log
 
     cat <<-END_VERSIONS > versions.yml

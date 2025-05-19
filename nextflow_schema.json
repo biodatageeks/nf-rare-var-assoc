@@ -133,6 +133,12 @@
                     "enum": ["symlink", "rellink", "link", "copy", "copyNoFollow", "move"],
                     "hidden": true
                 },
+                "bcftools_view_options_2": {
+                    "type": "string",
+                    "description": "Options to pass to the second bcftools view call.",
+                    "fa_icon": "fas fa-bed",
+                    "hidden": false
+                },
                 "plink19_makebed_options": {
                     "type": "string",
                     "description": "Options to pass to plink1.9 makebed call.",
