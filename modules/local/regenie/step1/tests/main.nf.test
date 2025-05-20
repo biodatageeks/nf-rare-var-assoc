@@ -69,7 +69,7 @@ nextflow_process {
                 script "../../../rscript/annotate/main.nf"
                 process {
                     """
-                    input[0] = file('${projectDir}/modules/local/rscript/annotate/assets/annotate.R', checkIfExists: true)
+                    input[0] = file('${projectDir}/modules/local/rscript/assign_annotations/assets/annotate.R', checkIfExists: true)
                     input[1] = [
                         [ id:'test', single_end:false ], // meta map
                         file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true)

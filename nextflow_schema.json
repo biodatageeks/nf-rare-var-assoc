@@ -133,6 +133,130 @@
                     "enum": ["symlink", "rellink", "link", "copy", "copyNoFollow", "move"],
                     "hidden": true
                 },
+                "hild_path": {
+                    "type": "string",
+                    "description": "Path to file with regions of high LD.",
+                    "default": "assets/hg38_hild.txt",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "bcftools_qual_filter": {
+                    "type": "string",
+                    "description": "Quality filter for bcftools call.",
+                    "default": "QUAL>=25",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "bcftools_info_filter": {
+                    "type": "string",
+                    "description": "INFO field filter for bcftools call.",
+                    "default": "INFO/DP>=10 && INFO/DP<=100",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "bcftools_fmt_filter": {
+                    "type": "string",
+                    "description": "FORMAT field filter for bcftools call.",
+                    "default": "FMT/DP>=10 && FMT/DP<=100",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "bcftools_info_filter_ensure_field_present": {
+                    "type": "string",
+                    "description": "Ensures specified INFO field is present for bcftools call.",
+                    "default": "DP",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "bcftools_fmt_filter_ensure_field_present": {
+                    "type": "string",
+                    "description": "Ensures specified FORMAT field is present for bcftools call.",
+                    "default": "DP",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "inbreeding_outliers_range_stds": {
+                    "type": "number",
+                    "description": "Number of standard deviations for detecting inbreeding outliers.",
+                    "default": 6,
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "plink2_indep_pairwise_options": {
+                    "type": "string",
+                    "description": "Options for PLINK2 independent pairwise pruning.",
+                    "default": "--mind 0.1",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "plink2_indep_pairwise_window": {
+                    "type": "string",
+                    "description": "Window settings for PLINK2 independent pairwise pruning.",
+                    "default": "50 5 0.2",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "plink2_indep_pairwise_window_pca": {
+                    "type": "string",
+                    "description": "Window settings for PLINK2 independent pairwise pruning for PCA.",
+                    "default": "500 50 0.2",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "plink2_king_cutoff_options": {
+                    "type": "string",
+                    "description": "Options for PLINK2 KING relatedness cutoff.",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "plink2_king_cutoff_threshold_pca": {
+                    "type": "number",
+                    "description": "Threshold for PLINK2 KING relatedness cutoff for PCA.",
+                    "default": 0.0884,
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "plink2_pca_settings": {
+                    "type": "string",
+                    "description": "Settings for PLINK2 PCA computation.",
+                    "default": "allele-wts 10",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "plink2_pca_options": {
+                    "type": "string",
+                    "description": "Options for PLINK2 PCA computation.",
+                    "default": "--freq counts",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "plink2_projection_score_settings": {
+                    "type": "string",
+                    "description": "Settings for PLINK2 projection score computation.",
+                    "default": "2 6 header-read no-mean-imputation variance-standardize",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "plink2_projection_score_options": {
+                    "type": "string",
+                    "description": "Options for PLINK2 projection score computation.",
+                    "default": "--score-col-nums 7-16",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "rscript_build_phenotypes_options": {
+                    "type": "string",
+                    "description": "Options for R script to build phenotypes.",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "rscript_build_phenotypes_path": {
+                    "type": "string",
+                    "description": "Path to R script for building phenotypes.",
+                    "default": "modules/local/rscript/build_phenotypes/assets/build_phenotypes.R",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
                 "bcftools_view_options_2": {
                     "type": "string",
                     "description": "Options to pass to the second bcftools view call.",
@@ -202,7 +326,7 @@
                 "rscript_annotate_path": {
                     "type": "string",
                     "description": "Path to annotate.R script.",
-                    "default": "${projectDir}/modules/local/rscript/annotate/assets/annotate.R",
+                    "default": "${projectDir}/modules/local/rscript/assign_annotations/assets/annotate.R",
                     "fa_icon": "fas fa-code",
                     "hidden": false
                 },

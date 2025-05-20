@@ -8,7 +8,7 @@ process PLINK2_MAKEBED {
         params.cpu_support_avx2 ? 'docker.io/psuszynski/plink:2.0-alpha.6.9': 'docker.io/psuszynski/plink:2.0-alpha.6.9.noavx2' }"
 
     input:
-    tuple val(meta), path(bed), path(bim), path(fam), path(vcf), path(frq), path(remove)
+    tuple val(meta), path(bed), path(bim), path(fam), path(vcf), path(frq), path(remove), path(exclude)
     val(out_name_part)
     val(input_args)
 
@@ -30,7 +30,8 @@ process PLINK2_MAKEBED {
     def fam_input = fam ? "--fam ${fam}" : ""
     def vcf_input = vcf ? "--vcf ${vcf}" : ""
     def frq_input = frq ? "--read-freq ${frq}" : ""
-    def remove_input = remove ? "--remove ${remove}" : ""
+    def remove_input = remove ? "--remove ${remove}" : ""      // remove samples
+    def exclude_input = exclude ? "--exclude ${exclude}" : ""  // exclude variants
 
     """
     plink2 \\
@@ -44,6 +45,7 @@ process PLINK2_MAKEBED {
         ${vcf_input} \\
         ${frq_input} \\
         ${remove_input} \\
+        ${exclude_input} \\
         --make-bed \\
         --out ${prefix}_${out_name_part}
 

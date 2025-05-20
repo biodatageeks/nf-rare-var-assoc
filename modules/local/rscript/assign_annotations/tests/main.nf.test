@@ -46,39 +46,19 @@ nextflow_process {
                     """
                 }
             }
-            run("BGENIX") {
-                script "../../../bgenix/main.nf"
-                process {
-                    """
-                    input[0] = PLINK2_EXPORT_BGEN.out.bgen
-                    input[1] = '-clobber'
-                    """
-                }
-            }
         }
 
         when {
             process {
                 """
-                input[0] = file('${projectDir}/modules/local/rscript/annotate/assets/annotate.R', checkIfExists: true)
+                input[0] = file('${projectDir}/modules/local/rscript/assign_annotations/assets/annotate.R', checkIfExists: true)
                 input[1] = [
                     [ id:'test', single_end:false ], // meta map
                     file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true)
                 ]
-                input[2] = PLINK2_MAKEBED.out.out_bed_bim_fam
-                input[3] = PLINK2_EXPORT_BGEN.out.bgen
-                input[4] = BGENIX.out.bgen_bgi
-                input[5] = PLINK2_EXPORT_BGEN.out.sample
-                input[6] = [
-                    [ id:'test', single_end:false ], // meta map
-                    file('${projectDir}/assets/medium_data/1kGP_controls.txt', checkIfExists: true)
-                ]
-                input[7] = [
-                    [ id:'test', single_end:false ], // meta map
-                    file('${projectDir}/assets/medium_data/1kGP_cases.txt', checkIfExists: true)
-                ]
-                input[8] = file('${projectDir}/assets/default.masks', checkIfExists: true)
-                input[9] = '--min_top_annotations 50 --quantile_threshold 0.25 --include-intergenic FALSE'
+                input[2] = PLINK2_EXPORT_BGEN.out.sample
+                input[3] = file('${projectDir}/assets/default.masks', checkIfExists: true)
+                input[4] = '--min_top_annotations 50 --quantile_threshold 0.25 --include-intergenic FALSE'
                 """
             }
         }
@@ -125,31 +105,16 @@ nextflow_process {
                     """
                 }
             }
-
-            run("BGENIX") {
-                script "../../../bgenix/main.nf"
-                process {
-                    """
-                    input[0] = PLINK2_EXPORT_BGEN.out.bgen
-                    input[1] = '-clobber'
-                    """
-                }
-            }
         }
 
         when {
             process {
                 """
-                input[0] = file('${projectDir}/modules/local/rscript/annotate/assets/annotate.R')
+                input[0] = file('${projectDir}/modules/local/rscript/assign_annotations/assets/annotate.R')
                 input[1] = [ [ id:'test' ], file('${projectDir}/assets/small_data/minimal.vcf', checkIfExists: true) ]
-                input[2] = PLINK2_MAKEBED.out.out_bed_bim_fam
-                input[3] = PLINK2_EXPORT_BGEN.out.bgen
-                input[4] = BGENIX.out.bgen_bgi
-                input[5] = PLINK2_EXPORT_BGEN.out.sample
-                input[6] = [ [ id:'test' ], file('${projectDir}/assets/small_data/minimal_controls.txt', checkIfExists: true) ]
-                input[7] = [ [ id:'test' ], file('${projectDir}/assets/small_data/minimal_cases.txt', checkIfExists: true) ]
-                input[8] = file('${projectDir}/assets/default.masks', checkIfExists: true)
-                input[9] = '--min_top_annotations 50 --quantile_threshold 0.25 --include-intergenic TRUE'
+                input[3] = PLINK2_EXPORT_BGEN.out.sample
+                input[4] = file('${projectDir}/assets/default.masks', checkIfExists: true)
+                input[5] = '--min_top_annotations 50 --quantile_threshold 0.25 --include-intergenic TRUE'
                 """
             }
         }
