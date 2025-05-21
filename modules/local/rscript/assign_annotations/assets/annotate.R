@@ -17,8 +17,10 @@ option_list <- list(
               help="Path to output annotations file", metavar="character"),
   make_option(c("--out-setlist-path"), type="character", default=NULL,
               help="Path to output setlist file", metavar="character"),
-  make_option(c("--min_top_annotations"), type="integer", default=50,
-              help="Filter annotations threshold - keep at least that many [default=50]", metavar="integer"),
+  make_option(c("--min_top_annotations"), type="integer", default=30,
+              help="Filter annotations threshold - keep at least that many [default=30]", metavar="integer"),
+  make_option(c("--max_annotations"), type="integer", default=62,
+              help="Filter annotations threshold - keep at most that many [default=62]", metavar="integer"),
   make_option(c("--quantile_threshold"), type="double", default=0.25,
               help="Filter annotations threshold - keep based on the quantile of the frequency table [default=0.25]", metavar="double"),
   make_option(c("--include-intergenic"), type="logical", default=FALSE,
@@ -49,9 +51,11 @@ r_out_setlist_path <- opt$`out-setlist-path`
 include_intergenic <- opt$`include-intergenic`
 quantile_threshold <- opt$`quantile_threshold`  # Keep consequences above Nth percentile (adjustable)
 min_top_annotations <- opt$`min_top_annotations`   # Ensure at least N top annotations are kept, if available
+max_annotations <- opt$`max_annotations`   # Ensure at most N annotations are kept
 
 cat(paste0("quantile_threshold = ", quantile_threshold, "\n"))
 cat(paste0("min_top_annotations = ", min_top_annotations, "\n"))
+cat(paste0("max_annotations = ", max_annotations, "\n"))
 cat(paste0("include_intergenic = ", include_intergenic, "\n"))
 
 
@@ -180,9 +184,10 @@ keep_important <- names(freq_table) %in% important_annotations
 threshold_freq <- quantile(freq_table, probs=quantile_threshold, names=FALSE)
 keep_quantile <- freq_table >= threshold_freq
 
-# c. Ensure at least 50 top annotations (if available)
+# c. Ensure at least min_top_annotations top annotations (if available)
 n_consequences <- length(freq_table)
-n_to_keep <- min(min_top_annotations, n_consequences)  # Don't exceed total unique consequences
+n_important <- sum(keep_important)  # Number of important annotations
+n_to_keep <- min(min_top_annotations, n_consequences, max_annotations - n_important)  # Limit by max_annotations
 keep_top <- names(sorted_freqs)[1:n_to_keep]  # Top N by frequency
 keep_top_logical <- names(freq_table) %in% keep_top
 
