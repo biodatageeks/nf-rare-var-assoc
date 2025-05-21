@@ -156,51 +156,102 @@ setlist <- setlist[!grepl("^chrM|^chrY|^M|^Y", chrom)]
 setlist$variants <- gsub(":", "_", setlist$variants)
 
 
-# Read and parse the mask file
-mask_data <- read.table(r_in_masks_path, sep="\t", header=FALSE, col.names=c("Mask", "Annotations"), 
-                        stringsAsFactors=FALSE)
 
-# Extract all unique annotations, treating '&' combinations as single units
-important_annotations <- unique(unlist(strsplit(mask_data$Annotations, ",")))
+filter_annotations <- function(anno, masks_path, quantile_threshold, min_top_annotations, max_annotations) {
+    # Read and parse the mask file
+    mask_data <- read.table(masks_path, sep="\t", header=FALSE, col.names=c("Mask", "Annotations"), 
+                            stringsAsFactors=FALSE)
 
-# Compute and display Consequence value counts
-cat("\n")
-cat("Consequence value counts:\n")
-consequence_counts <- sort(table(anno$Consequence), decreasing=TRUE)
-for (conseq in names(consequence_counts)) {
-    cat(sprintf("%s: %d\n", conseq, consequence_counts[conseq]))
+    # Extract all unique annotations, treating '&' combinations as single units
+    important_annotations <- unique(unlist(strsplit(mask_data$Annotations, ",")))
+
+    # Compute and display Consequence value counts
+    cat("\n")
+    cat("Consequence value counts:\n")
+    consequence_counts <- sort(table(anno$Consequence), decreasing=TRUE)
+    for (conseq in names(consequence_counts)) {
+        cat(sprintf("%s: %d\n", conseq, consequence_counts[conseq]))
+    }
+    cat("\n")
+
+    # Calculate frequency table
+    freq_table <- table(anno$Consequence)
+    sorted_freqs <- sort(freq_table, decreasing=TRUE)
+
+    # Determine which consequences to keep
+    # a. Keep all biologically important annotations
+    keep_important <- names(freq_table) %in% important_annotations
+
+    # b. Apply quantile threshold
+    threshold_freq <- quantile(freq_table, probs=quantile_threshold, names=FALSE)
+    keep_quantile <- freq_table >= threshold_freq
+
+    # c. Limit total non-important annotations to max_annotations - n_important
+    n_consequences <- length(freq_table)
+    n_important <- sum(keep_important)  # Number of important annotations
+    n_additional <- max(0, max_annotations - n_important)  # Max non-important annotations
+
+    # Limit quantile annotations by frequency
+    if (sum(keep_quantile) > n_additional) {
+        # Sort quantile annotations by frequency
+        quantile_candidates <- names(freq_table)[keep_quantile]
+        quantile_candidates_sorted <- quantile_candidates[order(freq_table[quantile_candidates], decreasing=TRUE)]
+        keep_quantile <- names(freq_table) %in% quantile_candidates_sorted[1:min(length(quantile_candidates_sorted), n_additional)]
+    }
+
+    
+    ## d. Apply top annotations if needed
+    #n_quantile <- sum(keep_quantile)  # Number of quantile annotations kept
+    #n_to_keep <- max(0, min(min_top_annotations, n_consequences, n_additional - n_quantile))  # Ensure non-negative
+    ## Only compute keep_top if n_to_keep > 0
+    #keep_top_logical <- rep(FALSE, length(freq_table))  # Initialize as FALSE
+    #if (n_to_keep > 0) {
+    #    available_annotations <- names(sorted_freqs)[!(names(sorted_freqs) %in% names(freq_table)[keep_important | keep_quantile])]
+    #    keep_top <- head(available_annotations, n_to_keep)  # Safely select up to n_to_keep
+    #    keep_top_logical <- names(freq_table) %in% keep_top
+    #}
+
+
+
+    # d. Apply top annotations if needed, only to meet min_top_annotations
+    n_quantile <- sum(keep_quantile)  # Number of quantile annotations kept
+    n_to_keep <- max(0, min(
+        min_top_annotations - n_important - n_quantile,
+        n_consequences - n_important - n_quantile,
+        n_additional - n_quantile
+    ))  # Only add to meet min_top_annotations
+    keep_top_logical <- rep(FALSE, length(freq_table))  # Initialize as FALSE
+    if (n_to_keep > 0) {
+        # First try annotations that pass quantile threshold but weren't selected
+        available_quantile <- names(sorted_freqs)[(names(sorted_freqs) %in% names(freq_table)[keep_quantile]) & 
+                                                    !(names(sorted_freqs) %in% names(freq_table)[keep_important | keep_quantile])]
+        if (length(available_quantile) >= n_to_keep) {
+            keep_top <- head(available_quantile, n_to_keep)  # Use quantile-passing annotations
+        } else {
+            # If not enough quantile-passing annotations, include others to meet min_top_annotations
+            available_other <- names(sorted_freqs)[!(names(sorted_freqs) %in% names(freq_table)[keep_important | keep_quantile])]
+            keep_top <- head(c(available_quantile, available_other), n_to_keep)
+        }
+        keep_top_logical <- names(freq_table) %in% keep_top
+    }
+
+
+
+    # Combine filters: keep if important OR above quantile OR in top 50
+    keep <- keep_important | keep_quantile | keep_top_logical
+
+    # Replace consequences not meeting criteria with "NULL"
+    anno$Consequence[!keep[match(anno$Consequence, names(freq_table))]] <- "NULL"
+
+    # Report kept consequences
+    kept_consequences <- unique(anno$Consequence[anno$Consequence != "NULL"])
+    cat("Kept consequences (after filtering):\n")
+    cat(paste(kept_consequences, collapse=", "), "\n")
+
+    return(anno)
 }
-cat("\n")
 
-# Calculate frequency table
-freq_table <- table(anno$Consequence)
-sorted_freqs <- sort(freq_table, decreasing=TRUE)
-
-# Determine which consequences to keep
-# a. Keep all biologically important annotations
-keep_important <- names(freq_table) %in% important_annotations
-
-# b. Apply quantile threshold
-threshold_freq <- quantile(freq_table, probs=quantile_threshold, names=FALSE)
-keep_quantile <- freq_table >= threshold_freq
-
-# c. Ensure at least min_top_annotations top annotations (if available)
-n_consequences <- length(freq_table)
-n_important <- sum(keep_important)  # Number of important annotations
-n_to_keep <- min(min_top_annotations, n_consequences, max_annotations - n_important)  # Limit by max_annotations
-keep_top <- names(sorted_freqs)[1:n_to_keep]  # Top N by frequency
-keep_top_logical <- names(freq_table) %in% keep_top
-
-# Combine filters: keep if important OR above quantile OR in top 50
-keep <- keep_important | keep_quantile | keep_top_logical
-
-# Replace consequences not meeting criteria with "NULL"
-anno$Consequence[!keep[match(anno$Consequence, names(freq_table))]] <- "NULL"
-
-# Report kept consequences
-kept_consequences <- unique(anno$Consequence[anno$Consequence != "NULL"])
-cat("Kept consequences (after filtering):\n")
-cat(paste(kept_consequences, collapse=", "), "\n")
+anno <- filter_annotations(anno, r_in_masks_path, quantile_threshold, min_top_annotations, max_annotations)
 
 
 # Write final annotations file and setlist file
