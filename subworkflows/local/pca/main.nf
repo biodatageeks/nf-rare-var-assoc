@@ -3,11 +3,13 @@ include { PLINK2_INDEP_PAIRWISE     } from '../../../modules/local/plink2/indep_
 include { PLINK2_KING_CUTOFF        } from '../../../modules/local/plink2/king_cutoff'
 include { PLINK2_PCA                } from '../../../modules/local/plink2/pca'
 include { PLINK2_PROJECTION_SCORE   } from '../../../modules/local/plink2/projection_score'
+include { DRAW_PC_PLOT              } from '../../../modules/local/python/draw_pc_plot'
 
 workflow PCA {
 
     take:
     ch_bed_bim_fam
+    ch_pheno
 
     main:
 
@@ -62,11 +64,19 @@ workflow PCA {
     ch_sscore = PLINK2_PROJECTION_SCORE.out.sscore
     ch_versions = ch_versions.mix(PLINK2_PROJECTION_SCORE.out.versions.first())
 
+    DRAW_PC_PLOT (
+        ch_sscore.join(ch_pheno, by: 0),
+        Channel.value('pc_plot')
+    )
+    ch_plot_file = DRAW_PC_PLOT.out.plot_file
+    ch_versions = ch_versions.mix(DRAW_PC_PLOT.out.versions.first())
+
     workflow.onError {
         log.error "Pipeline failed. Please refer to troubleshooting docs: https://nf-co.re/docs/usage/troubleshooting"
     }
 
     emit:
-    sscore = ch_sscore
-    versions    = ch_versions
+    sscore     = ch_sscore
+    plot_file  = ch_plot_file
+    versions   = ch_versions
 }

@@ -256,10 +256,24 @@ workflow RARE_VAR_ASSOC {
     ch_bed_bim_fam_4 = F_COEFFICIENT_FILTERING.out.bed_bim_fam_out
     ch_versions = ch_versions.mix(F_COEFFICIENT_FILTERING.out.versions.first())
 
+    r_script_build_phenotypes_ch = Channel.fromPath(params.rscript_build_phenotypes_path, checkIfExists: true)
+    RSCRIPT_BUILD_PHENOTYPES (
+        r_script_build_phenotypes_ch,
+        ch_bed_bim_fam_4.map { meta, bed_file, bim_file, fam_file -> tuple(meta, fam_file) }
+            .join(ch_controls, by: 0)
+            .join(ch_cases, by: 0),
+        Channel.value(params.rscript_build_phenotypes_options)
+    )
+    ch_r_out_fam  = RSCRIPT_BUILD_PHENOTYPES.out.out_fam
+    ch_phenotype  = RSCRIPT_BUILD_PHENOTYPES.out.phenotype
+    ch_versions = ch_versions.mix(RSCRIPT_BUILD_PHENOTYPES.out.versions.first())
+
     PCA (
-        ch_bed_bim_fam_4
+        ch_bed_bim_fam_4,
+        ch_phenotype
     )
     ch_sscore = PCA.out.sscore
+    ch_plot_file = PCA.out.plot_file
     ch_versions = ch_versions.mix(PCA.out.versions.first())
 
     PLINK2_WRITE_SNPLIST (
@@ -309,18 +323,6 @@ workflow RARE_VAR_ASSOC {
     ch_bgen_bgi  = BGENIX.out.bgen_bgi
     ch_versions = ch_versions.mix(BGENIX.out.versions.first())
 
-    r_script_build_phenotypes_ch = Channel.fromPath(params.rscript_build_phenotypes_path, checkIfExists: true)
-    RSCRIPT_BUILD_PHENOTYPES (
-        r_script_build_phenotypes_ch,
-        ch_bed_bim_fam_4.map { meta, bed_file, bim_file, fam_file -> tuple(meta, fam_file) }
-            .join(ch_controls, by: 0)
-            .join(ch_cases, by: 0),
-        Channel.value(params.rscript_build_phenotypes_options)
-    )
-    ch_r_out_fam  = RSCRIPT_BUILD_PHENOTYPES.out.out_fam
-    ch_phenotype  = RSCRIPT_BUILD_PHENOTYPES.out.phenotype
-    ch_versions = ch_versions.mix(RSCRIPT_BUILD_PHENOTYPES.out.versions.first())
-
     renamed_file_name = ch_meta.map { t -> "${t.id}_remove_inbreeding_outliers.fam" }.first()
     RENAME (
         ch_r_out_fam,
@@ -328,22 +330,22 @@ workflow RARE_VAR_ASSOC {
     )
     ch_renamed_fam  = RENAME.out.output
 
-    ch_regenie_step_1_input = ch_bed_bim_fam_4
+    ch_regenie_step_1_input_part = ch_bed_bim_fam_4
             .join(ch_renamed_fam, by: 0)
             .map { meta, bed_file, bim_file, fam_file, new_fam_file -> tuple(meta, bed_file, bim_file, new_fam_file) }
             .join(ch_id, by: 0)
             .join(ch_snplist, by: 0)
             .join(ch_phenotype, by: 0)
+    
+    if (params.regenie_step1_options.contains("covarColList")) {
+        ch_regenie_step_1_input = ch_regenie_step_1_input_part
             .join(ch_sscore, by: 0)
-
-    r_script_vcf2aaf_ch = Channel.fromPath(params.rscript_vcf2aaf_path, checkIfExists: true)
-    RSCRIPT_VCFTOAAF (
-        r_script_vcf2aaf_ch,
-        ch_vep_vcf_with_index.map { meta, vcf, tbi -> tuple(meta, vcf) },
-        Channel.value(params.rscript_vcf2aaf_options)
-    )
-    ch_aaf  = RSCRIPT_VCFTOAAF.out.aaf
-    ch_versions = ch_versions.mix(RSCRIPT_VCFTOAAF.out.versions.first())
+    } else {
+        ch_regenie_step_1_input = ch_regenie_step_1_input_part
+            .map { meta, bed_file, bim_file, fam_file, id_file, snplist_file, phenotype_file ->
+                tuple(meta, bed_file, bim_file, fam_file, id_file, snplist_file, phenotype_file, [])
+            }
+    }
 
     REGENIE_STEP1 (
         ch_regenie_step_1_input,
@@ -353,6 +355,15 @@ workflow RARE_VAR_ASSOC {
     ch_regenie_step1_pred_list  = REGENIE_STEP1.out.pred_list
     ch_versions = ch_versions.mix(REGENIE_STEP1.out.versions.first())
 
+
+    r_script_vcf2aaf_ch = Channel.fromPath(params.rscript_vcf2aaf_path, checkIfExists: true)
+    RSCRIPT_VCFTOAAF (
+        r_script_vcf2aaf_ch,
+        ch_vep_vcf_with_index.map { meta, vcf, tbi -> tuple(meta, vcf) },
+        Channel.value(params.rscript_vcf2aaf_options)
+    )
+    ch_aaf  = RSCRIPT_VCFTOAAF.out.aaf
+    ch_versions = ch_versions.mix(RSCRIPT_VCFTOAAF.out.versions.first())
     
     r_script_annotate_ch = Channel.fromPath(params.rscript_annotate_path, checkIfExists: true)
     RSCRIPT_ASSIGN_ANNOTATIONS (
@@ -367,15 +378,26 @@ workflow RARE_VAR_ASSOC {
     ch_setlist  = RSCRIPT_ASSIGN_ANNOTATIONS.out.setlist
     ch_versions = ch_versions.mix(RSCRIPT_ASSIGN_ANNOTATIONS.out.versions.first())
 
-    REGENIE_STEP2 (
-        ch_qc_bgen
+    
+    ch_regenie_step_2_input_part = ch_qc_bgen
             .join(ch_r_out_sample, by: 0)
             .join(ch_phenotype, by: 0)
             .join(ch_annotations, by: 0)
             .join(ch_setlist, by: 0)
             .join(ch_aaf, by: 0)
             .join(ch_regenie_step1_pred_list, by: 0)
-            .join(ch_sscore, by: 0),
+    if (params.regenie_step1_options.contains("covarColList")) {
+        ch_regenie_step_2_input = ch_regenie_step_2_input_part
+            .join(ch_sscore, by: 0)
+    } else {
+        ch_regenie_step_2_input = ch_regenie_step_2_input_part
+            .map { meta, bgen, sample, pheno, anno, setlist, aaf, pred_list ->
+                tuple(meta, bgen, sample, pheno, anno, setlist, aaf, pred_list, [])
+            }
+    }
+
+    REGENIE_STEP2 (
+        ch_regenie_step_2_input,
         ch_masks,
         Channel.value(params.regenie_step2_options)
     )
@@ -413,7 +435,8 @@ workflow RARE_VAR_ASSOC {
     REPORTING (
         ch_results_merged,
         ch_masks,
-        ch_phenotype
+        ch_phenotype,
+        ch_plot_file
     )
 
 

@@ -12,6 +12,7 @@ process RSCRIPT_MANHATTAN_QQ_PLOTS {
     path(r_functions_file)
     path(mask_file)
     tuple val(meta), path(phenotype_file)
+    tuple val(meta), path(pc_plot_file)
     path(rmd_pheno_stats_file)
 
     output:
@@ -37,6 +38,7 @@ process RSCRIPT_MANHATTAN_QQ_PLOTS {
           regenie_filename='${regenie_merged.baseName}', \\
           phenotype='${phenotype}', \\
           phenotype_file='${phenotype_file}', \\
+          pc_plot_file='${pc_plot_file}', \\
           plot_ylimit=${params.plot_ylimit}, \\
           manhattan_annotation_enabled = $annotation_as_string, \\
           annotation_min_log10p = ${params.annotation_min_log10p}, \\

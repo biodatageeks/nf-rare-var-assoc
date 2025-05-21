@@ -16,6 +16,7 @@ params:
   regenie_filename: pims_step2_Y1.regenie.all.gz
   phenotype: Y1
   phenotype_file: ../../../../../results/rscript_annotate/pims_phenotype.txt
+  pc_plot_file: ../../../../../results/python/draw_pc_plot/pims_pc_plot.png
   plot_ylimit: 0
   mask_file: ../../../../../results/rscript_annotate/pims.masks
   manhattan_annotation_enabled: true
@@ -57,6 +58,7 @@ source(params$r_functions)
 | Pipeline Version | `r params$version`          |
 | Date             | `r params$date`             |
 | Phenotype File   | `r params$phenotype_file`   |
+| PC Plot File     | `r params$pc_plot_file`     |
 | Phenotype        | `r params$phenotype`        |
 | Mask File        | `r params$mask_file`        |
 | Regenie Output   | `r params$regenie_filename` |
@@ -66,6 +68,12 @@ source(params$r_functions)
 
 ```{r child=params$rmd_pheno_stats}
 
+```
+
+## PC Plot
+
+```{r, fig.align='center'}
+knitr::include_graphics(params$pc_plot_file)
 ```
 
 ## Gene-based settings

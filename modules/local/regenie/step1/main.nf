@@ -21,8 +21,12 @@ process REGENIE_STEP1 {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
+    def covar_file_corr_format = covar_file + "_correct_format.txt"
+    def covar_file_input = covar_file ? "--covarFile " + covar_file_corr_format : ""
     """
-    sed '1s/^#//' ${covar_file} > ${covar_file}_correct_format.txt
+    if [ "${covar_file}" != ""]; then
+        sed '1s/^#//' ${covar_file} > ${covar_file_corr_format}
+    fi
     regenie \\
        --step 1 \\
        --threads ${task.cpus} \\
@@ -30,7 +34,7 @@ process REGENIE_STEP1 {
        --keep ${qc_pass_id} \\
        --extract ${qc_pass_snplist} \\
        --phenoFile ${phenotype} \\
-       --covarFile ${covar_file}_correct_format.txt \\
+       ${covar_file_input} \\
        --out ${prefix}_step1 \\
        $args $input_args
 
