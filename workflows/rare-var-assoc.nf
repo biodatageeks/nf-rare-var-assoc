@@ -19,6 +19,7 @@ include { PLINK2_WRITE_SNPLIST   } from '../modules/local/plink2/write_snplist'
 include { PLINK2_MAKEBED as PLINK2_MAKEBED_1 } from '../modules/local/plink2/makebed'
 include { PLINK2_MAKEBED as PLINK2_MAKEBED_2 } from '../modules/local/plink2/makebed'
 include { PLINK2_MAKEBED as PLINK2_MAKEBED_3 } from '../modules/local/plink2/makebed'
+include { PLINK2_MAKEBED as PLINK2_MAKEBED_4 } from '../modules/local/plink2/makebed'
 include { PLINK19_MAKEBED        } from '../modules/local/plink19/makebed'
 include { VEP_ANNOTATE           } from '../modules/local/vep/annotate'
 include { VEP_UPDATECACHE        } from '../modules/local/vep/updatecache'
@@ -241,8 +242,8 @@ workflow RARE_VAR_ASSOC {
 
     PLINK2_MAKEBED_3 (
         ch_bed_bim_fam_before_quality_filtering
-            .map { meta, bed_file, bim_file, fam_file -> tuple(meta, bed_file, bim_file, fam_file, [], [], []) }
-            .merge(ch_hild),
+            .join(ch_meta.merge(ch_hild), by: 0)
+            .map { meta, bed_file, bim_file, fam_file, hild_file -> tuple(meta, bed_file, bim_file, fam_file, [], [], [], hild_file) },
         Channel.value('filter_pass'),
         Channel.value(params.plink2_makebed_options_3)
     )
@@ -297,8 +298,18 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(BCFTOOLS_VIEW_2.out.versions.first())
     
 
+    PLINK2_MAKEBED_4 (
+        ch_bed_bim_fam_before_quality_filtering
+            .join(ch_meta.merge(ch_hild), by: 0)
+            .map { meta, bed_file, bim_file, fam_file, hild_file -> tuple(meta, bed_file, bim_file, fam_file, [], [], [], hild_file) },
+        Channel.value('step2_filter'),
+        Channel.value(params.plink2_makebed_options_4)
+    )
+    ch_bed_bim_fam_5  = PLINK2_MAKEBED_4.out.out_bed_bim_fam
+    ch_versions = ch_versions.mix(PLINK2_MAKEBED_4.out.versions.first())
+
     PLINK2_EXPORT_BGEN (
-        ch_bed_bim_fam_before_quality_filtering,
+        ch_bed_bim_fam_5,
         Channel.value('pvcf.norm_zlib'),
         Channel.value(params.plink2_export_bgen_options)
     )

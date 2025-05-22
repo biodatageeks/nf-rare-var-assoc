@@ -72,7 +72,7 @@ process PLINK2_WRITE_SNPLIST {
         --bed ${bed} \\
         --bim ${bim} \\
         --fam ${fam} \\
-        --write-snplist \\
+        --write-samples --write-snplist \\
         --out ${prefix}_${out_name_part}
 
     cat <<-END_VERSIONS > versions.yml
