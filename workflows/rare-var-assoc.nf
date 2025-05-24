@@ -24,15 +24,16 @@ include { PLINK19_MAKEBED        } from '../modules/local/plink19/makebed'
 include { VEP_ANNOTATE           } from '../modules/local/vep/annotate'
 include { VEP_UPDATECACHE        } from '../modules/local/vep/updatecache'
 include { BCFTOOLS_VCF2FRQ       } from '../modules/local/bcftools/vcf2frq'
-include { BCFTOOLS_FILTER_QUAL_DP          } from '../modules/local/bcftools/filter_qual_dp'
-include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_1 } from '../modules/local/bcftools/view'
-include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_2 } from '../modules/local/bcftools/view'
+include { BCFTOOLS_FILTER_QUAL_DP            } from '../modules/local/bcftools/filter_qual_dp'
+include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_1   } from '../modules/local/bcftools/view'
+include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_2   } from '../modules/local/bcftools/view'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_1 } from '../modules/local/bcftools/index'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_2 } from '../modules/local/bcftools/index'
 include { BCFTOOLS_NORM          } from '../modules/local/bcftools/norm'
 include { BCFTOOLS_ANNOTATE      } from '../modules/nf-core/bcftools/annotate'
 include { MULTIQC                } from '../modules/nf-core/multiqc'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
+include { FILTER_MISSING_PER_PHENO           } from '../subworkflows/local/filter_missing_per_pheno'
 include { F_COEFFICIENT_FILTERING            } from '../subworkflows/local/f_coefficient_filtering'
 include { PCA                    } from '../subworkflows/local/pca'
 include { REPORTING              } from '../subworkflows/local/reporting'
@@ -99,6 +100,16 @@ workflow RARE_VAR_ASSOC {
     ch_hild = Channel.fromPath(params.hild_path, checkIfExists: true)
     ch_rename_chr = Channel.fromPath("${projectDir}/assets/rename_chr.txt", checkIfExists: true)
     ch_meta = ch_input_vcf.map { t -> t[0] }
+
+
+    r_script_build_phenotypes_ch = Channel.fromPath(params.rscript_build_phenotypes_path, checkIfExists: true)
+    RSCRIPT_BUILD_PHENOTYPES (
+        r_script_build_phenotypes_ch,
+        ch_controls.join(ch_cases, by: 0),
+        Channel.value(params.rscript_build_phenotypes_options)
+    )
+    ch_phenotype  = RSCRIPT_BUILD_PHENOTYPES.out.phenotype
+    ch_versions = ch_versions.mix(RSCRIPT_BUILD_PHENOTYPES.out.versions.first())
 
 
     VEP_UPDATECACHE (
@@ -210,7 +221,7 @@ workflow RARE_VAR_ASSOC {
     //ch_versions = ch_versions.mix(PLINK2_MAKEBED_1.out.versions.first())
 
     PLINK19_MAKEBED (
-        ch_vep_vcf
+        ch_vep_vcf.join(ch_phenotype, by: 0)
     )
     ch_bed_bim_fam_1  = PLINK19_MAKEBED.out.out_bed_bim_fam
     ch_versions = ch_versions.mix(PLINK19_MAKEBED.out.versions.first())
@@ -231,6 +242,8 @@ workflow RARE_VAR_ASSOC {
         split_data.with_x
             .join(ch_frq, by: 0)
             .map { meta, has_x, bed, bim, fam, frq -> tuple(meta, bed, bim, fam, [], frq, [], []) },
+        Channel.value('--remove'),
+        Channel.value('--exclude'),
         Channel.value('impute_sex'),
         Channel.value(params.plink2_makebed_options_2)
     )
@@ -240,10 +253,19 @@ workflow RARE_VAR_ASSOC {
     ch_bed_bim_fam_before_quality_filtering = ch_bed_bim_fam_2
         .mix(split_data.without_x.map { meta, has_x, bed, bim, fam -> tuple(meta, bed, bim, fam) })
 
+    FILTER_MISSING_PER_PHENO (
+        ch_bed_bim_fam_before_quality_filtering,
+        ch_phenotype
+    )
+    ch_bed_bim_fam_filtered_per_pheno  = FILTER_MISSING_PER_PHENO.out.bed_bim_fam_out
+    ch_versions = ch_versions.mix(FILTER_MISSING_PER_PHENO.out.versions.first())
+
     PLINK2_MAKEBED_3 (
-        ch_bed_bim_fam_before_quality_filtering
+        ch_bed_bim_fam_filtered_per_pheno
             .join(ch_meta.merge(ch_hild), by: 0)
             .map { meta, bed_file, bim_file, fam_file, hild_file -> tuple(meta, bed_file, bim_file, fam_file, [], [], [], hild_file) },
+        Channel.value('--remove'),
+        Channel.value('--exclude'),
         Channel.value('filter_pass'),
         Channel.value(params.plink2_makebed_options_3)
     )
@@ -257,18 +279,6 @@ workflow RARE_VAR_ASSOC {
     ch_bed_bim_fam_4 = F_COEFFICIENT_FILTERING.out.bed_bim_fam_out
     ch_versions = ch_versions.mix(F_COEFFICIENT_FILTERING.out.versions.first())
 
-    r_script_build_phenotypes_ch = Channel.fromPath(params.rscript_build_phenotypes_path, checkIfExists: true)
-    RSCRIPT_BUILD_PHENOTYPES (
-        r_script_build_phenotypes_ch,
-        ch_bed_bim_fam_4.map { meta, bed_file, bim_file, fam_file -> tuple(meta, fam_file) }
-            .join(ch_controls, by: 0)
-            .join(ch_cases, by: 0),
-        Channel.value(params.rscript_build_phenotypes_options)
-    )
-    ch_r_out_fam  = RSCRIPT_BUILD_PHENOTYPES.out.out_fam
-    ch_phenotype  = RSCRIPT_BUILD_PHENOTYPES.out.phenotype
-    ch_versions = ch_versions.mix(RSCRIPT_BUILD_PHENOTYPES.out.versions.first())
-
     PCA (
         ch_bed_bim_fam_4,
         ch_phenotype
@@ -278,7 +288,7 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(PCA.out.versions.first())
 
     PLINK2_WRITE_SNPLIST (
-        ch_bed_bim_fam_4,
+        ch_bed_bim_fam_4.map { meta, bed_file, bim_file, fam_file -> tuple(meta, bed_file, bim_file, fam_file, []) },
         Channel.value('writesnp_pass'),
         Channel.value(params.plink2_write_snplist_qc_options)
     )
@@ -299,9 +309,11 @@ workflow RARE_VAR_ASSOC {
     
 
     PLINK2_MAKEBED_4 (
-        ch_bed_bim_fam_before_quality_filtering
+        ch_bed_bim_fam_filtered_per_pheno
             .join(ch_meta.merge(ch_hild), by: 0)
             .map { meta, bed_file, bim_file, fam_file, hild_file -> tuple(meta, bed_file, bim_file, fam_file, [], [], [], hild_file) },
+        Channel.value('--remove'),
+        Channel.value('--exclude'),
         Channel.value('step2_filter'),
         Channel.value(params.plink2_makebed_options_4)
     )
@@ -334,16 +346,16 @@ workflow RARE_VAR_ASSOC {
     ch_bgen_bgi  = BGENIX.out.bgen_bgi
     ch_versions = ch_versions.mix(BGENIX.out.versions.first())
 
-    renamed_file_name = ch_meta.map { t -> "${t.id}_remove_inbreeding_outliers.fam" }.first()
-    RENAME (
-        ch_r_out_fam,
-        renamed_file_name
-    )
-    ch_renamed_fam  = RENAME.out.output
+    // renamed_file_name = ch_meta.map { t -> "${t.id}_remove_inbreeding_outliers.fam" }.first()
+    // RENAME (
+    //    ch_r_out_fam,
+    //    renamed_file_name
+    //)
+    //ch_renamed_fam  = RENAME.out.output
 
     ch_regenie_step_1_input_part = ch_bed_bim_fam_4
-            .join(ch_renamed_fam, by: 0)
-            .map { meta, bed_file, bim_file, fam_file, new_fam_file -> tuple(meta, bed_file, bim_file, new_fam_file) }
+            //.join(ch_renamed_fam, by: 0)
+            //.map { meta, bed_file, bim_file, fam_file, new_fam_file -> tuple(meta, bed_file, bim_file, new_fam_file) }
             .join(ch_id, by: 0)
             .join(ch_snplist, by: 0)
             .join(ch_phenotype, by: 0)

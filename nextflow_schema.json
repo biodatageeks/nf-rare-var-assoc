@@ -288,6 +288,12 @@
                     "fa_icon": "fas fa-pen-to-square",
                     "hidden": false
                 },
+                "plink2_makebed_options_4": {
+                    "type": "string",
+                    "description": "Options to pass to plink2 makebed call 4.",
+                    "fa_icon": "fas fa-pen-to-square",
+                    "hidden": false
+                },
                 "plink2_write_snplist_qc_options": {
                     "type": "string",
                     "description": "Options to pass to plink2 write-snplist qc call.",
@@ -299,6 +305,12 @@
                     "type": "string",
                     "description": "Options to pass to plink2 export bgen call.",
                     "default": "--1 --export bgen-1.2 bits=8 id-paste=iid ref-first",
+                    "fa_icon": "fas fa-pen-to-square",
+                    "hidden": false
+                },
+                "plink2_missing_per_pheno_options": {
+                    "type": "string",
+                    "description": "Options to pass to plink2 missing per phenotype call.",
                     "fa_icon": "fas fa-pen-to-square",
                     "hidden": false
                 },

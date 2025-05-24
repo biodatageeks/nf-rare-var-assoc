@@ -31,8 +31,10 @@ nextflow_process {
                         file('${projectDir}/assets/medium_data/1000g_lpa_hg38_vep.vcf', checkIfExists: true),
                         []   // frq
                     ]
-                    input[1] = 'filter'
-                    input[2] = '--mac 1 --double-id --vcf-half-call missing'
+                    input[1] = '--remove'
+                    input[2] = '--exclude'
+                    input[3] = 'filter'
+                    input[4] = '--mac 1 --double-id --vcf-half-call missing'
                     """
                 }
             }

@@ -44,6 +44,8 @@ workflow F_COEFFICIENT_FILTERING {
         ch_bed_bim_fam
             .join(ch_inbreeding_outliers, by: 0)
             .map { meta, bed_file, bim_file, fam_file, outliers_file -> tuple(meta, bed_file, bim_file, fam_file, [], [], outliers_file, []) },
+        Channel.value('--remove'),
+        Channel.value('--exclude'),
         Channel.value('remove_inbreeding_outliers'),
         Channel.value('')
     )

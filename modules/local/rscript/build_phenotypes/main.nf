@@ -7,12 +7,11 @@ process RSCRIPT_BUILD_PHENOTYPES {
 
     input:
     path(r_script_ch)
-    tuple val(meta), path(fam), path(controls), path(cases)
+    tuple val(meta), path(controls), path(cases)
     val(input_args)
 
     output:
     tuple val(meta), path("*_phenotype.txt"), emit: phenotype
-    tuple val(meta), path("*_r_out.fam"), emit: out_fam
     path "versions.yml", emit: versions
 
     when:
@@ -24,10 +23,8 @@ process RSCRIPT_BUILD_PHENOTYPES {
     """
     Rscript \\
         ${r_script_ch} \\
-        --fam-path ${fam} \\
         --controls-path ${controls} \\
         --cases-paths ${cases} \\
-        --out-fam-path ${prefix}_r_out.fam \\
         --out-pheno-path ${prefix}_phenotype.txt \\
         $input_args
 
@@ -42,7 +39,6 @@ process RSCRIPT_BUILD_PHENOTYPES {
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
     touch ${prefix}_phenotype.txt
-    touch ${prefix}_r_out.fam
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

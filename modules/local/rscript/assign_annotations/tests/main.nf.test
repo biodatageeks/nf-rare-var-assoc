@@ -31,8 +31,10 @@ nextflow_process {
                         file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true),
                         []   // frq
                     ]
-                    input[1] = 'filter'
-                    input[2] = '--mac 1 --double-id --vcf-half-call missing'
+                    input[1] = '--remove'
+                    input[2] = '--exclude'
+                    input[3] = 'filter'
+                    input[4] = '--mac 1 --double-id --vcf-half-call missing'
                     """
                 }
             }
@@ -89,8 +91,10 @@ nextflow_process {
                         file('${projectDir}/assets/small_data/minimal.vcf', checkIfExists: true),
                         []   // frq
                     ]
-                    input[1] = 'filter'
-                    input[2] = '--mac 1 --double-id --vcf-half-call missing'
+                    input[1] = '--remove'
+                    input[2] = '--exclude'
+                    input[3] = 'filter'
+                    input[4] = '--mac 1 --double-id --vcf-half-call missing'
                     """
                 }
             }
