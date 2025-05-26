@@ -14,12 +14,14 @@ process BCFTOOLS_FILTER_QUAL_DP {
     val(fmt_filter)
     val(info_filter_ensure_field_present)
     val(fmt_filter_ensure_field_present)
+    path(tracking_in)
 
     output:
     tuple val(meta), path("*.{vcf,vcf.gz,bcf,bcf.gz}"), emit: vcf
     tuple val(meta), path("*.tbi")                    , emit: tbi, optional: true
     tuple val(meta), path("*.csi")                    , emit: csi, optional: true
     path "versions.yml"                               , emit: versions
+    path "*_tracking.json"                            , emit: tracking_out
 
     when:
     task.ext.when == null || task.ext.when
@@ -76,6 +78,47 @@ process BCFTOOLS_FILTER_QUAL_DP {
         --include "\$FILTER" \\
         --threads $task.cpus \\
         ${vcf}
+
+    bcftools stats ${vcf} > ${prefix}_filter_qual_dp_${extension}_in_stats.txt
+    bcftools stats ${prefix}_filter_qual_dp.${extension} > ${prefix}_filter_qual_dp_${extension}_out_stats.txt
+
+
+    # Extract counts from stats files
+    samples_in=\$(grep "number of samples:" ${prefix}_filter_qual_dp_${extension}_in_stats.txt | cut -f4)
+    variants_in=\$(grep "number of records:" ${prefix}_filter_qual_dp_${extension}_in_stats.txt | cut -f4)
+    samples_out=\$(grep "number of samples:" ${prefix}_filter_qual_dp_${extension}_out_stats.txt | cut -f4)
+    variants_out=\$(grep "number of records:" ${prefix}_filter_qual_dp_${extension}_out_stats.txt | cut -f4)
+    echo "samples_in: \$samples_in"
+    echo "variants_in: \$variants_in"
+    echo "samples_out: \$samples_out"
+    echo "variants_out: \$variants_out"
+
+    echo "tracking_in: ${tracking_in}"
+    predecessor="none"
+    if [ -s "${tracking_in}" ]; then
+        predecessor=\$(grep '"process_name"' ${tracking_in} | sed 's/.*"process_name": "\\([^"]*\\)".*/\\1/')
+    fi
+    echo "predecessor: \$predecessor"
+
+    out_tracking_file_name=\$(echo "${task.process}_filter_qual_dp_${prefix}_tracking.json" | sed 's/[^:]*://' | sed 's/:/_/g')
+    echo "out_tracking_file_name: \$out_tracking_file_name"
+
+    # Create tracking JSON
+    cat <<-END_TRACKING_JSON > \$out_tracking_file_name
+    {
+        "process_name": "${task.process}_filter_qual_dp_${prefix}",
+        "inputs": {
+            "variants": \$variants_in,
+            "samples": \$samples_in
+        },
+        "outputs": {
+            "variants": \$variants_out,
+            "samples": \$samples_out
+        },
+        "parameters": "$args --include '\$FILTER'",
+        "predecessor": "\$predecessor"
+    }
+    END_TRACKING_JSON
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

@@ -32,10 +32,12 @@ workflow FILTER_MISSING_PER_PHENO {
     take:
     ch_bed_bim_fam
     ch_phenotype
+    ch_tracking_in
 
     main:
 
     ch_versions = Channel.empty()
+    ch_tracking = Channel.of([])
 
 
     EXTRACT_PHENOTYPES_AND_SAMPLES(
@@ -55,10 +57,12 @@ workflow FILTER_MISSING_PER_PHENO {
                 tuple(meta + ['orig_id': meta.id, 'id': sample_file.getBaseName()], bed_file, bim_file, fam_file, sample_file)
             },
         Channel.value('identify_acceptable_variants'),
-        Channel.value(params.plink2_missing_per_pheno_options)
+        Channel.value(params.plink2_missing_per_pheno_options),
+        ch_tracking_in
     )
     ch_snplist = PLINK2_WRITE_SNPLIST.out.snplist
     ch_versions = ch_versions.mix(PLINK2_WRITE_SNPLIST.out.versions.first())
+    ch_tracking = PLINK2_WRITE_SNPLIST.out.tracking_out
 
 
     PLINK2_MAKEBED (
@@ -72,10 +76,12 @@ workflow FILTER_MISSING_PER_PHENO {
         Channel.value(''),
         Channel.value('--extract-intersect'),
         Channel.value('intersect_variants_to_keep'),
-        Channel.value('')
+        Channel.value(''),
+        ch_tracking
     )
     ch_bed_bim_fam_out = PLINK2_MAKEBED.out.out_bed_bim_fam
     ch_versions = ch_versions.mix(PLINK2_MAKEBED.out.versions.first())
+    ch_tracking = ch_tracking.mix(PLINK2_MAKEBED.out.tracking_out.first())
 
 
     workflow.onError {
@@ -85,4 +91,5 @@ workflow FILTER_MISSING_PER_PHENO {
     emit:
     bed_bim_fam_out = ch_bed_bim_fam_out
     versions        = ch_versions
+    tracking        = ch_tracking
 }

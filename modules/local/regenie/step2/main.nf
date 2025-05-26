@@ -9,6 +9,7 @@ process REGENIE_STEP2 {
     tuple val(meta), path(bgen), path(sample), path(phenotype), path(annotations), path(setlist), path(aaf), path(step1_pred_list), path(covar_file)
     path(masks)
     val(input_args)
+    path(tracking_in)
 
     output:
     tuple val(meta), path("*_masks.bed"), path("*_masks.bim"), path("*_masks.fam"), emit: masks_bed_bim_fam
@@ -16,6 +17,7 @@ process REGENIE_STEP2 {
     tuple val(meta), path("*.regenie"), emit: regenie_out
     tuple val(meta), path("*.log"), emit: log
     path "versions.yml"           , emit: versions
+    path "*_tracking.json"        , emit: tracking_out
 
     when:
     task.ext.when == null || task.ext.when
@@ -43,6 +45,38 @@ process REGENIE_STEP2 {
        --aaf-file ${aaf} \\
        --out ${prefix}_step2 \\
        $args $input_args
+
+
+    # Extract counts from PLINK log
+    samples_in=\$(grep "n_samples =" ${prefix}_step2.log | head -1 | awk '{print \$NF}' || echo "-1")
+    variants_in=\$(grep "n_snps =" ${prefix}_step2.log | head -1 | awk '{print \$NF}' || echo "-1")
+   
+    echo "samples_in: \$samples_in"
+    echo "variants_in: \$variants_in"
+
+    echo "tracking_in: ${tracking_in}"
+    predecessor="none"
+    if [ -s "${tracking_in}" ]; then
+        predecessor=\$(grep '"process_name"' ${tracking_in} | sed 's/.*"process_name": "\\([^"]*\\)".*/\\1/')
+    fi
+    echo "predecessor: \$predecessor"
+
+    out_tracking_file_name=\$(echo "${task.process}_tracking.json" | sed 's/[^:]*://' | sed 's/:/_/g')
+    echo "out_tracking_file_name: \$out_tracking_file_name"
+
+    # Create tracking JSON
+    cat <<-END_TRACKING_JSON > \$out_tracking_file_name
+    {
+        "process_name": "${task.process}",
+        "inputs": {
+            "variants": \$variants_in,
+            "samples": \$samples_in
+        },
+        "parameters": "$args $input_args --step 2 ${covar_file_input}",
+        "predecessor": "\$predecessor"
+    }
+    END_TRACKING_JSON
+
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

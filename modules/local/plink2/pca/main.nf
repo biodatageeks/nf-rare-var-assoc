@@ -12,6 +12,7 @@ process PLINK2_PCA {
     val(pca_options)
     val(out_name_part)
     val(input_args)
+    path(tracking_in)
 
     output:
     tuple val(meta), path("*.acount"), emit: acount
@@ -20,6 +21,7 @@ process PLINK2_PCA {
     tuple val(meta), path("*.eigenvec.allele"), emit: eigenvec_allele
     tuple val(meta), path("*.log"), emit: log
     path "versions.yml"           , emit: versions
+    path "*_tracking.json"        , emit: tracking_out
 
     when:
     task.ext.when == null || task.ext.when
@@ -47,6 +49,46 @@ process PLINK2_PCA {
         ${keep_input} \\
         --pca ${pca_options} \\
         --out ${prefix}_${out_name_part}
+
+
+    # Extract counts from PLINK log
+    samples_in=\$(grep "samples.*loaded from" ${prefix}_${out_name_part}.log | head -1 | awk '{print \$1}' || echo "-1")
+    variants_in=\$(grep "variants loaded from" ${prefix}_${out_name_part}.log | head -1 | awk '{print \$1}' || echo "-1")
+    samples_out=\$(grep "samples.*remaining" ${prefix}_${out_name_part}.log | head -1 | awk '{print \$1}' || echo "-1")
+    variants_out=\$(grep "variants remaining after" ${prefix}_${out_name_part}.log | head -1 | awk '{print \$1}' || echo "-1")
+   
+    echo "samples_in: \$samples_in"
+    echo "variants_in: \$variants_in"
+    echo "samples_out: \$samples_out"
+    echo "variants_out: \$variants_out"
+
+    echo "tracking_in: ${tracking_in}"
+    predecessor="none"
+    if [ -s "${tracking_in}" ]; then
+        predecessor=\$(grep '"process_name"' ${tracking_in} | sed 's/.*"process_name": "\\([^"]*\\)".*/\\1/')
+    fi
+    echo "predecessor: \$predecessor"
+
+    out_tracking_file_name=\$(echo "${task.process}_${prefix}_${out_name_part}_tracking.json" | sed 's/[^:]*://' | sed 's/:/_/g')
+    echo "out_tracking_file_name: \$out_tracking_file_name"
+
+    # Create tracking JSON
+    cat <<-END_TRACKING_JSON > \$out_tracking_file_name
+    {
+        "process_name": "${task.process}_${prefix}_${out_name_part}",
+        "inputs": {
+            "variants": \$variants_in,
+            "samples": \$samples_in
+        },
+        "outputs": {
+            "variants": \$variants_out,
+            "samples": \$samples_out
+        },
+        "parameters": "$args $input_args ${extract_input} ${keep_input}",
+        "predecessor": "\$predecessor"
+    }
+    END_TRACKING_JSON
+
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

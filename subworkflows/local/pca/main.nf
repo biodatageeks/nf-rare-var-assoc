@@ -10,59 +10,71 @@ workflow PCA {
     take:
     ch_bed_bim_fam
     ch_pheno
+    ch_tracking_in
 
     main:
 
     ch_hild = Channel.fromPath(params.hild_path, checkIfExists: true)
     ch_versions = Channel.empty()
+    ch_tracking = Channel.of([])
 
 
     PLINK19_MAKESET (
-        ch_bed_bim_fam.merge(ch_hild)
+        ch_bed_bim_fam.merge(ch_hild),
+        ch_tracking_in
     )
     ch_hildset = PLINK19_MAKESET.out.out_set
     ch_versions = ch_versions.mix(PLINK19_MAKESET.out.versions.first())
+    ch_tracking = PLINK19_MAKESET.out.tracking_out
 
     PLINK2_INDEP_PAIRWISE (
         ch_bed_bim_fam.join(ch_hildset, by: 0),
         Channel.value(params.plink2_indep_pairwise_window_pca),
         Channel.value('indep_pairwise'),
-        Channel.value(params.plink2_indep_pairwise_options)
+        Channel.value(params.plink2_indep_pairwise_options),
+        ch_tracking
     )
     ch_indep_pairwise_prune_in = PLINK2_INDEP_PAIRWISE.out.out_prune_in
     ch_indep_pairwise_prune_out = PLINK2_INDEP_PAIRWISE.out.out_prune_out
     ch_versions = ch_versions.mix(PLINK2_INDEP_PAIRWISE.out.versions.first())
+    ch_tracking = ch_tracking.mix(PLINK2_INDEP_PAIRWISE.out.tracking_out.first())
 
     PLINK2_KING_CUTOFF (
         ch_bed_bim_fam.join(ch_indep_pairwise_prune_in, by: 0),
         Channel.value(params.plink2_king_cutoff_threshold_pca),
         Channel.value('king_cutoff'),
-        Channel.value(params.plink2_king_cutoff_options)
+        Channel.value(params.plink2_king_cutoff_options),
+        ch_tracking
     )
     ch_king_cutoff_prune_in = PLINK2_KING_CUTOFF.out.out_prune_in
     ch_king_cutoff_prune_out = PLINK2_KING_CUTOFF.out.out_prune_out
     ch_versions = ch_versions.mix(PLINK2_KING_CUTOFF.out.versions.first())
+    ch_tracking = ch_tracking.mix(PLINK2_KING_CUTOFF.out.tracking_out.first())
 
     PLINK2_PCA (
         ch_bed_bim_fam.join(ch_indep_pairwise_prune_in, by: 0).join(ch_king_cutoff_prune_in, by: 0),
         Channel.value(params.plink2_pca_settings),
         Channel.value('pca'),
-        Channel.value(params.plink2_pca_options)
+        Channel.value(params.plink2_pca_options),
+        ch_tracking
     )
     ch_acount = PLINK2_PCA.out.acount
     ch_eigenval = PLINK2_PCA.out.eigenval
     ch_eigenvec = PLINK2_PCA.out.eigenvec
     ch_eigenvec_allele = PLINK2_PCA.out.eigenvec_allele
     ch_versions = ch_versions.mix(PLINK2_PCA.out.versions.first())
+    ch_tracking = ch_tracking.mix(PLINK2_PCA.out.tracking_out.first())
 
     PLINK2_PROJECTION_SCORE (
         ch_bed_bim_fam.join(ch_acount, by: 0).join(ch_eigenvec_allele, by: 0),
         Channel.value(params.plink2_projection_score_settings),
         Channel.value('projection'),
-        Channel.value(params.plink2_projection_score_options)
+        Channel.value(params.plink2_projection_score_options),
+        ch_tracking
     )
     ch_sscore = PLINK2_PROJECTION_SCORE.out.sscore
     ch_versions = ch_versions.mix(PLINK2_PROJECTION_SCORE.out.versions.first())
+    ch_tracking = ch_tracking.mix(PLINK2_PROJECTION_SCORE.out.tracking_out.first())
 
     DRAW_PC_PLOT (
         ch_sscore.join(ch_pheno, by: 0),
@@ -79,4 +91,5 @@ workflow PCA {
     sscore     = ch_sscore
     plot_file  = ch_plot_file
     versions   = ch_versions
+    tracking   = ch_tracking
 }

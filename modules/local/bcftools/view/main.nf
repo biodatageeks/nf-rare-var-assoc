@@ -16,12 +16,14 @@ process BCFTOOLS_VIEW {
     path(samples)
     path(snplist)
     val(input_args)
+    path(tracking_in)
 
     output:
     tuple val(meta), path("*.{vcf,vcf.gz,bcf,bcf.gz}"), emit: vcf
     tuple val(meta), path("*.tbi")                    , emit: tbi, optional: true
     tuple val(meta), path("*.csi")                    , emit: csi, optional: true
     path "versions.yml"                               , emit: versions
+    path "*_tracking.json"                            , emit: tracking_out
 
     when:
     task.ext.when == null || task.ext.when
@@ -63,6 +65,48 @@ process BCFTOOLS_VIEW {
         $args \\
         --threads $task.cpus \\
         ${vcf}
+    
+
+    bcftools stats ${vcf} > ${prefix}_view_${extension}_in_stats.txt
+    bcftools stats ${prefix}.${extension} > ${prefix}_view_${extension}_out_stats.txt
+
+
+    # Extract counts from stats files
+    samples_in=\$(grep "number of samples:" ${prefix}_view_${extension}_in_stats.txt | cut -f4)
+    variants_in=\$(grep "number of records:" ${prefix}_view_${extension}_in_stats.txt | cut -f4)
+    samples_out=\$(grep "number of samples:" ${prefix}_view_${extension}_out_stats.txt | cut -f4)
+    variants_out=\$(grep "number of records:" ${prefix}_view_${extension}_out_stats.txt | cut -f4)
+    echo "samples_in: \$samples_in"
+    echo "variants_in: \$variants_in"
+    echo "samples_out: \$samples_out"
+    echo "variants_out: \$variants_out"
+
+    echo "tracking_in: ${tracking_in}"
+    predecessor="none"
+    if [ -s "${tracking_in}" ]; then
+        predecessor=\$(grep '"process_name"' ${tracking_in} | sed 's/.*"process_name": "\\([^"]*\\)".*/\\1/')
+    fi
+    echo "predecessor: \$predecessor"
+
+    out_tracking_file_name=\$(echo "${task.process}_${prefix}_tracking.json" | sed 's/[^:]*://' | sed 's/:/_/g')
+    echo "out_tracking_file_name: \$out_tracking_file_name"
+
+    # Create tracking JSON
+    cat <<-END_TRACKING_JSON > \$out_tracking_file_name
+    {
+        "process_name": "${task.process}_${prefix}",
+        "inputs": {
+            "variants": \$variants_in,
+            "samples": \$samples_in
+        },
+        "outputs": {
+            "variants": \$variants_out,
+            "samples": \$samples_out
+        },
+        "parameters": "${regions_file} ${targets_file} ${samples_file} ${snplist_file} $args",
+        "predecessor": "\$predecessor"
+    }
+    END_TRACKING_JSON
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
