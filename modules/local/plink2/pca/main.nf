@@ -21,7 +21,7 @@ process PLINK2_PCA {
     tuple val(meta), path("*.eigenvec.allele"), emit: eigenvec_allele
     tuple val(meta), path("*.log"), emit: log
     path "versions.yml"           , emit: versions
-    path "*_tracking.json"        , emit: tracking_out
+    path "*_${out_name_part}_tracking.json"        , emit: tracking_out
 
     when:
     task.ext.when == null || task.ext.when
@@ -54,8 +54,8 @@ process PLINK2_PCA {
     # Extract counts from PLINK log
     samples_in=\$(grep "samples.*loaded from" ${prefix}_${out_name_part}.log | head -1 | awk '{print \$1}' || echo "-1")
     variants_in=\$(grep "variants loaded from" ${prefix}_${out_name_part}.log | head -1 | awk '{print \$1}' || echo "-1")
-    samples_out=\$(grep "samples.*remaining" ${prefix}_${out_name_part}.log | head -1 | awk '{print \$1}' || echo "-1")
-    variants_out=\$(grep "variants remaining after" ${prefix}_${out_name_part}.log | head -1 | awk '{print \$1}' || echo "-1")
+    samples_out=\$(grep "samples (.*) remaining" ${prefix}_${out_name_part}.log | tail -1 | awk '{print \$1}' || echo "-1")
+    variants_out=\$(grep "variants remaining after" ${prefix}_${out_name_part}.log | tail -1 | awk '{print \$1}' || echo "-1")
    
     echo "samples_in: \$samples_in"
     echo "variants_in: \$variants_in"
@@ -69,6 +69,9 @@ process PLINK2_PCA {
     fi
     echo "predecessor: \$predecessor"
 
+    workflow_name=\$(echo "${task.process}" | awk -F: '{print \$(NF-1)}')
+    echo "workflow_name: \$workflow_name"
+
     out_tracking_file_name=\$(echo "${task.process}_${prefix}_${out_name_part}_tracking.json" | sed 's/[^:]*://' | sed 's/:/_/g')
     echo "out_tracking_file_name: \$out_tracking_file_name"
 
@@ -76,6 +79,7 @@ process PLINK2_PCA {
     cat <<-END_TRACKING_JSON > \$out_tracking_file_name
     {
         "process_name": "${task.process}_${prefix}_${out_name_part}",
+        "workflow_name": "\$workflow_name",
         "inputs": {
             "variants": \$variants_in,
             "samples": \$samples_in

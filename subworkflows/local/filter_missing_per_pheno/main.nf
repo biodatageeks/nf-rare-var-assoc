@@ -37,7 +37,6 @@ workflow FILTER_MISSING_PER_PHENO {
     main:
 
     ch_versions = Channel.empty()
-    ch_tracking = Channel.of([])
 
 
     EXTRACT_PHENOTYPES_AND_SAMPLES(
@@ -58,7 +57,7 @@ workflow FILTER_MISSING_PER_PHENO {
             },
         Channel.value('identify_acceptable_variants'),
         Channel.value(params.plink2_missing_per_pheno_options),
-        ch_tracking_in
+        ch_tracking_in.collect()
     )
     ch_snplist = PLINK2_WRITE_SNPLIST.out.snplist
     ch_versions = ch_versions.mix(PLINK2_WRITE_SNPLIST.out.versions.first())
@@ -77,7 +76,7 @@ workflow FILTER_MISSING_PER_PHENO {
         Channel.value('--extract-intersect'),
         Channel.value('intersect_variants_to_keep'),
         Channel.value(''),
-        ch_tracking
+        PLINK2_WRITE_SNPLIST.out.tracking_out.collect()
     )
     ch_bed_bim_fam_out = PLINK2_MAKEBED.out.out_bed_bim_fam
     ch_versions = ch_versions.mix(PLINK2_MAKEBED.out.versions.first())

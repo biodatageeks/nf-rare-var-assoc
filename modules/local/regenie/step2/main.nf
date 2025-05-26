@@ -17,7 +17,7 @@ process REGENIE_STEP2 {
     tuple val(meta), path("*.regenie"), emit: regenie_out
     tuple val(meta), path("*.log"), emit: log
     path "versions.yml"           , emit: versions
-    path "*_tracking.json"        , emit: tracking_out
+    path "*_regenie_step2_tracking.json"        , emit: tracking_out
 
     when:
     task.ext.when == null || task.ext.when
@@ -28,7 +28,7 @@ process REGENIE_STEP2 {
     def covar_file_corr_format = covar_file + "_correct_format.txt"
     def covar_file_input = covar_file ? "--covarFile " + covar_file_corr_format : ""
     """
-    if [ "${covar_file}" != ""]; then
+    if [ -n "${covar_file}" ]; then
         sed '1s/^#//' ${covar_file} > ${covar_file_corr_format}
     fi
     regenie \\
@@ -48,8 +48,8 @@ process REGENIE_STEP2 {
 
 
     # Extract counts from PLINK log
-    samples_in=\$(grep "n_samples =" ${prefix}_step2.log | head -1 | awk '{print \$NF}' || echo "-1")
-    variants_in=\$(grep "n_snps =" ${prefix}_step2.log | head -1 | awk '{print \$NF}' || echo "-1")
+    samples_in=\$(grep "number of individuals used in analysis =" ${prefix}_step2.log | head -1 | awk '{print \$NF}' || echo "-1")
+    variants_in=\$(grep "bgen file .* with .* samples and .* variants" ${prefix}_step2.log | head -1 | grep -oP '\\d+(?=\\s*variants)' || echo "-1")
    
     echo "samples_in: \$samples_in"
     echo "variants_in: \$variants_in"
@@ -61,13 +61,17 @@ process REGENIE_STEP2 {
     fi
     echo "predecessor: \$predecessor"
 
-    out_tracking_file_name=\$(echo "${task.process}_tracking.json" | sed 's/[^:]*://' | sed 's/:/_/g')
+    workflow_name=\$(echo "${task.process}" | awk -F: '{print \$(NF-1)}')
+    echo "workflow_name: \$workflow_name"
+
+    out_tracking_file_name=\$(echo "${task.process}_regenie_step2_tracking.json" | sed 's/[^:]*://' | sed 's/:/_/g')
     echo "out_tracking_file_name: \$out_tracking_file_name"
 
     # Create tracking JSON
     cat <<-END_TRACKING_JSON > \$out_tracking_file_name
     {
         "process_name": "${task.process}",
+        "workflow_name": "\$workflow_name",
         "inputs": {
             "variants": \$variants_in,
             "samples": \$samples_in

@@ -16,23 +16,22 @@ workflow PCA {
 
     ch_hild = Channel.fromPath(params.hild_path, checkIfExists: true)
     ch_versions = Channel.empty()
-    ch_tracking = Channel.of([])
 
 
     PLINK19_MAKESET (
         ch_bed_bim_fam.merge(ch_hild),
-        ch_tracking_in
+        ch_tracking_in.first()
     )
     ch_hildset = PLINK19_MAKESET.out.out_set
     ch_versions = ch_versions.mix(PLINK19_MAKESET.out.versions.first())
-    ch_tracking = PLINK19_MAKESET.out.tracking_out
+    ch_tracking = PLINK19_MAKESET.out.tracking_out.first()
 
     PLINK2_INDEP_PAIRWISE (
         ch_bed_bim_fam.join(ch_hildset, by: 0),
         Channel.value(params.plink2_indep_pairwise_window_pca),
         Channel.value('indep_pairwise'),
         Channel.value(params.plink2_indep_pairwise_options),
-        ch_tracking
+        PLINK19_MAKESET.out.tracking_out.first()
     )
     ch_indep_pairwise_prune_in = PLINK2_INDEP_PAIRWISE.out.out_prune_in
     ch_indep_pairwise_prune_out = PLINK2_INDEP_PAIRWISE.out.out_prune_out
@@ -44,7 +43,7 @@ workflow PCA {
         Channel.value(params.plink2_king_cutoff_threshold_pca),
         Channel.value('king_cutoff'),
         Channel.value(params.plink2_king_cutoff_options),
-        ch_tracking
+        PLINK2_INDEP_PAIRWISE.out.tracking_out.first()
     )
     ch_king_cutoff_prune_in = PLINK2_KING_CUTOFF.out.out_prune_in
     ch_king_cutoff_prune_out = PLINK2_KING_CUTOFF.out.out_prune_out
@@ -56,7 +55,7 @@ workflow PCA {
         Channel.value(params.plink2_pca_settings),
         Channel.value('pca'),
         Channel.value(params.plink2_pca_options),
-        ch_tracking
+        PLINK2_KING_CUTOFF.out.tracking_out.first()
     )
     ch_acount = PLINK2_PCA.out.acount
     ch_eigenval = PLINK2_PCA.out.eigenval
@@ -70,7 +69,7 @@ workflow PCA {
         Channel.value(params.plink2_projection_score_settings),
         Channel.value('projection'),
         Channel.value(params.plink2_projection_score_options),
-        ch_tracking
+        PLINK2_PCA.out.tracking_out.first()
     )
     ch_sscore = PLINK2_PROJECTION_SCORE.out.sscore
     ch_versions = ch_versions.mix(PLINK2_PROJECTION_SCORE.out.versions.first())

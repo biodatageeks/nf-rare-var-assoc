@@ -95,7 +95,6 @@ workflow RARE_VAR_ASSOC {
 
     vep_cachedir = "${projectDir}/../vep_cachedir"
     ch_versions = Channel.empty()
-    ch_tracking = Channel.of([])
     ch_multiqc_files = Channel.empty()
     ch_vep_cachedir = Channel.fromPath(vep_cachedir, checkIfExists: true)
     ch_masks = Channel.fromPath(params.input_masks, checkIfExists: true)
@@ -146,13 +145,13 @@ workflow RARE_VAR_ASSOC {
         ch_all_samples,                                       // Samples file
         Channel.of([]),                                       // SNPs file
         Channel.value("--output-type z --write-index=tbi"),       // input args
-        ch_tracking
+        Channel.value("view1"),
+        Channel.of([])
     )
     ch_all_samples_vcf  = BCFTOOLS_VIEW_1.out.vcf
     ch_all_samples_vcf_tbi  = BCFTOOLS_VIEW_1.out.tbi
     ch_versions = ch_versions.mix(BCFTOOLS_VIEW_1.out.versions.first())
-    ch_tracking = ch_tracking.mix(BCFTOOLS_VIEW_1.out.tracking_out.first())
-        .filter { v -> v != [] }
+    ch_tracking = BCFTOOLS_VIEW_1.out.tracking_out.first()
 
 
     BCFTOOLS_FILTER_QUAL_DP (
@@ -162,7 +161,7 @@ workflow RARE_VAR_ASSOC {
         Channel.value(params.bcftools_fmt_filter),
         Channel.value(params.bcftools_info_filter_ensure_field_present),
         Channel.value(params.bcftools_fmt_filter_ensure_field_present),
-        ch_tracking
+        BCFTOOLS_VIEW_1.out.tracking_out.first()
     )
     ch_qual_vcf = BCFTOOLS_FILTER_QUAL_DP.out.vcf
     ch_qual_vcf_tbi = BCFTOOLS_FILTER_QUAL_DP.out.tbi
@@ -175,7 +174,7 @@ workflow RARE_VAR_ASSOC {
             .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) },
         ch_vep_cachesubdir.map { t -> "${t}/${params.vep_fasta_path}" },
         Channel.value("norm"),
-        ch_tracking
+        BCFTOOLS_FILTER_QUAL_DP.out.tracking_out.first()
     )
     ch_normalized_vcf = BCFTOOLS_NORM.out.vcf
     ch_normalized_vcf_tbi = BCFTOOLS_NORM.out.tbi
@@ -231,7 +230,7 @@ workflow RARE_VAR_ASSOC {
 
     PLINK19_MAKEBED (
         ch_vep_vcf.join(ch_phenotype, by: 0),
-        ch_tracking
+        BCFTOOLS_NORM.out.tracking_out.first()
     )
     ch_bed_bim_fam_1  = PLINK19_MAKEBED.out.out_bed_bim_fam
     ch_versions = ch_versions.mix(PLINK19_MAKEBED.out.versions.first())
@@ -257,7 +256,7 @@ workflow RARE_VAR_ASSOC {
         Channel.value('--exclude'),
         Channel.value('impute_sex'),
         Channel.value(params.plink2_makebed_options_2),
-        ch_tracking
+        PLINK19_MAKEBED.out.tracking_out.first()
     )
     ch_bed_bim_fam_2  = PLINK2_MAKEBED_2.out.out_bed_bim_fam
     ch_versions = ch_versions.mix(PLINK2_MAKEBED_2.out.versions.first())
@@ -269,7 +268,7 @@ workflow RARE_VAR_ASSOC {
     FILTER_MISSING_PER_PHENO (
         ch_bed_bim_fam_before_quality_filtering,
         ch_phenotype,
-        ch_tracking
+        PLINK2_MAKEBED_2.out.tracking_out.first().mix(PLINK19_MAKEBED.out.tracking_out.first()).collect()
     )
     ch_bed_bim_fam_filtered_per_pheno  = FILTER_MISSING_PER_PHENO.out.bed_bim_fam_out
     ch_versions = ch_versions.mix(FILTER_MISSING_PER_PHENO.out.versions.first())
@@ -284,7 +283,7 @@ workflow RARE_VAR_ASSOC {
         Channel.value('--exclude'),
         Channel.value('filter_pass'),
         Channel.value(params.plink2_makebed_options_3),
-        ch_tracking_filtered_per_pheno
+        FILTER_MISSING_PER_PHENO.out.tracking.last()
     )
     ch_bed_bim_fam_3  = PLINK2_MAKEBED_3.out.out_bed_bim_fam
     ch_versions = ch_versions.mix(PLINK2_MAKEBED_3.out.versions.first())
@@ -293,7 +292,7 @@ workflow RARE_VAR_ASSOC {
 
     F_COEFFICIENT_FILTERING (
         ch_bed_bim_fam_3,
-        ch_tracking_step1
+        PLINK2_MAKEBED_3.out.tracking_out.first()
     )
     ch_bed_bim_fam_4 = F_COEFFICIENT_FILTERING.out.bed_bim_fam_out
     ch_versions = ch_versions.mix(F_COEFFICIENT_FILTERING.out.versions.first())
@@ -302,7 +301,7 @@ workflow RARE_VAR_ASSOC {
     PCA (
         ch_bed_bim_fam_4,
         ch_phenotype,
-        ch_tracking_step1
+        F_COEFFICIENT_FILTERING.out.tracking.last()
     )
     ch_sscore = PCA.out.sscore
     ch_plot_file = PCA.out.plot_file
@@ -313,7 +312,7 @@ workflow RARE_VAR_ASSOC {
         ch_bed_bim_fam_4.map { meta, bed_file, bim_file, fam_file -> tuple(meta, bed_file, bim_file, fam_file, []) },
         Channel.value('writesnp_pass'),
         Channel.value(params.plink2_write_snplist_qc_options),
-        ch_tracking_step1
+        PCA.out.tracking.last()
     )
     ch_snplist  = PLINK2_WRITE_SNPLIST.out.snplist
     ch_id  = PLINK2_WRITE_SNPLIST.out.id
@@ -327,7 +326,8 @@ workflow RARE_VAR_ASSOC {
         ch_id.map { t -> t[1] },            // Samples file
         ch_snplist.map { t -> t[1] },       // SNPs file
         Channel.value("--output-type v"),       // input args
-        ch_tracking_step1
+        Channel.value("view2"),
+        PLINK2_WRITE_SNPLIST.out.tracking_out.first()
     )
     ch_filtered_vcf  = BCFTOOLS_VIEW_2.out.vcf
     ch_versions = ch_versions.mix(BCFTOOLS_VIEW_2.out.versions.first())
@@ -342,17 +342,17 @@ workflow RARE_VAR_ASSOC {
         Channel.value('--exclude'),
         Channel.value('step2_filter'),
         Channel.value(params.plink2_makebed_options_4),
-        ch_tracking_filtered_per_pheno
+        FILTER_MISSING_PER_PHENO.out.tracking.last()
     )
     ch_bed_bim_fam_5  = PLINK2_MAKEBED_4.out.out_bed_bim_fam
     ch_versions = ch_versions.mix(PLINK2_MAKEBED_4.out.versions.first())
-    ch_tracking_step2 = PLINK2_MAKEBED_4.out.tracking_out
+    ch_tracking_step2 = PLINK2_MAKEBED_4.out.tracking_out.first()
 
     PLINK2_EXPORT_BGEN (
         ch_bed_bim_fam_5,
         Channel.value('pvcf.norm_zlib'),
         Channel.value(params.plink2_export_bgen_options),
-        ch_tracking_step2
+        PLINK2_MAKEBED_4.out.tracking_out.first()
     )
     ch_bgen  = PLINK2_EXPORT_BGEN.out.bgen
     ch_sample  = PLINK2_EXPORT_BGEN.out.sample
@@ -403,7 +403,7 @@ workflow RARE_VAR_ASSOC {
     REGENIE_STEP1 (
         ch_regenie_step_1_input,
         Channel.value(params.regenie_step1_options),
-        ch_tracking_step1
+        PLINK2_WRITE_SNPLIST.out.tracking_out.first()
     )
     ch_regenie_step1_loco  = REGENIE_STEP1.out.loco
     ch_regenie_step1_pred_list  = REGENIE_STEP1.out.pred_list
@@ -455,7 +455,7 @@ workflow RARE_VAR_ASSOC {
         ch_regenie_step_2_input,
         ch_masks,
         Channel.value(params.regenie_step2_options),
-        ch_tracking_step2
+        PLINK2_EXPORT_BGEN.out.tracking_out.first()
     )
     ch_regenie_step2_masks_bed_bim_fam  = REGENIE_STEP2.out.masks_bed_bim_fam
     ch_regenie_step2_masks_snplist  = REGENIE_STEP2.out.masks_snplist

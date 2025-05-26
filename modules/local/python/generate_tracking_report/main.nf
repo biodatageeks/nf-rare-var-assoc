@@ -6,13 +6,13 @@ process GENERATE_TRACKING_REPORT {
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/seaborn:0.13.2':
-        'biocontainers/seaborn:0.13.2' }"
+        'docker.io/psuszynski/python_tools:1.0.0' }"
 
     input:
     tuple val(meta), path(tracking_files)
     
     output:
-    tuple val(meta), path("pipeline_report.html"), emit: report_html_file
+    tuple val(meta), path("sankey_report.html"), emit: report_html_file
     tuple val(meta), path("pipeline_report.txt"), emit: report_txt_file
     path "versions.yml", emit: versions
 
@@ -20,7 +20,7 @@ process GENERATE_TRACKING_REPORT {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    #!/usr/bin/env python
+    #!/usr/bin/env python3
 import json
 import sys
 import os
@@ -60,7 +60,9 @@ for file in tracking_files:
     if data is not None:
         # Extract and shorten process name
         full_name = data["process_name"]
+        workflow_name = data["workflow_name"]
         short_name = full_name.split(":")[-1]
+        
         # Extract variants and samples
         variants_in = data["inputs"]["variants"]
         samples_in = data["inputs"]["samples"]
@@ -70,11 +72,20 @@ for file in tracking_files:
         else:
             variants_out = -1
             samples_out = -1
+        
         # Extract parameters
         #params = ", ".join(f"{k}={v}" for k, v in data["parameters"].items())
         params = data["parameters"]
+
         # Extract and shorten predecessor
-        predecessor = data["predecessor"].split(":")[-1] if data["predecessor"] != "none" else "none"
+        predecessor = []
+        if data["predecessor"] != "none":
+            for pred_elem in data["predecessor"].split(" "):
+                predecessor.append(pred_elem.split(":")[-1])
+        else:
+            predecessor = ["none"]
+        predecessor = " ".join(predecessor)
+        
         # Get execution metrics
         duration = metrics.get("realtime", {}).get(full_name, 0) / 1000  # ms to s
         memory = metrics.get("peak_rss", {}).get(full_name, 0) / 1024**2  # bytes to MB
@@ -84,6 +95,7 @@ for file in tracking_files:
         # Add to report
         report_lines.extend([
             f"Process: {short_name}",
+            f"Workflow: {workflow_name}",
             f"Input Variants: {variants_in}",
             f"Output Variants: {variants_out}",
             f"Input Samples: {samples_in}",
@@ -102,209 +114,197 @@ with open("pipeline_report.txt", "w") as f:
 
 
 
-nodes = []
-edges = []
-for file in tracking_files:
-    with open(file) as f:
-        try:
-            data = json.load(f)
-        except ValueError as e:
-            print(f"Error while reading file {file}, error: {e}")
-            data = None
+import json
+import os
+from collections import defaultdict
+import networkx as nx
+
+# Function to load JSON files from a directory
+def load_json_files():
+    files = "${tracking_files}".split(" ")
+    data = []
+    for file in files:
+        with open(file, 'r') as f:
+            try:
+                data.append(json.load(f))
+            except ValueError as e:
+                print(f"Error while reading file {file}, error: {e}")
+
+    return data
+
+# Function to build DAG and identify branches
+def build_dag_and_branches(data):
+    G = nx.DiGraph()
+    process_dict = {item['process_name']: item for item in data}
     
-    if data is not None:
-        # Create node label
-        # params = "\\n".join(f"{k}={v}" for k, v in data["parameters"].items())
-        params = data["parameters"]
-        label = (f"{data['process_name']}\\n"
-                f"Variants: {data['inputs']['variants']}→{data.get('outputs', {'variants': -1})['variants']}\\n"
-                f"Samples: {data['inputs']['samples']}→{data.get('outputs', {'samples': -1})['samples']}\\n"
-                f"Parameters:\\n{params}")
-        nodes.append({"id": data["process_name"], "label": label})
-        if data["predecessor"] != "none":
-            edges.append({"source": data["predecessor"], "target": data["process_name"]})
+    # Add nodes and edges
+    for item in data:
+        process_name = item['process_name']
+        G.add_node(process_name, data=item)
+        predecessors = item.get('predecessor', '').split()
+        for pred in predecessors:
+            if pred and pred in process_dict:
+                G.add_edge(pred, process_name)
+    
+    # Identify disconnected subgraphs (branches)
+    branches = list(nx.weakly_connected_components(G))
+    return G, branches
 
-# HTML template with D3.js
-html_template = '''
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Pipeline Flow Diagram</title>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; }
-        .node rect {
-            fill: #f0f8ff;
-            stroke: #4682b4;
-            stroke-width: 1.5px;
-        }
-        .node text {
-            font-size: 12px;
-            text-anchor: middle;
-        }
-        .edgePath path {
-            stroke: #333;
-            stroke-width: 1.5px;
-            fill: none;
-        }
-        .tooltip {
-            position: absolute;
-            background: #333;
-            color: white;
-            padding: 5px;
-            border-radius: 3px;
-            pointer-events: none;
-        }
-        svg { border: 1px solid #ccc; background: #fff; }
-    </style>
-</head>
-<body>
-    <h1>Pipeline Flow Diagram</h1>
-    <svg width="1200" height="1000"></svg>
-    <div id="tooltip" class="tooltip" style="opacity: 0;"></div>
-    <script>
-        try {
-            const nodes = %s;
-            const edges = %s;
+# Function to prepare Sankey data for a branch
+def prepare_sankey_data(G, branch, value_key):
+    nodes = []
+    links = []
+    node_indices = {node: idx for idx, node in enumerate(branch)}
+    
+    # Add nodes
+    for node in branch:
+        if 'outputs' in G.nodes[node]['data'] and G.nodes[node]['data']['outputs'][value_key] >= 0:
+            value = G.nodes[node]['data']['outputs'][value_key]
+        else:
+            value = G.nodes[node]['data']['inputs'][value_key]
+        nodes.append({"name": node, "value": value})
+    
+    # Add links
+    for src in branch:
+        for dst in G.successors(src):
+            if dst in branch:
+                if 'outputs' in G.nodes[dst]['data'] and G.nodes[dst]['data']['outputs'][value_key] >= 0:
+                    value = G.nodes[dst]['data']['outputs'][value_key]
+                else:
+                    value = G.nodes[dst]['data']['inputs'][value_key]
+                links.append({
+                    "source": node_indices[src],
+                    "target": node_indices[dst],
+                    "value": value
+                })
+    
+    return {"nodes": nodes, "links": links}
 
-            console.log("Nodes:", nodes);
-            console.log("Edges:", edges);
+# Function to generate HTML report
+def generate_html_report(branches, G, output_file):
+    html_content = '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Workflow Sankey Report</title>
+        <script src="https://d3js.org/d3.v7.min.js"></script>
+        <script src="https://unpkg.com/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 20px; }}
+            h1, h2 {{ color: #333; }}
+            .sankey-plot {{ margin-bottom: 50px; }}
+            .section {{ margin-top: 30px; }}
+        </style>
+    </head>
+    <body>
+        <h1>Workflow Analysis Report</h1>
+        
+        <script>
+            function createSankey(data, containerId, width, height) {{
+                const svg = d3.select(`#\${{containerId}}`)
+                    .append("svg")
+                    .attr("width", width)
+                    .attr("height", height);
+                
+                const sankey = d3.sankey()
+                    .nodeWidth(15)
+                    .nodePadding(10)
+                    .extent([[1, 1], [width - 1, height - 6]]);
+                
+                const {{nodes, links}} = sankey({{
+                    nodes: data.nodes.map(d => ({{...d}})),
+                    links: data.links.map(d => ({{...d}}))
+                }});
+                
+                svg.append("g")
+                    .selectAll("rect")
+                    .data(nodes)
+                    .enter()
+                    .append("rect")
+                    .attr("x", d => d.x0)
+                    .attr("y", d => d.y0)
+                    .attr("height", d => d.y1 - d.y0)
+                    .attr("width", d => d.x1 - d.x0)
+                    .attr("fill", "steelblue")
+                    .append("title")
+                    .text(d => `\${{d.name}}\\\\n\${{d.value}}`);
+                
+                svg.append("g")
+                    .selectAll("path")
+                    .data(links)
+                    .enter()
+                    .append("path")
+                    .attr("d", d3.sankeyLinkHorizontal())
+                    .attr("stroke", "gray")
+                    .attr("stroke-width", d => Math.max(1, d.width))
+                    .attr("fill", "none")
+                    .style("opacity", 0.5)
+                    .append("title")
+                    .text(d => `\${{d.source.name}} → \${{d.target.name}}\\\\n\${{d.value}}`);
+                
+                svg.append("g")
+                    .selectAll("text")
+                    .data(nodes)
+                    .enter()
+                    .append("text")
+                    .attr("x", d => d.x0 - 6)
+                    .attr("y", d => (d.y1 + d.y0) / 2)
+                    .attr("dy", "0.35em")
+                    .attr("text-anchor", "end")
+                    .text(d => d.name.split(":").pop())
+                    .filter(d => d.x0 < width / 2)
+                    .attr("x", d => d.x1 + 6)
+                    .attr("text-anchor", "start");
+            }}
+        </script>
 
-            const svg = d3.select("svg"),
-                width = +svg.attr("width"),
-                height = +svg.attr("height");
+        <div class="section">
+            <h2>Variants Flow</h2>
+            {0}
+        </div>
+        
+        <div class="section">
+            <h2>Samples Flow</h2>
+            {1}
+        </div>
+    </body>
+    </html>
+    '''
+    
+    # Generate plot divs for variants and samples
+    variants_plots = ""
+    samples_plots = ""
+    
+    for i, branch in enumerate(branches):
+        # Variants Sankey data
+        variants_data = prepare_sankey_data(G, branch, 'variants')
+        variants_div_id = f"variants_sankey_{i}"
+        variants_plots += f'<div class="sankey-plot"><h3>Branch {i+1}</h3><div id="{variants_div_id}"></div></div>'
+        variants_plots += f'<script>createSankey({json.dumps(variants_data)}, "{variants_div_id}", 8000, 600);</script>'
+        
+        # Samples Sankey data
+        samples_data = prepare_sankey_data(G, branch, 'samples')
+        samples_div_id = f"samples_sankey_{i}"
+        samples_plots += f'<div class="sankey-plot"><h3>Branch {i+1}</h3><div id="{samples_div_id}"></div></div>'
+        samples_plots += f'<script>createSankey({json.dumps(samples_data)}, "{samples_div_id}", 8000, 600);</script>'
+    
+    # Write HTML file
+    with open(output_file, 'w') as f:
+        f.write(html_content.format(variants_plots, samples_plots))
 
-            // Function to measure text width
-            function getTextWidth(text, fontSize = 12) {
-                const tempSvg = d3.select("body").append("svg");
-                const tempText = tempSvg.append("text")
-                    .attr("font-size", fontSize)
-                    .text(text);
-                const width = tempText.node().getBBox().width;
-                tempSvg.remove();
-                return width;
-            }
 
-            // Calculate node dimensions
-            nodes.forEach(d => {
-                const lines = d.label.split('\\\\n');
-                d.width = Math.max(...lines.map(line => getTextWidth(line, 12))) + 20; // Add padding
-                // d.height = lines.length * 18 + 20; // 18px per line + padding
-                d.height = lines.length * 24 + 100;
-            });
+# Load data
+data = load_json_files()
+output_file = "sankey_report.html"
 
-            // Force simulation
-            const simulation = d3.forceSimulation(nodes)
-                .force("link", d3.forceLink(edges).id(d => d.id).distance(150))
-                .force("charge", d3.forceManyBody().strength(-500))
-                .force("center", d3.forceCenter(width / 2, height / 2))
-                .force("x", d3.forceX().strength(0.1))
-                .force("y", d3.forceY().strength(0.1));
+# Build DAG and identify branches
+G, branches = build_dag_and_branches(data)
+print(f"len(branches) = {len(branches)}")
 
-            // Add links
-            const link = svg.append("g")
-                .attr("class", "links")
-                .selectAll("line")
-                .data(edges)
-                .enter().append("line")
-                .attr("class", "edgePath")
-                .attr("stroke", "#333")
-                .attr("stroke-width", 1.5)
-                .attr("marker-end", "url(#arrow)");
+# Generate HTML report
+generate_html_report(branches, G, output_file)
+print(f"Report generated: {output_file}")
 
-            // Add nodes
-            const node = svg.append("g")
-                .attr("class", "nodes")
-                .selectAll("g")
-                .data(nodes)
-                .enter().append("g")
-                .attr("class", "node")
-                .call(d3.drag()
-                    .on("start", dragstarted)
-                    .on("drag", dragged)
-                    .on("end", dragended))
-                .on("mouseover", showTooltip)
-                .on("mouseout", hideTooltip);
-
-            node.append("rect")
-                .attr("width", d => d.width)
-                .attr("height", d => d.height)
-                .attr("x", d => -d.width / 2)
-                .attr("y", d => -d.height / 2);
-
-            node.append("text")
-                .selectAll("tspan")
-                .data(d => d.label.split('\\\\n'))
-                .enter().append("tspan")
-                .attr("x", 0)
-                .attr("dy", (d, i) => i * 18)
-                .text(d => d);
-
-            // Arrowheads
-            svg.append("defs").append("marker")
-                .attr("id", "arrow")
-                .attr("viewBox", "0 -5 10 10")
-                .attr("refX", 15)  // Adjusted for better arrow placement
-                .attr("refY", 0)
-                .attr("markerWidth", 8)
-                .attr("markerHeight", 8)
-                .attr("orient", "auto")
-                .append("path")
-                .attr("d", "M0,-5L10,0L0,5")
-                .attr("fill", "#333");
-
-            // Update positions
-            simulation.on("tick", () => {
-                link
-                    .attr("x1", d => d.source.x)
-                    .attr("y1", d => d.source.y)
-                    .attr("x2", d => d.target.x)
-                    .attr("y2", d => d.target.y);
-                node.attr("transform", d => {
-                    d.x = Math.max(d.width / 2, Math.min(width - d.width / 2, d.x));
-                    d.y = Math.max(d.height / 2, Math.min(height - d.height / 2, d.y));
-                    return `translate(\${d.x},\${d.y})`;
-                });
-            });
-
-            function dragstarted(event, d) {
-                if (!event.active) simulation.alphaTarget(0.3).restart();
-                d.fx = d.x;
-                d.fy = d.y;
-            }
-            function dragged(event, d) {
-                d.fx = event.x;
-                d.fy = event.y;
-            }
-            function dragended(event, d) {
-                if (!event.active) simulation.alphaTarget(0);
-                d.fx = null;
-                d.fy = null;
-            }
-
-            const tooltip = d3.select("#tooltip");
-            function showTooltip(event, d) {
-                tooltip.style("opacity", 1)
-                    .html(`Full Name: \${d.full_name}`)
-                    .style("left", (event.pageX + 10) + "px")
-                    .style("top", (event.pageY - 10) + "px");
-            }
-            function hideTooltip() {
-                tooltip.style("opacity", 0);
-            }
-
-        } catch (error) {
-            console.error("D3.js Error:", error);
-            alert("Error rendering diagram: " + error.message);
-        }
-    </script>
-</body>
-</html>
-'''
-
-# Write HTML report
-with open("pipeline_report.html", "w") as f:
-    f.write(html_template % (json.dumps(nodes), json.dumps(edges)))
 
 # Write versions.yml
 with open('versions.yml', 'w') as f:
@@ -317,7 +317,8 @@ with open('versions.yml', 'w') as f:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    touch ${prefix}_${out_name_part}.png
+    touch sankey_report.html
+    touch pipeline_report.txt
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

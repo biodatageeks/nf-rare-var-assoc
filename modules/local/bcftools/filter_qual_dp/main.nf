@@ -21,7 +21,7 @@ process BCFTOOLS_FILTER_QUAL_DP {
     tuple val(meta), path("*.tbi")                    , emit: tbi, optional: true
     tuple val(meta), path("*.csi")                    , emit: csi, optional: true
     path "versions.yml"                               , emit: versions
-    path "*_tracking.json"                            , emit: tracking_out
+    path "*_filter_qual_dp_tracking.json"             , emit: tracking_out
 
     when:
     task.ext.when == null || task.ext.when
@@ -100,13 +100,17 @@ process BCFTOOLS_FILTER_QUAL_DP {
     fi
     echo "predecessor: \$predecessor"
 
-    out_tracking_file_name=\$(echo "${task.process}_filter_qual_dp_${prefix}_tracking.json" | sed 's/[^:]*://' | sed 's/:/_/g')
+    workflow_name=\$(echo "${task.process}" | awk -F: '{print \$(NF-1)}')
+    echo "workflow_name: \$workflow_name"
+
+    out_tracking_file_name=\$(echo "${task.process}_${prefix}_filter_qual_dp_tracking.json" | sed 's/[^:]*://' | sed 's/:/_/g')
     echo "out_tracking_file_name: \$out_tracking_file_name"
 
     # Create tracking JSON
     cat <<-END_TRACKING_JSON > \$out_tracking_file_name
     {
         "process_name": "${task.process}_filter_qual_dp_${prefix}",
+        "workflow_name": "\$workflow_name",
         "inputs": {
             "variants": \$variants_in,
             "samples": \$samples_in

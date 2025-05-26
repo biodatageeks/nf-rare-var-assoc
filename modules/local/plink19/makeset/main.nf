@@ -15,7 +15,7 @@ process PLINK19_MAKESET {
     tuple val(meta), path("*.set"), emit: out_set
     tuple val(meta), path("*.log"), emit: log
     path "versions.yml"           , emit: versions
-    path "*_tracking.json"        , emit: tracking_out
+    path "*_plink19_makeset_tracking.json"        , emit: tracking_out
 
     when:
     task.ext.when == null || task.ext.when
@@ -59,13 +59,17 @@ process PLINK19_MAKESET {
     fi
     echo "predecessor: \$predecessor"
 
-    out_tracking_file_name=\$(echo "${task.process}_tracking.json" | sed 's/[^:]*://' | sed 's/:/_/g')
+    workflow_name=\$(echo "${task.process}" | awk -F: '{print \$(NF-1)}')
+    echo "workflow_name: \$workflow_name"
+
+    out_tracking_file_name=\$(echo "${task.process}_plink19_makeset_tracking.json" | sed 's/[^:]*://' | sed 's/:/_/g')
     echo "out_tracking_file_name: \$out_tracking_file_name"
 
     # Create tracking JSON
     cat <<-END_TRACKING_JSON > \$out_tracking_file_name
     {
         "process_name": "${task.process}_${prefix}",
+        "workflow_name": "\$workflow_name",
         "inputs": {
             "variants": \$variants_in,
             "samples": \$samples_in
