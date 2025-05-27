@@ -37,8 +37,16 @@ process BCFTOOLS_FILTER_QUAL_DP {
                     "vcf"
     """
     # Check if INFO/${info_filter_ensure_field_present} and FMT/${fmt_filter_ensure_field_present} are present in the VCF header
-    INFO_FIELD=\$(bcftools view -h "${vcf}" | grep -c '^##INFO=<ID=${info_filter_ensure_field_present},' || true)
-    FMT_FIELD=\$(bcftools view -h "${vcf}" | grep -c '^##FORMAT=<ID=${fmt_filter_ensure_field_present},' || true)
+    if [ -n "${info_filter_ensure_field_present}" ]; then
+        INFO_FIELD=\$(bcftools view -h "${vcf}" | grep '^##INFO=<ID=' | grep -c -e '${info_filter_ensure_field_present}' || true)
+    else
+        INFO_FIELD=0
+    fi
+    if [ -n "${fmt_filter_ensure_field_present}" ]; then
+        FMT_FIELD=\$(bcftools view -h "${vcf}" | grep '^##FORMAT=<ID=' | grep -c -e '${fmt_filter_ensure_field_present}' || true)
+    else
+        FMT_FIELD=0
+    fi
 
     # Ensure single integer output (handle empty or invalid output)
     INFO_FIELD=\${INFO_FIELD:-0}
@@ -52,19 +60,19 @@ process BCFTOOLS_FILTER_QUAL_DP {
 
     # Add INFO_FIELD filters if present
     if [ "\$INFO_FIELD" -gt 0 ]; then
-        if [ "\$FILTER" = "" ];then
-            FILTER="${info_filter}"
-        else
+        if [ -n "\$FILTER" ]; then
             FILTER="\$FILTER && ${info_filter}"
+        else
+            FILTER="${info_filter}"
         fi
     fi
 
     # Add FMT_FIELD filters if present
     if [ "\$FMT_FIELD" -gt 0 ]; then
-        if [ "\$FILTER" = "" ];then
-            FILTER="${fmt_filter}"
-        else
+        if [ -n "\$FILTER" ]; then
             FILTER="\$FILTER && ${fmt_filter}"
+        else
+            FILTER="${fmt_filter}"
         fi
     fi
 
