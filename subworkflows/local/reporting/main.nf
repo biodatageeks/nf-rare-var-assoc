@@ -6,7 +6,8 @@ workflow REPORTING {
     results_merged
     masks_file
     phenotype_file
-    ch_plot_file
+    pca_plot_file
+    eda_plots
 
     main:
     gwas_report_template = file("$baseDir/modules/local/rscript/manhattan_qq_plots/assets/gene_level_report_template.Rmd", checkIfExists: true)
@@ -24,7 +25,8 @@ workflow REPORTING {
         r_functions_file,
         masks_file,
         phenotype_file,
-        ch_plot_file,
+        pca_plot_file,
+        eda_plots,
         rmd_pheno_stats_file
     )
 }

@@ -8,14 +8,14 @@ process PLINK2_PCA {
         params.cpu_support_avx2 ? 'docker.io/psuszynski/plink:2.0-alpha.6.9': 'docker.io/psuszynski/plink:2.0-alpha.6.9.noavx2' }"
 
     input:
-    tuple val(meta), path(bed), path(bim), path(fam), path(extract), path(keep)
+    tuple val(meta), path(bed), path(bim), path(fam), path(extract), path(keep), path(frq)
     val(pca_options)
     val(out_name_part)
     val(input_args)
     path(tracking_in)
 
     output:
-    tuple val(meta), path("*.acount"), emit: acount
+    // tuple val(meta), path("*.acount"), emit: acount
     tuple val(meta), path("*.eigenval"), emit: eigenval
     tuple val(meta), path("*.eigenvec"), emit: eigenvec
     tuple val(meta), path("*.eigenvec.allele"), emit: eigenvec_allele
@@ -47,6 +47,7 @@ process PLINK2_PCA {
         ${fam_input} \\
         ${extract_input} \\
         ${keep_input} \\
+        --read-freq ${frq} \\
         --pca ${pca_options} \\
         --out ${prefix}_${out_name_part}
 
@@ -104,8 +105,9 @@ process PLINK2_PCA {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    touch ${prefix}_${out_name_part}.prune.in
-    touch ${prefix}_${out_name_part}.prune.out
+    touch ${prefix}_${out_name_part}.eigenval
+    touch ${prefix}_${out_name_part}.eigenvec
+    touch ${prefix}_${out_name_part}.eigenvec.allele
     touch ${prefix}_${out_name_part}.log
 
     cat <<-END_VERSIONS > versions.yml

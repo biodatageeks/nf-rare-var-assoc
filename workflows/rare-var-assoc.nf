@@ -7,6 +7,7 @@ include { DOWNLOAD_FILE          } from '../modules/local/cmds/download_file'
 include { MERGE_RESULTS          } from '../modules/local/cmds/merge_results'
 include { RENAME                 } from '../modules/local/cmds/rename'
 include { GENERATE_TRACKING_REPORT           } from '../modules/local/python/generate_tracking_report'
+include { EXPLORATORY_DATA_ANALYSIS          } from '../modules/local/python/eda'
 include { RSCRIPT_BUILDREPORTS   } from '../modules/local/rscript/buildreports'
 include { REGENIE_STEP2          } from '../modules/local/regenie/step2'
 include { REGENIE_STEP1          } from '../modules/local/regenie/step1'
@@ -25,9 +26,12 @@ include { PLINK19_MAKEBED        } from '../modules/local/plink19/makebed'
 include { VEP_ANNOTATE           } from '../modules/local/vep/annotate'
 include { VEP_UPDATECACHE        } from '../modules/local/vep/updatecache'
 include { BCFTOOLS_VCF2FRQ       } from '../modules/local/bcftools/vcf2frq'
-include { BCFTOOLS_FILTER_QUAL_DP            } from '../modules/local/bcftools/filter_qual_dp'
+//include { BCFTOOLS_FILTER_QUAL_DP as BCFTOOLS_FILTER_QUAL_DP_1 } from '../modules/local/bcftools/filter_qual_dp'
+//include { BCFTOOLS_FILTER_QUAL_DP as BCFTOOLS_FILTER_QUAL_DP_2 } from '../modules/local/bcftools/filter_qual_dp'
 include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_1   } from '../modules/local/bcftools/view'
 include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_2   } from '../modules/local/bcftools/view'
+include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_1   } from '../modules/local/bcftools/filter'
+include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_2   } from '../modules/local/bcftools/filter'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_1 } from '../modules/local/bcftools/index'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_2 } from '../modules/local/bcftools/index'
 include { BCFTOOLS_NORM          } from '../modules/local/bcftools/norm'
@@ -137,9 +141,7 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(BCFTOOLS_INDEX_1.out.versions.first())
 
     BCFTOOLS_VIEW_1 (
-        ch_input_vcf
-            .join(ch_input_vcf_tbi, by: 0)                    // Join by the first element (meta)
-            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) },
+        ch_input_vcf.join(ch_input_vcf_tbi, by: 0),
         Channel.of([]),                                       // No regions file
         Channel.of([]),                                       // No targets file
         ch_all_samples,                                       // Samples file
@@ -153,28 +155,49 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(BCFTOOLS_VIEW_1.out.versions.first())
     ch_tracking = BCFTOOLS_VIEW_1.out.tracking_out.first()
 
+    EXPLORATORY_DATA_ANALYSIS (
+        ch_all_samples_vcf
+            .join(ch_all_samples_vcf_tbi, by: 0)
+            .join(ch_phenotype, by: 0)
+    )
+    ch_eda_plots = EXPLORATORY_DATA_ANALYSIS.out.plots
+    ch_versions = ch_versions.mix(EXPLORATORY_DATA_ANALYSIS.out.versions.first())
 
-    BCFTOOLS_FILTER_QUAL_DP (
+    BCFTOOLS_FILTER_1 (
         ch_all_samples_vcf.join(ch_all_samples_vcf_tbi, by: 0),
-        Channel.value(params.bcftools_qual_filter),
-        Channel.value(params.bcftools_info_filter),
-        Channel.value(params.bcftools_fmt_filter),
-        Channel.value(params.bcftools_info_filter_ensure_field_present),
-        Channel.value(params.bcftools_fmt_filter_ensure_field_present),
+        Channel.of([]),                                       // No regions file
+        Channel.of([]),                                       // No targets file
+        Channel.of([]),                                       // No samples file
+        Channel.of([]),                                       // SNPs file
+        Channel.value(params.bcftools_filter_1_options),        // input args
+        Channel.value("view2"),
         BCFTOOLS_VIEW_1.out.tracking_out.first()
     )
-    ch_qual_vcf = BCFTOOLS_FILTER_QUAL_DP.out.vcf
-    ch_qual_vcf_tbi = BCFTOOLS_FILTER_QUAL_DP.out.tbi
-    ch_versions = ch_versions.mix(BCFTOOLS_FILTER_QUAL_DP.out.versions.first())
-    ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_QUAL_DP.out.tracking_out.first())
+    ch_filter_1_vcf  = BCFTOOLS_FILTER_1.out.vcf
+    ch_filter_1_vcf_tbi  = BCFTOOLS_FILTER_1.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_FILTER_1.out.versions.first())
+    ch_tracking = BCFTOOLS_FILTER_1.out.tracking_out.first()
+
+    BCFTOOLS_FILTER_2 (
+        ch_filter_1_vcf.join(ch_filter_1_vcf_tbi, by: 0),
+        Channel.of([]),                                       // No regions file
+        Channel.of([]),                                       // No targets file
+        Channel.of([]),                                       // No samples file
+        Channel.of([]),                                       // SNPs file
+        Channel.value(params.bcftools_filter_2_options),        // input args
+        Channel.value("view3"),
+        BCFTOOLS_FILTER_1.out.tracking_out.first()
+    )
+    ch_filter_2_vcf  = BCFTOOLS_FILTER_2.out.vcf
+    ch_filter_2_vcf_tbi  = BCFTOOLS_FILTER_2.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_FILTER_2.out.versions.first())
+    ch_tracking = BCFTOOLS_FILTER_2.out.tracking_out.first()
     
     BCFTOOLS_NORM (
-        ch_qual_vcf
-            .join(ch_qual_vcf_tbi, by: 0)  // Join by the first element (meta)
-            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) },
+        ch_filter_2_vcf.join(ch_filter_2_vcf_tbi, by: 0),
         ch_vep_cachesubdir.map { t -> "${t}/${params.vep_fasta_path}" },
         Channel.value("norm"),
-        BCFTOOLS_FILTER_QUAL_DP.out.tracking_out.first()
+        BCFTOOLS_FILTER_2.out.tracking_out.first()
     )
     ch_normalized_vcf = BCFTOOLS_NORM.out.vcf
     ch_normalized_vcf_tbi = BCFTOOLS_NORM.out.tbi
@@ -193,9 +216,7 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(BCFTOOLS_ANNOTATE.out.versions.first())
 
     VEP_ANNOTATE (
-        ch_annotated_vcf
-            .join(ch_annotated_vcf_tbi, by: 0)  // Join by the first element (meta)
-            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) },
+        ch_annotated_vcf.join(ch_annotated_vcf_tbi, by: 0),
         ch_vep_cachesubdir,
         Channel.value(params.vep_annotate_species),
         Channel.value(params.vep_fasta_path),
@@ -301,10 +322,11 @@ workflow RARE_VAR_ASSOC {
     PCA (
         ch_bed_bim_fam_4,
         ch_phenotype,
+        ch_frq,
         F_COEFFICIENT_FILTERING.out.tracking.last()
     )
     ch_sscore = PCA.out.sscore
-    ch_plot_file = PCA.out.plot_file
+    ch_pca_plot_file = PCA.out.plot_file
     ch_versions = ch_versions.mix(PCA.out.versions.first())
     ch_tracking_step1 = ch_tracking_step1.mix(PCA.out.tracking)
 
@@ -493,7 +515,8 @@ workflow RARE_VAR_ASSOC {
         ch_results_merged,
         ch_masks,
         ch_phenotype,
-        ch_plot_file
+        ch_pca_plot_file,
+        ch_eda_plots.collect()
     )
 
     ch_tracking = ch_tracking_step1.mix(ch_tracking_step2)

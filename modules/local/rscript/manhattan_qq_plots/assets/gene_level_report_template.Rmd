@@ -17,6 +17,7 @@ params:
   phenotype: Y1
   phenotype_file: ../../../../../results/rscript_annotate/pims_phenotype.txt
   pc_plot_file: ../../../../../results/python/draw_pc_plot/pims_pc_plot.png
+  eda_plots: ../../../../../results/python/exploratory_data_analysis/*.png
   plot_ylimit: 0
   mask_file: ../../../../../results/rscript_annotate/pims.masks
   manhattan_annotation_enabled: true
@@ -59,6 +60,7 @@ source(params$r_functions)
 | Date             | `r params$date`             |
 | Phenotype File   | `r params$phenotype_file`   |
 | PC Plot File     | `r params$pc_plot_file`     |
+| EDA Plot Files   | `r params$eda_plots`        |
 | Phenotype        | `r params$phenotype`        |
 | Mask File        | `r params$mask_file`        |
 | Regenie Output   | `r params$regenie_filename` |
@@ -68,6 +70,15 @@ source(params$r_functions)
 
 ```{r child=params$rmd_pheno_stats}
 
+```
+
+## Exploratory Data Analysis
+
+```{r, fig.align='center', echo=FALSE}
+file_list <- unlist(strsplit(params$eda_plots, "\\s+"))
+file_list <- sort(file_list[file_list != ""])
+
+knitr::include_graphics(file_list)
 ```
 
 ## PC Plot
@@ -122,10 +133,10 @@ kable(masks)
 https://github.com/genepi/nf-gwas/blob/main/reports/functions.R
 ```{r, results='asis'}
 if(nrow(regenieTable_burdenJoint) > 0) {
-test_joint <- unique(regenieTable_burdenJoint$TEST)
-test_joint <- as.data.frame(test_joint)
-test_joint <- test_joint %>% tidyr::separate(test_joint, into=c("Model", "Test", "Joint"), sep="-", extra="merge")
-cat("The following joint tests were used for burden masks:", unique(test_joint$Joint), ".")
+    test_joint <- unique(regenieTable_burdenJoint$TEST)
+    test_joint <- as.data.frame(test_joint)
+    test_joint <- test_joint %>% tidyr::separate(test_joint, into=c("Model", "Test", "Joint"), sep="-", extra="merge")
+    cat("The following joint tests were used for burden masks:", unique(test_joint$Joint), ".")
 } else {
     cat("No joint test was performed for burden masks and AAF thresholds.")
 }

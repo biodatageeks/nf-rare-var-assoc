@@ -10,6 +10,7 @@ workflow PCA {
     take:
     ch_bed_bim_fam
     ch_pheno
+    ch_frq
     ch_tracking_in
 
     main:
@@ -51,13 +52,16 @@ workflow PCA {
     ch_tracking = ch_tracking.mix(PLINK2_KING_CUTOFF.out.tracking_out.first())
 
     PLINK2_PCA (
-        ch_bed_bim_fam.join(ch_indep_pairwise_prune_in, by: 0).join(ch_king_cutoff_prune_in, by: 0),
+        ch_bed_bim_fam
+            .join(ch_indep_pairwise_prune_in, by: 0)
+            .join(ch_king_cutoff_prune_in, by: 0)
+            .join(ch_frq, by: 0),
         Channel.value(params.plink2_pca_settings),
         Channel.value('pca'),
         Channel.value(params.plink2_pca_options),
         PLINK2_KING_CUTOFF.out.tracking_out.first()
     )
-    ch_acount = PLINK2_PCA.out.acount
+    // ch_acount = PLINK2_PCA.out.acount
     ch_eigenval = PLINK2_PCA.out.eigenval
     ch_eigenvec = PLINK2_PCA.out.eigenvec
     ch_eigenvec_allele = PLINK2_PCA.out.eigenvec_allele
@@ -65,7 +69,9 @@ workflow PCA {
     ch_tracking = ch_tracking.mix(PLINK2_PCA.out.tracking_out.first())
 
     PLINK2_PROJECTION_SCORE (
-        ch_bed_bim_fam.join(ch_acount, by: 0).join(ch_eigenvec_allele, by: 0),
+        ch_bed_bim_fam
+            .join(ch_frq, by: 0)
+            .join(ch_eigenvec_allele, by: 0),
         Channel.value(params.plink2_projection_score_settings),
         Channel.value('projection'),
         Channel.value(params.plink2_projection_score_options),

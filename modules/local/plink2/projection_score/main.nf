@@ -8,7 +8,7 @@ process PLINK2_PROJECTION_SCORE {
         params.cpu_support_avx2 ? 'docker.io/psuszynski/plink:2.0-alpha.6.9': 'docker.io/psuszynski/plink:2.0-alpha.6.9.noavx2' }"
 
     input:
-    tuple val(meta), path(bed), path(bim), path(fam), path(acount), path(eigenvec_allele)
+    tuple val(meta), path(bed), path(bim), path(fam), path(frq), path(eigenvec_allele)
     val(score_options)
     val(out_name_part)
     val(input_args)
@@ -40,7 +40,7 @@ process PLINK2_PROJECTION_SCORE {
         ${bed_input} \\
         ${bim_input} \\
         ${fam_input} \\
-        --read-freq ${acount} \\
+        --read-freq ${frq} \\
         --score ${eigenvec_allele} ${score_options} \\
         --out ${prefix}_${out_name_part}
 

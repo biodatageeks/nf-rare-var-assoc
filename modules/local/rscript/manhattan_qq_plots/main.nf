@@ -13,6 +13,7 @@ process RSCRIPT_MANHATTAN_QQ_PLOTS {
     path(mask_file)
     tuple val(meta), path(phenotype_file)
     tuple val(meta), path(pc_plot_file)
+    tuple val(meta), path(eda_plots)
     path(rmd_pheno_stats_file)
 
     output:
@@ -39,6 +40,7 @@ process RSCRIPT_MANHATTAN_QQ_PLOTS {
           phenotype='${phenotype}', \\
           phenotype_file='${phenotype_file}', \\
           pc_plot_file='${pc_plot_file}', \\
+          eda_plots='${eda_plots}', \\
           plot_ylimit=${params.plot_ylimit}, \\
           manhattan_annotation_enabled = $annotation_as_string, \\
           annotation_min_log10p = ${params.annotation_min_log10p}, \\
