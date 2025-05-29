@@ -91,7 +91,7 @@ def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], sta
 
     plt.figure(figsize=(8, 6))
     sns.histplot(mean_values.dropna(), bins=50, log_scale=True)
-    plt.title(f'Mean {stat} Across Variants (log scale)')
+    plt.title(f'Mean {stat} Across Variants - log scale')
     plt.xlabel(stat_label + " (log)")
     plt.ylabel('Variant Count')
     plt.savefig(f'{output_dir}/1b_{stat}_mean_variants.png')
@@ -108,6 +108,15 @@ def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], sta
             plt.ylabel('Variant Count')
             plt.savefig(f'{output_dir}/2_{stat}_percentile_{perc}_variants.png')
             plt.close()
+
+            perc_values = stats.quantile(perc / 100, axis=1)
+            plt.figure(figsize=(8, 6))
+            sns.histplot(perc_values.dropna(), bins=50, log_scale=True)
+            plt.title(f'{stat} ({perc}th Percentile) Across Variants - log scale')
+            plt.xlabel(stat_label)
+            plt.ylabel('Variant Count')
+            plt.savefig(f'{output_dir}/2b_{stat}_percentile_{perc}_variants.png')
+            plt.close()
     else:
         # Per-phenotype histograms
         for perc in percentiles + ['mean']:
@@ -121,11 +130,34 @@ def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], sta
                     else:
                         pheno_values = df[pheno_cols].quantile(perc / 100, axis=1)
                     sns.histplot(pheno_values.dropna(), bins=50, label=f'{pheno} ({perc})', alpha=0.5)
-            plt.title(f'{stat} ({perc}th Percentile) by Phenotype')
+            if perc == 'mean':
+                plt.title(f'Mean {stat} by Phenotype')
+            else:
+                plt.title(f'{stat} ({perc}th Percentile) by Phenotype')
             plt.xlabel(stat_label)
             plt.ylabel('Variant Count')
             plt.legend()
             plt.savefig(f'{output_dir}/3_{stat}_percentile_{perc}_by_phenotype_variants.png')
+            plt.close()
+
+            plt.figure(figsize=(10, 6))
+            for pheno in phenotypes:
+                pheno_samples = pheno_df[pheno_df['Y1'] == pheno]['IID'].values
+                pheno_cols = [f'{stat}_{sample}' for sample in pheno_samples if f'{stat}_{sample}' in df.columns]
+                if pheno_cols:
+                    if perc == 'mean':
+                        pheno_values = df[pheno_cols].mean(axis=1)
+                    else:
+                        pheno_values = df[pheno_cols].quantile(perc / 100, axis=1)
+                    sns.histplot(pheno_values.dropna(), bins=50, label=f'{pheno} ({perc})', alpha=0.5, log_scale=True)
+            if perc == 'mean':
+                plt.title(f'Mean {stat} by Phenotype - log scale')
+            else:
+                plt.title(f'{stat} ({perc}th Percentile) by Phenotype - log scale')
+            plt.xlabel(stat_label)
+            plt.ylabel('Variant Count')
+            plt.legend()
+            plt.savefig(f'{output_dir}/3b_{stat}_percentile_{perc}_by_phenotype_variants.png')
             plt.close()
 
 # Plotting function for sample-level statistics
@@ -251,20 +283,17 @@ def plot_dp_differences(df, pheno_df, samples):
             plt.savefig(f'{output_dir}/10b_dp_abs_diff_cases_controls.png')
             plt.close()
 
-def plot_allele_frequency(vcf_df, pheno_df):
-    phenotypes = pheno_df['Y1'].unique()
-    # TODO: add plots per phenotype
-
+def plot_allele_frequency(vcf_df):
     af = vcf_df['AF']
     plt.figure(figsize=(8, 6))
-    sns.histplot(af, bins=100)
-    plt.title('Alternate Allele Frequency Distribution')
+    sns.histplot(af, bins=100, log_scale=True)
+    plt.title('Alternate Allele Frequency Distribution - log scala')
     plt.xlabel('Allele Frequency')
     plt.ylabel('Variant Count')
     plt.savefig(f'{output_dir}/11_allele_frequency.png')
     plt.close()
 
-def plot_variant_types(vcf_df, pheno_df, samples):
+def plot_variant_types(vcf_df, samples):
     vcf_df['Variant_Type'] = vcf_df.apply(
         lambda x: 'SNP' if len(x['REF']) == 1 and len(x['ALT'].split(',')[0]) == 1 else 'Indel', axis=1)
     plt.figure(figsize=(8, 6))
@@ -348,8 +377,8 @@ def main(vcf_file, phenotype_file, percentiles):
     # Plot DP differences if exactly two phenotypes
     plot_dp_differences(vcf_df, pheno_df, samples)
 
-    plot_allele_frequency(vcf_df, pheno_df)
-    plot_variant_types(vcf_df, pheno_df, samples)
+    plot_allele_frequency(vcf_df)
+    plot_variant_types(vcf_df, samples)
     plot_chrom_density(vcf_df)
     plot_heterozygosity(vcf_df, pheno_df, samples)
     

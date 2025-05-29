@@ -5,9 +5,11 @@ output:
     self_contained: true
     thumbnails: false
     lightbox: true
-    gallery: false
+    gallery: true
     highlight: tango
     toc_depth: 3
+    fig_width: 16
+    fig_height: 10
 params:
   project: test-gene-level
   date: 2022-05-27
@@ -51,7 +53,7 @@ source(params$r_functions)
 ```
 
 
-## Project Summary
+# Project summary
 
 | Parameter        | Value                       |
 |------------------|-----------------------------|
@@ -65,27 +67,6 @@ source(params$r_functions)
 | Mask File        | `r params$mask_file`        |
 | Regenie Output   | `r params$regenie_filename` |
 
-
-## Phenotype Statistics
-
-```{r child=params$rmd_pheno_stats}
-
-```
-
-## Exploratory Data Analysis
-
-```{r, fig.align='center', echo=FALSE}
-file_list <- unlist(strsplit(params$eda_plots, "\\s+"))
-file_list <- sort(file_list[file_list != ""])
-
-knitr::include_graphics(file_list)
-```
-
-## PC Plot
-
-```{r, fig.align='center'}
-knitr::include_graphics(params$pc_plot_file)
-```
 
 ## Gene-based settings
 
@@ -126,8 +107,37 @@ kable(aaf_cutoffs,
 ```{r}
 masks <- read.table(params$mask_file, header=FALSE)
 names(masks) <- c("Mask", "Annotations")
+masks$Annotations <- gsub(",", ", ", masks$Annotations)
 kable(masks)
 ```
+
+
+# Input data characteristics
+
+## Phenotype Statistics
+
+```{r child=params$rmd_pheno_stats}
+
+```
+
+## Exploratory Data Analysis
+
+(click to expand)
+
+```{r, echo=FALSE, out.width="50%", out.height="50%", fig.cap="caption", fig.show='hold', fig.align='center'}
+file_list <- unlist(strsplit(params$eda_plots, "\\s+"))
+file_list <- sort(file_list[file_list != ""])
+
+knitr::include_graphics(file_list)
+```
+
+## PC Plot
+
+```{r, echo=FALSE, fig.align='center'}
+knitr::include_graphics(params$pc_plot_file)
+```
+
+# Association tests results
 
 ### Joint tests for burden masks
 https://github.com/genepi/nf-gwas/blob/main/reports/functions.R
@@ -197,6 +207,7 @@ for (test in unique(regenieTable$TEST)){
   for (settings in unique(regenieTable_tmp01$Settings)) {
     regenieTable_tmp02 <- regenieTable_tmp01[regenieTable_tmp01$Settings == settings, ]
     annotations <- masks[masks$Mask == unique(regenieTable_tmp02$Mask),]$Annotations
+    annotations <- gsub(",", ", ", annotations)
     cat('\n\n')
     cat('### AAF cutoff: ', unique(regenieTable_tmp02$AAF), ', Mask: ', unique(regenieTable_tmp02$Mask), ' (', annotations, '), (Test: ', unique(regenieTable_tmp02$TEST), ')',
         sep = "")
