@@ -17,6 +17,7 @@ include { RSCRIPT_ASSIGN_ANNOTATIONS         } from '../modules/local/rscript/as
 include { BGENIX                 } from '../modules/local/bgenix'
 include { QCTOOL                 } from '../modules/local/qctool'
 include { PLINK2_EXPORT_BGEN     } from '../modules/local/plink2/export_bgen'
+include { PLINK2_MAKEPGEN        } from '../modules/local/plink2/makepgen'
 include { PLINK2_WRITE_SNPLIST   } from '../modules/local/plink2/write_snplist'
 include { PLINK2_MAKEBED as PLINK2_MAKEBED_1 } from '../modules/local/plink2/makebed'
 include { PLINK2_MAKEBED as PLINK2_MAKEBED_2 } from '../modules/local/plink2/makebed'
@@ -370,33 +371,47 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(PLINK2_MAKEBED_4.out.versions.first())
     ch_tracking_step2 = PLINK2_MAKEBED_4.out.tracking_out.first()
 
-    PLINK2_EXPORT_BGEN (
-        ch_bed_bim_fam_5,
-        Channel.value('pvcf.norm_zlib'),
-        Channel.value(params.plink2_export_bgen_options),
+    //PLINK2_EXPORT_BGEN (
+    //    ch_bed_bim_fam_5,
+    //    Channel.value('pvcf.norm_zlib'),
+    //    Channel.value(params.plink2_export_bgen_options),
+    //    PLINK2_MAKEBED_4.out.tracking_out.first()
+    //)
+    //ch_bgen  = PLINK2_EXPORT_BGEN.out.bgen
+    //ch_sample  = PLINK2_EXPORT_BGEN.out.sample
+    //ch_versions = ch_versions.mix(PLINK2_EXPORT_BGEN.out.versions.first())
+    //ch_tracking_step2 = ch_tracking_step2.mix(PLINK2_EXPORT_BGEN.out.tracking_out.first())
+
+    //QCTOOL (
+    //    ch_bgen,
+    //    ch_sample,
+    //    Channel.value('pvcf.norm'),
+    //    Channel.value(params.qctool_options)
+    //)
+    //ch_qc_bgen  = QCTOOL.out.bgen
+    //ch_qc_sample  = QCTOOL.out.sample
+    //ch_versions = ch_versions.mix(QCTOOL.out.versions.first())
+
+    //BGENIX (
+    //    ch_qc_bgen,
+    //    Channel.value(params.bgenix_options)
+    //)
+    //ch_bgen_bgi  = BGENIX.out.bgen_bgi
+    //ch_versions = ch_versions.mix(BGENIX.out.versions.first())
+
+
+    PLINK2_MAKEPGEN (
+        ch_bed_bim_fam_5
+            .map { meta, bed_file, bim_file, fam_file -> tuple(meta, bed_file, bim_file, fam_file, [], [], [], []) },
+        Channel.value('--remove'),
+        Channel.value('--exclude'),
+        Channel.value('step2_input'),
+        Channel.value(params.plink2_makepgen_options),
         PLINK2_MAKEBED_4.out.tracking_out.first()
     )
-    ch_bgen  = PLINK2_EXPORT_BGEN.out.bgen
-    ch_sample  = PLINK2_EXPORT_BGEN.out.sample
-    ch_versions = ch_versions.mix(PLINK2_EXPORT_BGEN.out.versions.first())
-    ch_tracking_step2 = ch_tracking_step2.mix(PLINK2_EXPORT_BGEN.out.tracking_out.first())
-
-    QCTOOL (
-        ch_bgen,
-        ch_sample,
-        Channel.value('pvcf.norm'),
-        Channel.value(params.qctool_options)
-    )
-    ch_qc_bgen  = QCTOOL.out.bgen
-    ch_qc_sample  = QCTOOL.out.sample
-    ch_versions = ch_versions.mix(QCTOOL.out.versions.first())
-
-    BGENIX (
-        ch_qc_bgen,
-        Channel.value(params.bgenix_options)
-    )
-    ch_bgen_bgi  = BGENIX.out.bgen_bgi
-    ch_versions = ch_versions.mix(BGENIX.out.versions.first())
+    ch_pgen_pvar_psam  = PLINK2_MAKEPGEN.out.out_pgen_pvar_psam
+    ch_versions = ch_versions.mix(PLINK2_MAKEPGEN.out.versions.first())
+    ch_tracking_step2 = ch_tracking_step2.mix(PLINK2_MAKEPGEN.out.tracking_out.first())
 
     // renamed_file_name = ch_meta.map { t -> "${t.id}_remove_inbreeding_outliers.fam" }.first()
     // RENAME (
@@ -446,18 +461,17 @@ workflow RARE_VAR_ASSOC {
     RSCRIPT_ASSIGN_ANNOTATIONS (
         r_script_annotate_ch,
         ch_vep_vcf_with_index.map { meta, vcf, tbi -> tuple(meta, vcf) },
-        ch_qc_sample,
+        // ch_qc_sample,
         ch_masks,
         Channel.value(params.rscript_annotate_options)
     )
-    ch_r_out_sample  = RSCRIPT_ASSIGN_ANNOTATIONS.out.out_sample
+    // ch_r_out_sample  = RSCRIPT_ASSIGN_ANNOTATIONS.out.out_sample
     ch_annotations  = RSCRIPT_ASSIGN_ANNOTATIONS.out.annotations
     ch_setlist  = RSCRIPT_ASSIGN_ANNOTATIONS.out.setlist
     ch_versions = ch_versions.mix(RSCRIPT_ASSIGN_ANNOTATIONS.out.versions.first())
 
     
-    ch_regenie_step_2_input_part = ch_qc_bgen
-            .join(ch_r_out_sample, by: 0)
+    ch_regenie_step_2_input_part = ch_pgen_pvar_psam
             .join(ch_phenotype, by: 0)
             .join(ch_annotations, by: 0)
             .join(ch_setlist, by: 0)
@@ -468,8 +482,8 @@ workflow RARE_VAR_ASSOC {
             .join(ch_sscore, by: 0)
     } else {
         ch_regenie_step_2_input = ch_regenie_step_2_input_part
-            .map { meta, bgen, sample, pheno, anno, setlist, aaf, pred_list ->
-                tuple(meta, bgen, sample, pheno, anno, setlist, aaf, pred_list, [])
+            .map { meta, pgen, pvar, psam, pheno, anno, setlist, aaf, pred_list ->
+                tuple(meta, pgen, pvar, psam, pheno, anno, setlist, aaf, pred_list, [])
             }
     }
 
@@ -477,7 +491,8 @@ workflow RARE_VAR_ASSOC {
         ch_regenie_step_2_input,
         ch_masks,
         Channel.value(params.regenie_step2_options),
-        PLINK2_EXPORT_BGEN.out.tracking_out.first()
+        // PLINK2_EXPORT_BGEN.out.tracking_out.first()
+        PLINK2_MAKEPGEN.out.tracking_out.first()
     )
     ch_regenie_step2_masks_bed_bim_fam  = REGENIE_STEP2.out.masks_bed_bim_fam
     ch_regenie_step2_masks_snplist  = REGENIE_STEP2.out.masks_snplist

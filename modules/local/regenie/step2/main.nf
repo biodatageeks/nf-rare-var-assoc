@@ -6,7 +6,7 @@ process REGENIE_STEP2 {
     container 'ghcr.io/rgcgithub/regenie/regenie:v4.1.gz'
 
     input:
-    tuple val(meta), path(bgen), path(sample), path(phenotype), path(annotations), path(setlist), path(aaf), path(step1_pred_list), path(covar_file)
+    tuple val(meta), path(pgen), path(pvar), path(psam), path(phenotype), path(annotations), path(setlist), path(aaf), path(step1_pred_list), path(covar_file)
     path(masks)
     val(input_args)
     path(tracking_in)
@@ -34,8 +34,7 @@ process REGENIE_STEP2 {
     regenie \\
        --step 2 \\
        --threads ${task.cpus} \\
-       --bgen ${bgen} \\
-       --sample ${sample} \\
+       --pgen ${pgen.baseName} \\
        --phenoFile ${phenotype} \\
        ${covar_file_input} \\
        --anno-file ${annotations} \\

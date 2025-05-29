@@ -6,13 +6,13 @@ library("optparse")
 option_list <- list(
   make_option(c("--vcf-path"), type="character", default=NULL,
               help="Path to input VCF file", metavar="character"),
-  make_option(c("--sample-path"), type="character", default=NULL,
-              help="Path to input sample file", metavar="character"),
+#  make_option(c("--sample-path"), type="character", default=NULL,
+#              help="Path to input sample file", metavar="character"),
   make_option(c("--masks-path"), type="character", default=NULL,
               help="Path to input masks file", metavar="character"),
   
-  make_option(c("--out-sample-path"), type="character", default=NULL,
-              help="Path to output sample file", metavar="character"),
+#  make_option(c("--out-sample-path"), type="character", default=NULL,
+#              help="Path to output sample file", metavar="character"),
   make_option(c("--out-anno-path"), type="character", default=NULL,
               help="Path to output annotations file", metavar="character"),
   make_option(c("--out-setlist-path"), type="character", default=NULL,
@@ -33,18 +33,18 @@ opt <- parse_args(opt_parser)
 
 # Check for required arguments and assign to variables
 if (is.null(opt$`vcf-path`)) stop("Input VCF file path is required")
-if (is.null(opt$`sample-path`)) stop("Input sample file path is required")
+#if (is.null(opt$`sample-path`)) stop("Input sample file path is required")
 if (is.null(opt$`masks-path`)) stop("Input masks file path is required")
 
-if (is.null(opt$`out-sample-path`)) stop("Output sample file path is required")
+#if (is.null(opt$`out-sample-path`)) stop("Output sample file path is required")
 if (is.null(opt$`out-anno-path`)) stop("Output annotations file path is required")
 if (is.null(opt$`out-setlist-path`)) stop("Output setlist file path is required")
 
 r_in_vcf_path <- opt$`vcf-path`
-r_in_sample_path <- opt$`sample-path`
+#r_in_sample_path <- opt$`sample-path`
 r_in_masks_path <- opt$`masks-path`
 
-r_out_sample_path <- opt$`out-sample-path`
+#r_out_sample_path <- opt$`out-sample-path`
 r_out_annotations_path <- opt$`out-anno-path`
 r_out_setlist_path <- opt$`out-setlist-path`
 
@@ -259,6 +259,6 @@ fwrite(anno, r_out_annotations_path, sep="\t", col.names=F, quote=F)
 fwrite(setlist, r_out_setlist_path, sep="\t", col.names=F, quote=F)
 
 # need to set missing to 0 in *.sample file
-dd <- fread(r_in_sample_path)
-dd$missing <- 0
-fwrite(dd, r_out_sample_path, sep="\t", quote=F)
+#dd <- fread(r_in_sample_path)
+#dd$missing <- 0
+#fwrite(dd, r_out_sample_path, sep="\t", quote=F)
