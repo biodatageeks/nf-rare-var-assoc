@@ -1,7 +1,7 @@
 process EXPLORATORY_DATA_ANALYSIS {
 
     tag "$meta.id"
-    label 'process_single'
+    label 'process_medium_memory'
 
     conda "${moduleDir}/environment.yml"
     container 'docker.io/psuszynski/python_tools:1.0.1'
