@@ -102,11 +102,41 @@ anno_snps2 <- cbind(anno[match( anno_snps$selV, anno$V1),], anno_snps)
 cat("Creating res_log10p_1_annotated.tsv ..")
 sel_dd <- dd[which(dd$LOG10P > 1),]
 cat(paste0(" (nrow(sel_dd) = ", nrow(sel_dd), ") "))
+problem_ids <- character()
 
 if (nrow(sel_dd) > 0) {
     ll <- lapply(1:nrow(sel_dd), function(i){
-        anno_snps2$selV %in% strsplit(masks$V4[which(masks$V1 == sel_dd$ID[i])],",")
-        cbind(sel_dd[i,],anno_snps2[which(anno_snps2$selV %in% strsplit(masks$V4[which(masks$V1 == sel_dd$ID[i])],",")[[1]]),])
+        id_matches <- which(masks$V1 == sel_dd$ID[i])
+        if (i == 1) {
+          cat("id_matches for ID ", sel_dd$ID[i], ": ", id_matches, "\n")
+          v4 <- masks$V4[id_matches]
+          cat("v4 for ID ", sel_dd$ID[i], ": ", v4, "\n")
+        }
+        if (length(id_matches) == 0) {
+            problem_ids <<- c(problem_ids, sel_dd$ID[i])
+            cat("id_matches is empty for ID ", sel_dd$ID[i], "\n")
+            return(NULL)  # Skip this iteration
+        }
+        split_result <- tryCatch(
+            strsplit(masks$V4[id_matches], ",")[[1]],
+            error = function(e) {
+                warning("Error splitting masks$V4 for ID: ", sel_dd$ID[i], ": ", e$message)
+                problem_ids <<- c(problem_ids, sel_dd$ID[i])
+                return(NULL)
+            }
+        )
+        if (is.null(split_result) || length(split_result) == 0) {
+            problem_ids <<- c(problem_ids, sel_dd$ID[i])
+            cat("split_result is empty for ID ", sel_dd$ID[i], "\n")
+            return(NULL)
+        }
+        sel_indices <- which(anno_snps2$selV %in% split_result)
+        if (length(sel_indices) == 0) {
+            problem_ids <<- c(problem_ids, sel_dd$ID[i])
+            cat("sel_indices is empty for ID ", sel_dd$ID[i], "\n")
+            return(NULL)
+        }
+        cbind(sel_dd[i, ], anno_snps2[sel_indices, ])
     })
     final <- rbindlist(ll)
 } else {
@@ -116,6 +146,9 @@ if (nrow(sel_dd) > 0) {
 fwrite(final, r_out_res_log10p_1_annotated_tsv_path)
 cat(" - done!\n")
 
+if (length(problem_ids) > 0) {
+    writeLines(problem_ids, "problem_ids.txt")
+}
 
 sel <- anno[which(anno$V1 %in% umaskvars),]
 print(paste0("for all umaskvars  nrow(sel) = ", nrow(sel)))

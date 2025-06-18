@@ -25,7 +25,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pysam
+import time
 from pathlib import Path
+
+
+def current_milli_time():
+    return round(time.time() * 1000)
 
 # Create output directory for plots
 output_dir = "plots"
@@ -40,6 +45,7 @@ def encode_genotype(gt):
 
 # Function to load VCF.gz and extract DP, GQ, and missingness
 def load_vcf(vcf_file):
+    print(f"load_vcf(\${vcf_file})  ts = \${current_milli_time()}")
     vcf = pysam.VariantFile(vcf_file)
     samples = list(vcf.header.samples)
     data = {'CHROM': [], 'POS': [], 'Variant_Type': [], 'AF': []}
@@ -80,11 +86,13 @@ def load_vcf(vcf_file):
 
 # Load phenotype file
 def load_phenotype(phenotype_file):
+    print(f"load_phenotype(\${phenotype_file})  ts = \${current_milli_time()}")
     pheno_df = pl.read_csv(phenotype_file, separator='\t')
     return pheno_df
 
 # Plotting function for variant-level statistics
 def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], stat_label='Statistic'):
+    print(f"plot_variant_stats(stat=\${stat})  ts = \${current_milli_time()}")
     stat_cols = [f'{stat}_{sample}' for sample in samples]
     phenotypes = pheno_df['Y1'].unique().to_list()
     
@@ -109,7 +117,8 @@ def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], sta
     if len(phenotypes) > 5:
         # Overall histograms
         for perc in percentiles:
-            perc_values = df.select(stat_cols).quantile(perc / 100).to_numpy()
+            perc_values = np.quantile(df.select(stat_cols).to_numpy(), perc / 100, axis=1)
+            
             plt.figure(figsize=(8, 6))
             sns.histplot(perc_values[~np.isnan(perc_values)], bins=50)
             plt.title(f'{stat} ({perc}th Percentile) Across Variants')
@@ -136,7 +145,7 @@ def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], sta
                     if perc == 'mean':
                         pheno_values = df.select(pheno_cols).mean_horizontal().to_numpy()
                     else:
-                        pheno_values = df.select(pheno_cols).quantile(perc / 100).to_numpy()
+                        pheno_values = np.quantile(df.select(pheno_cols).to_numpy(), perc / 100, axis=1)
                     sns.histplot(pheno_values[~np.isnan(pheno_values)], bins=50, label=f'{pheno} ({perc})', alpha=0.5)
             plt.title(f'Mean {stat} by Phenotype' if perc == 'mean' else f'{stat} ({perc}th Percentile) by Phenotype')
             plt.xlabel(stat_label)
@@ -164,6 +173,7 @@ def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], sta
 
 # Plotting function for sample-level statistics
 def plot_sample_stats(df, pheno_df, samples, stat, stat_label='Statistic'):
+    print(f"plot_sample_stats(stat=\${stat})  ts = \${current_milli_time()}")
     stat_cols = [f'{stat}_{sample}' for sample in samples]
     sample_stats = df.select(stat_cols).to_pandas().mean().reset_index()
     sample_stats['IID'] = sample_stats['index'].str.replace(f'{stat}_', '')
@@ -194,6 +204,7 @@ def plot_sample_stats(df, pheno_df, samples, stat, stat_label='Statistic'):
 
 # Plot missingness per variant and sample
 def plot_missingness(df, pheno_df, samples):
+    print(f"plot_missingness()  ts = \${current_milli_time()}")
     gt_cols = [f'GT_{sample}' for sample in samples]
     missingness_samples = (
         df.select(pl.col(gt_cols).is_null().mean())  # Calculate mean of nulls per column
@@ -253,6 +264,7 @@ def plot_missingness(df, pheno_df, samples):
 
 # Plot absolute DP differences for cases vs controls
 def plot_dp_differences(df, pheno_df, samples):
+    print(f"plot_dp_differences()  ts = \${current_milli_time()}")
     phenotypes = pheno_df['Y1'].unique().to_list()
     if len(phenotypes) == 2:
         case_samples = pheno_df.filter(pl.col('Y1') == phenotypes[0])['IID'].to_list()
@@ -281,6 +293,7 @@ def plot_dp_differences(df, pheno_df, samples):
             plt.close()
 
 def plot_allele_frequency(vcf_df):
+    print(f"plot_allele_frequency()  ts = \${current_milli_time()}")
     af = vcf_df['AF'].to_numpy()
     plt.figure(figsize=(8, 6))
     sns.histplot(af[~np.isnan(af)], bins=100, log_scale=True)
@@ -291,6 +304,7 @@ def plot_allele_frequency(vcf_df):
     plt.close()
 
 def plot_variant_types(vcf_df, samples):
+    print(f"plot_variant_types()  ts = \${current_milli_time()}")
     plt.figure(figsize=(8, 6))
     sns.countplot(data=vcf_df.to_pandas(), x='Variant_Type')
     plt.title('Variant Type Distribution')
@@ -299,6 +313,7 @@ def plot_variant_types(vcf_df, samples):
     plt.close()
 
 def plot_chrom_density(vcf_df):
+    print(f"plot_chrom_density()  ts = \${current_milli_time()}")
     chrom_counts = vcf_df.group_by('CHROM').len().sort('CHROM').to_pandas()
     plt.figure(figsize=(12, 6))
     sns.barplot(x='CHROM', y='len', data=chrom_counts)
@@ -310,6 +325,7 @@ def plot_chrom_density(vcf_df):
     plt.close()
 
 def plot_heterozygosity(vcf_df, pheno_df, samples):
+    print(f"plot_heterozygosity()  ts = \${current_milli_time()}")
     het_rates = []
     for sample in samples:
         gt_col = f'GT_{sample}'
@@ -345,6 +361,7 @@ def plot_heterozygosity(vcf_df, pheno_df, samples):
         plt.close()
 
 def plot_boxplots(vcf_df, pheno_df, samples, stat, stat_label):
+    print(f"plot_boxplots(stat=\${stat})  ts = \${current_milli_time()}")
     stat_cols = [f'{stat}_{sample}' for sample in samples]
     sample_stats = vcf_df.select(stat_cols).to_pandas().mean().reset_index()
     sample_stats['IID'] = sample_stats['index'].str.replace(f'{stat}_', '')
@@ -384,7 +401,7 @@ def main(vcf_file, phenotype_file, percentiles):
 # Run the analysis
 vcf_file = "${vcf}"
 phenotype_file = "${phenotype_file}"
-percentiles = [1, 10, 50]
+percentiles = [1, 50]
 main(vcf_file, phenotype_file, percentiles)
 
 
