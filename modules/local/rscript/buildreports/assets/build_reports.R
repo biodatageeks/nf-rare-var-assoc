@@ -74,7 +74,15 @@ resList <- lapply( (1:nrow(sel)), function(i){
         cases_af <-  cases_ac/ (2*(length(cases)-length(cases_nas)))
         controls_ac <-  (length(controls_htz) + 2*(length(controls_hmz)))
         controls_af <-  controls_ac/  (2*(length(controls)-length(controls_nas)))
-        data.table(cbind(selV, cases_af=cases_af, controls_af=controls_af,cases_ac=cases_ac, controls_ac=controls_ac, cases_na=length(cases_nas), controls_na=length(controls_nas)))
+        data.table(cbind(
+            selV,
+            cases_af=cases_af, 
+            controls_af=controls_af,
+            cases_ac=cases_ac, 
+            controls_ac=controls_ac, 
+            cases_na=length(cases_nas), 
+            controls_na=length(controls_nas)
+        ))
 })
 
 anno_snps <- rbindlist(resList)
@@ -139,9 +147,19 @@ resList <- lapply( (1:nrow(sel)), function(i){
         controls_ac <-  (length(controls_htz) + 2*(length(controls_hmz)))
         controls_af <-  controls_ac/  (2*(length(controls)-length(controls_nas)))
 
-        data.table(cbind(selV, cases_af=cases_af, controls_af=controls_af,cases_ac=cases_ac, controls_ac=controls_ac, 
-                         cases_na=length(cases_nas), cases_htz=paste0(cases_htz,collapse=";"), cases_hmz=paste0(cases_hmz,collapse=";"), 
-                         controls_na=length(controls_nas), controls_htz=paste0(controls_htz,collapse=";"), controls_hmz=paste0(controls_hmz,collapse=";")))
+        data.table(cbind(
+            selV, 
+            cases_af=cases_af, 
+            controls_af=controls_af,
+            cases_ac=cases_ac, 
+            controls_ac=controls_ac, 
+            cases_na=length(cases_nas), 
+            cases_htz=paste0(cases_htz,collapse=";"), 
+            cases_hmz=paste0(cases_hmz,collapse=";"), 
+            controls_na=length(controls_nas), 
+            controls_htz=paste0(controls_htz,collapse=";"), 
+            controls_hmz=paste0(controls_hmz,collapse=";")
+        ))
 })
 
 res <- rbindlist(resList)
