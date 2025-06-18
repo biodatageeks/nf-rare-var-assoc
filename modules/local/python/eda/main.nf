@@ -4,7 +4,7 @@ process EXPLORATORY_DATA_ANALYSIS {
     label 'process_medium_memory'
 
     conda "${moduleDir}/environment.yml"
-    container 'docker.io/psuszynski/python_tools:1.0.3'
+    container 'docker.io/psuszynski/python_tools:1.0.4'
 
     input:
     tuple val(meta), path(vcf), path(tbi), path(phenotype_file)
