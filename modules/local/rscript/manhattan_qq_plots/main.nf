@@ -12,9 +12,10 @@ process RSCRIPT_MANHATTAN_QQ_PLOTS {
     path(r_functions_file)
     path(mask_file)
     tuple val(meta), path(phenotype_file)
-    tuple val(meta), path(pc_plot_file)
-    tuple val(meta), path(eda_plots)
+    tuple val(meta2), path(pc_plot_file)
+    tuple val(meta3), path(eda_plots)
     path(rmd_pheno_stats_file)
+    tuple val(meta4), path(setlist_file)
 
     output:
     path("*.html"), emit: plots_report
@@ -28,8 +29,12 @@ process RSCRIPT_MANHATTAN_QQ_PLOTS {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def VERSION = '4.4.2.5-0.1'
     def annotation_as_string = params.manhattan_annotation_enabled.toString().toUpperCase()
+    def all_params = params.toString().replaceAll("'", "\\\\'")
 
     """
+    gene_count=\$(cat ${setlist_file} | wc -l)
+    echo "gene count: \$gene_count"
+
     Rscript -e "require( 'rmarkdown' ); render('${gwas_report_template}', \\
         params = list( \\
           project = '${params.project_name}', \\
@@ -42,11 +47,13 @@ process RSCRIPT_MANHATTAN_QQ_PLOTS {
           pc_plot_file='${pc_plot_file}', \\
           eda_plots='${eda_plots}', \\
           plot_ylimit=${params.plot_ylimit}, \\
-          manhattan_annotation_enabled = $annotation_as_string, \\
+          genes_num=\$gene_count, \\
+          manhattan_annotation_enabled = ${annotation_as_string}, \\
           annotation_min_log10p = ${params.annotation_min_log10p}, \\
           mask_file='${mask_file}', \\
           r_functions='${r_functions_file}', \\
-          rmd_pheno_stats='${rmd_pheno_stats_file}' \\
+          rmd_pheno_stats='${rmd_pheno_stats_file}', \\
+          all_params='${all_params}' \\
         ), \\
         intermediates_dir='\$PWD', \\
         knit_root_dir='\$PWD', \\

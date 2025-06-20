@@ -21,11 +21,13 @@ params:
   pc_plot_file: ../../../../../results/python/draw_pc_plot/pims_pc_plot.png
   eda_plots: ../../../../../results/python/exploratory_data_analysis/*.png
   plot_ylimit: 0
+  genes_num: 0
   mask_file: ../../../../../results/rscript_annotate/pims.masks
   manhattan_annotation_enabled: true
   annotation_min_log10p: 1
   r_functions: ./functions.R
   rmd_pheno_stats: ./child_phenostatistics.Rmd
+  all_params: ""
 ---
 
 <!--
@@ -48,6 +50,7 @@ library(ggplot2)
 library(skimr)
 library(kableExtra)
 library(dplyr)
+library(tidyr)
 knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, error = TRUE, cache=FALSE)
 source(params$r_functions)
 ```
@@ -66,6 +69,8 @@ source(params$r_functions)
 | Phenotype        | `r params$phenotype`        |
 | Mask File        | `r params$mask_file`        |
 | Regenie Output   | `r params$regenie_filename` |
+| Number of genes  | `r params$genes_num`        |
+| Parameters       | `r gsub(", ", "|\n| |", gsub(":", " :  ", gsub("\\|", "\\\\|", params$all_params)))`       |
 
 
 ## Gene-based settings
@@ -175,7 +180,7 @@ for (test in unique(regenieTable_burdenJoint$TEST)){
   cat('**Manhattan Plot**')
   cat('\n\n')
   df_prep <- manhattan_prep(regenieTable_tmp01)
-  plot <- manhattan_plot(df_prep, ymax = params$plot_ylimit, hlines = FALSE)
+  plot <- manhattan_plot(df_prep, ymax = params$plot_ylimit, hlines = FALSE, n_genes = params$genes_num)
   #annotatate plot (if it is enabled)
   if(!params$manhattan_annotation_enabled) {
     plot
@@ -224,7 +229,7 @@ for (test in unique(regenieTable$TEST)){
     cat('**Manhattan Plot**')
     cat('\n\n')
     df_prep <- manhattan_prep(regenieTable_tmp02)
-    plot <- manhattan_plot(df_prep, ymax = params$plot_ylimit, hlines = FALSE)
+    plot <- manhattan_plot(df_prep, ymax = params$plot_ylimit, hlines = FALSE, n_genes = params$genes_num)
     #annotatate plot (if it is enabled)
     if(!params$manhattan_annotation_enabled) {
       plot

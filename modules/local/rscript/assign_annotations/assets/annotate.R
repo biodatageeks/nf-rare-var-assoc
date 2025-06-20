@@ -140,22 +140,6 @@ anno$key <- gsub(":", "_", anno$key)
 # remove multiallelic
 anno <- anno[!grepl(",", key)]
 
-# Setlist creation with grouping by Symbol
-unique_features <- unique(anno$Symbol)
-setlist <- rbindlist(lapply(unique_features, function(feature) {
-    feature_rows <- dd[Symbol == feature]
-    data.table(
-        symbol = feature,
-        chrom = feature_rows$CHROM[1],
-        pos = feature_rows$POS[1],
-        variants = paste(feature_rows$key, collapse=",")
-    )
-}))
-# Filter and process setlist (same chrM/chrY filtering as annotations)
-setlist <- setlist[!grepl("^chrM|^chrY|^M|^Y", chrom)]
-setlist$variants <- gsub(":", "_", setlist$variants)
-
-
 
 filter_annotations <- function(anno, masks_path, quantile_threshold, min_top_annotations, max_annotations) {
     # Read and parse the mask file
@@ -252,6 +236,22 @@ filter_annotations <- function(anno, masks_path, quantile_threshold, min_top_ann
 }
 
 anno <- filter_annotations(anno, r_in_masks_path, quantile_threshold, min_top_annotations, max_annotations)
+
+
+# Setlist creation with grouping by Symbol
+unique_features <- unique(anno$Symbol)
+setlist <- rbindlist(lapply(unique_features, function(feature) {
+    feature_rows <- dd[Symbol == feature]
+    data.table(
+        symbol = feature,
+        chrom = feature_rows$CHROM[1],
+        pos = feature_rows$POS[1],
+        variants = paste(feature_rows$key, collapse=",")
+    )
+}))
+# Filter and process setlist (same chrM/chrY filtering as annotations)
+setlist <- setlist[!grepl("^chrM|^chrY|^M|^Y", chrom)]
+setlist$variants <- gsub(":", "_", setlist$variants)
 
 
 # Write final annotations file and setlist file

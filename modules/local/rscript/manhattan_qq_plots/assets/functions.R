@@ -34,14 +34,20 @@ manhattan_prep <- function(df) {
 ## << Create Manhattan plot ===========================
 manhattan_plot <- function(df_prep,
                            ymax = 0,
-                           hlines = TRUE) {
+                           hlines = TRUE,
+                           n_genes = 0) {
   # prepare x axis
   axisdf <-  df_prep %>%
     group_by(CHROM) %>%
     summarize(center=( max(GENPOScum) + min(GENPOScum) ) / 2 )
+  
+  n_records <- nrow(df_prep)
+  bonferroni_threshold_genes <- -log10(0.05 / n_genes)
+  # bonferroni_threshold_records <- -log10(0.05 / n_records)
+
   # prepare y axis
   if (ymax == 0) {
-    ydim <- c(0, sum(max(df_prep$LOG10P), 0.5))
+    ydim <- c(0, sum(max(max(df_prep$LOG10P), bonferroni_threshold_genes), 0.5))
   } else {
     ydim <- c(0, ymax)
   }
@@ -72,7 +78,28 @@ manhattan_plot <- function(df_prep,
                                color = "black"),
       axis.title = element_text(size = 14),
       axis.ticks = element_line(color = "black")
-    )
+    ) +
+    geom_hline(yintercept = bonferroni_threshold_genes,
+               linetype = "longdash",
+               color = "#0d7838",
+               linewidth = 0.5) +
+    annotate("text",
+             x = max(df_prep$GENPOScum) * 0.95,
+             y = bonferroni_threshold_genes + 0.1,
+             label = "Bonferroni (number of genes)",
+             color = "#0d7838",
+             size = 3.5) #+
+    #geom_hline(yintercept = bonferroni_threshold_records,
+    #           linetype = "longdash",
+    #           color = "#bd5f08",
+    #           linewidth = 0.5) +
+    #annotate("text",
+    #         x = max(df_prep$GENPOScum) * 0.95,
+    #         y = bonferroni_threshold_records + 0.1,
+    #         label = "Bonferroni (total tests number)",
+    #         color = "#bd5f08",
+    #         size = 3.5)
+
   # switch hlines off
   if (hlines == TRUE) {
     plot <- plot +

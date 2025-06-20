@@ -18,7 +18,8 @@ include { BGENIX                 } from '../modules/local/bgenix'
 include { QCTOOL                 } from '../modules/local/qctool'
 include { PLINK2_EXPORT_BGEN     } from '../modules/local/plink2/export_bgen'
 include { PLINK2_MAKEPGEN        } from '../modules/local/plink2/makepgen'
-include { PLINK2_WRITE_SNPLIST   } from '../modules/local/plink2/write_snplist'
+include { PLINK2_WRITE_SNPLIST as PLINK2_WRITE_SNPLIST_1 } from '../modules/local/plink2/write_snplist'
+include { PLINK2_WRITE_SNPLIST as PLINK2_WRITE_SNPLIST_2 } from '../modules/local/plink2/write_snplist'
 include { PLINK2_MAKEBED as PLINK2_MAKEBED_1 } from '../modules/local/plink2/makebed'
 include { PLINK2_MAKEBED as PLINK2_MAKEBED_2 } from '../modules/local/plink2/makebed'
 include { PLINK2_MAKEBED as PLINK2_MAKEBED_3 } from '../modules/local/plink2/makebed'
@@ -331,30 +332,16 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(PCA.out.versions.first())
     ch_tracking_step1 = ch_tracking_step1.mix(PCA.out.tracking)
 
-    PLINK2_WRITE_SNPLIST (
+    PLINK2_WRITE_SNPLIST_1 (
         ch_bed_bim_fam_4.map { meta, bed_file, bim_file, fam_file -> tuple(meta, bed_file, bim_file, fam_file, []) },
         Channel.value('writesnp_pass'),
         Channel.value(params.plink2_write_snplist_qc_options),
         PCA.out.tracking.last()
     )
-    ch_snplist  = PLINK2_WRITE_SNPLIST.out.snplist
-    ch_id  = PLINK2_WRITE_SNPLIST.out.id
-    ch_versions = ch_versions.mix(PLINK2_WRITE_SNPLIST.out.versions.first())
-    ch_tracking_step1 = ch_tracking_step1.mix(PLINK2_WRITE_SNPLIST.out.tracking_out.first())
-
-    BCFTOOLS_VIEW_2 (
-        ch_vep_vcf_with_index,
-        Channel.of([]),                     // No regions file
-        Channel.of([]),                     // No targets file
-        ch_id.map { t -> t[1] },            // Samples file
-        ch_snplist.map { t -> t[1] },       // SNPs file
-        Channel.value("--output-type v"),       // input args
-        Channel.value("view2"),
-        PLINK2_WRITE_SNPLIST.out.tracking_out.first()
-    )
-    ch_filtered_vcf  = BCFTOOLS_VIEW_2.out.vcf
-    ch_versions = ch_versions.mix(BCFTOOLS_VIEW_2.out.versions.first())
-    ch_tracking_step1 = ch_tracking_step1.mix(BCFTOOLS_VIEW_2.out.tracking_out.first())
+    ch_snplist  = PLINK2_WRITE_SNPLIST_1.out.snplist
+    ch_id  = PLINK2_WRITE_SNPLIST_1.out.id
+    ch_versions = ch_versions.mix(PLINK2_WRITE_SNPLIST_1.out.versions.first())
+    ch_tracking_step1 = ch_tracking_step1.mix(PLINK2_WRITE_SNPLIST_1.out.tracking_out.first())
     
 
     PLINK2_MAKEBED_4 (
@@ -413,6 +400,33 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(PLINK2_MAKEPGEN.out.versions.first())
     ch_tracking_step2 = ch_tracking_step2.mix(PLINK2_MAKEPGEN.out.tracking_out.first())
 
+    
+    PLINK2_WRITE_SNPLIST_2 (
+        ch_bed_bim_fam_5.map { meta, bed_file, bim_file, fam_file -> tuple(meta, bed_file, bim_file, fam_file, []) },
+        Channel.value('writesnp_step2'),
+        Channel.value(params.plink2_write_snplist_step2_options),
+        PLINK2_MAKEPGEN.out.tracking_out.first()
+    )
+    ch_step2_snplist = PLINK2_WRITE_SNPLIST_2.out.snplist
+    ch_step2_sample_ids = PLINK2_WRITE_SNPLIST_2.out.id
+    ch_versions = ch_versions.mix(PLINK2_WRITE_SNPLIST_2.out.versions.first())
+    ch_tracking_step2 = ch_tracking_step2.mix(PLINK2_WRITE_SNPLIST_2.out.tracking_out.first())
+
+    BCFTOOLS_VIEW_2 (
+        ch_vep_vcf_with_index,
+        Channel.of([]),                     // No regions file
+        Channel.of([]),                     // No targets file
+        ch_step2_sample_ids.map { t -> t[1] },    // Samples file
+        ch_step2_snplist.map { t -> t[1] },       // SNPs file
+        Channel.value("--output-type z --write-index=tbi"),         // input args
+        Channel.value("view2"),
+        PLINK2_WRITE_SNPLIST_2.out.tracking_out.first()
+    )
+    ch_step2_vcf  = BCFTOOLS_VIEW_2.out.vcf
+    ch_step2_vcf_tbi  = BCFTOOLS_VIEW_1.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_VIEW_2.out.versions.first())
+    ch_tracking_step2 = ch_tracking_step2.mix(BCFTOOLS_VIEW_2.out.tracking_out.first())
+
     // renamed_file_name = ch_meta.map { t -> "${t.id}_remove_inbreeding_outliers.fam" }.first()
     // RENAME (
     //    ch_r_out_fam,
@@ -440,7 +454,7 @@ workflow RARE_VAR_ASSOC {
     REGENIE_STEP1 (
         ch_regenie_step_1_input,
         Channel.value(params.regenie_step1_options),
-        PLINK2_WRITE_SNPLIST.out.tracking_out.first()
+        PLINK2_WRITE_SNPLIST_1.out.tracking_out.first()
     )
     ch_regenie_step1_loco  = REGENIE_STEP1.out.loco
     ch_regenie_step1_pred_list  = REGENIE_STEP1.out.pred_list
@@ -460,7 +474,7 @@ workflow RARE_VAR_ASSOC {
     r_script_annotate_ch = Channel.fromPath(params.rscript_annotate_path, checkIfExists: true)
     RSCRIPT_ASSIGN_ANNOTATIONS (
         r_script_annotate_ch,
-        ch_vep_vcf_with_index.map { meta, vcf, tbi -> tuple(meta, vcf) },
+        ch_step2_vcf,
         // ch_qc_sample,
         ch_masks,
         Channel.value(params.rscript_annotate_options)
@@ -505,7 +519,7 @@ workflow RARE_VAR_ASSOC {
         r_script_buildreports_ch,
         ch_regenie_step2_masks_snplist,
         ch_regenie_step2_regenie_out,
-        ch_vep_vcf_with_index.map { meta, vcf, tbi -> tuple(meta, vcf) },
+        ch_step2_vcf,
         ch_phenotype,
         ch_annotations
     )
@@ -531,7 +545,8 @@ workflow RARE_VAR_ASSOC {
         ch_masks,
         ch_phenotype,
         ch_pca_plot_file,
-        ch_eda_plots.collect()
+        ch_eda_plots.collect(),
+        ch_setlist
     )
 
     ch_tracking = ch_tracking_step1.mix(ch_tracking_step2)
