@@ -1,6 +1,7 @@
 process REGENIE_STEP1 {
     tag "$meta.id"
     label 'process_medium'
+    label 'process_long'
 
     conda "${moduleDir}/environment.yml"
     container 'ghcr.io/rgcgithub/regenie/regenie:v4.1.gz'

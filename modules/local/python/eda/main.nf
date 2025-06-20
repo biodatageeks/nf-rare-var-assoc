@@ -1,7 +1,7 @@
 process EXPLORATORY_DATA_ANALYSIS {
 
     tag "$meta.id"
-    label 'process_medium_memory'
+    label 'process_high_memory'
 
     conda "${moduleDir}/environment.yml"
     container 'docker.io/psuszynski/python_tools:1.0.4'
@@ -18,15 +18,18 @@ process EXPLORATORY_DATA_ANALYSIS {
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
     #!/usr/bin/env python3
-import sys
 import os
+from pathlib import Path
+tmp_matplotlib_dir = Path("matplotlib_tmp")
+tmp_matplotlib_dir.mkdir(exist_ok=True)
+os.environ['MPLCONFIGDIR'] = str(tmp_matplotlib_dir.resolve())
+import sys
 import polars as pl
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pysam
 import time
-from pathlib import Path
 
 
 def current_milli_time():
@@ -45,7 +48,7 @@ def encode_genotype(gt):
 
 # Function to load VCF.gz and extract DP, GQ, and missingness
 def load_vcf(vcf_file):
-    print(f"load_vcf(\${vcf_file})  ts = \${current_milli_time()}")
+    print(f"load_vcf(\${vcf_file})  ts = \${current_milli_time()}", flush=True)
     vcf = pysam.VariantFile(vcf_file)
     samples = list(vcf.header.samples)
     data = {'CHROM': [], 'POS': [], 'Variant_Type': [], 'AF': []}
@@ -53,8 +56,13 @@ def load_vcf(vcf_file):
         data[f'DP_{sample}'] = []
         data[f'GQ_{sample}'] = []
         data[f'GT_{sample}'] = []
-    
+
+    i = 0
     for record in vcf.fetch():
+        i += 1
+        if i % 100000 == 0:
+            print('.', end='', flush=True)
+
         data['CHROM'].append(record.chrom)
         data['POS'].append(record.pos)
         # Determine variant type (0 for SNP, 1 for Indel)
@@ -74,6 +82,8 @@ def load_vcf(vcf_file):
             # Genotype (encoded as integer)
             gt = sample_data['GT']
             data[f'GT_{sample}'].append(encode_genotype(gt))
+ 
+    print(f"Loaded \${i} records from the vcf file  ts = \${current_milli_time()}", flush=True)
     
     # Convert to Polars DataFrame with appropriate dtypes
     dtypes = {'CHROM': pl.Utf8, 'POS': pl.Int32, 'Variant_Type': pl.Int8, 'AF': pl.Float32}
@@ -378,6 +388,8 @@ def plot_boxplots(vcf_df, pheno_df, samples, stat, stat_label):
 
 # Main execution
 def main(vcf_file, phenotype_file, percentiles):
+    print(f"main()  ts = \${current_milli_time()}", flush=True)
+
     vcf_df, samples = load_vcf(vcf_file)
     pheno_df = load_phenotype(phenotype_file)
     
