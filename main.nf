@@ -65,16 +65,17 @@ workflow {
         params.outdir,
         params.input_vcf,
         params.input_controls,
-        params.input_cases
+        params.input_cases,
+        params.input_phenotype
     )
 
     //
     // WORKFLOW: Run main workflow
     //
     PSUSZYNS_RARE_VAR_ASSOC (
-        PIPELINE_INITIALISATION.out.input_vcf,
-        PIPELINE_INITIALISATION.out.input_controls,
-        PIPELINE_INITIALISATION.out.input_cases
+        PIPELINE_INITIALISATION.out.vcf,
+        PIPELINE_INITIALISATION.out.phenotype,
+        PIPELINE_INITIALISATION.out.all_samples
     )
     //
     // SUBWORKFLOW: Run completion tasks

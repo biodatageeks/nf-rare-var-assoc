@@ -21,6 +21,38 @@ include { UTILS_NEXTFLOW_PIPELINE   } from '../../nf-core/utils_nextflow_pipelin
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
+process JOIN_CASES_AND_CONTROLS {
+    label 'process_single'
+
+    input:
+    path(cases)
+    path(controls)
+
+    output:
+    path("all.samples"), emit: output_file
+
+    script:
+    """
+    cut -f1 ${cases} > all.samples
+    cut -f1 ${controls} >> all.samples
+    """
+}
+
+process PHENOTYPE_SAMPLES {
+    label 'process_single'
+
+    input:
+    path(phenotype)
+
+    output:
+    path("all.samples"), emit: output_file
+
+    script:
+    """
+    cut -f1 ${phenotype} | tail -n +2 > all.samples
+    """
+}
+
 workflow PIPELINE_INITIALISATION {
 
     take:
@@ -32,6 +64,7 @@ workflow PIPELINE_INITIALISATION {
     input_vcf         //  string: Path to input samplesheet
     input_controls
     input_cases
+    input_phenotype
 
     main:
 
@@ -67,52 +100,63 @@ workflow PIPELINE_INITIALISATION {
     // Create channel from input file provided through params.input
     //
 
-    /*
-    Channel
-        .fromList(samplesheetToList(params.input, "${projectDir}/assets/schema_input.json"))
-        .map {
-            meta, fastq_1, fastq_2 ->
-                if (!fastq_2) {
-                    return [ meta.id, meta + [ single_end:true ], [ fastq_1 ] ]
-                } else {
-                    return [ meta.id, meta + [ single_end:false ], [ fastq_1, fastq_2 ] ]
-                }
-        }
-        .groupTuple()
-        .map { samplesheet ->
-            validateInputSamplesheet(samplesheet)
-        }
-        .map {
-            meta, fastqs ->
-                return [ meta, fastqs.flatten() ]
-        }
-        .set { ch_samplesheet }
-    */
-
-    Channel.fromPath(params.input_vcf, checkIfExists: true)
+    Channel.fromPath(input_vcf, checkIfExists: true)
         .map { files ->
             tuple( [id: params.project_name], files ) // Add meta component
         }
         .set { ch_input_vcf }
 
 
-    Channel.fromPath(params.input_controls, checkIfExists: true)
-        .map { files ->
-            tuple( [id: params.project_name], files ) // Add meta component
-        }
-        .set { ch_input_controls }
+    if (input_phenotype != null && file(input_phenotype).isFile()) {
+        Channel.fromPath(input_phenotype, checkIfExists: true)
+            .map { files ->
+                tuple( [id: params.project_name], files ) // Add meta component
+            }
+            .set { ch_phenotype }
 
+        PHENOTYPE_SAMPLES (
+            ch_phenotype.map { t -> t[1] }
+        )
+        ch_all_samples = PHENOTYPE_SAMPLES.out.output_file
+    } else {
+        if (input_controls != null && file(input_controls).isFile() && input_cases != null && file(input_cases).isFile()) {
+            Channel.fromPath(input_controls, checkIfExists: true)
+                .map { files ->
+                    tuple( [id: params.project_name], files ) // Add meta component
+                }
+                .set { ch_input_controls }
 
-    Channel.fromPath(params.input_cases, checkIfExists: true)
-        .map { files ->
-            tuple( [id: params.project_name], files ) // Add meta component
+            Channel.fromPath(input_cases, checkIfExists: true)
+                .map { files ->
+                    tuple( [id: params.project_name], files ) // Add meta component
+                }
+                .set { ch_input_cases }
+            
+            r_script_build_phenotypes_ch = Channel.fromPath(params.rscript_build_phenotypes_path, checkIfExists: true)
+            RSCRIPT_BUILD_PHENOTYPES (
+                r_script_build_phenotypes_ch,
+                ch_input_controls.join(ch_input_cases, by: 0),
+                Channel.value(params.rscript_build_phenotypes_options)
+            )
+            ch_phenotype  = RSCRIPT_BUILD_PHENOTYPES.out.phenotype
+            ch_versions = ch_versions.mix(RSCRIPT_BUILD_PHENOTYPES.out.versions.first())
+            
+            JOIN_CASES_AND_CONTROLS (
+                ch_input_cases.map { t -> t[1] },
+                ch_input_controls.map { t -> t[1] }
+            )
+            ch_all_samples = JOIN_CASES_AND_CONTROLS.out.output_file
+
+        } else {
+            throw new RuntimeException("Please provide either a phenotype file or both controls and cases files")
         }
-        .set { ch_input_cases }
+    }
+
 
     emit:
-    input_vcf = ch_input_vcf
-    input_controls = ch_input_controls
-    input_cases = ch_input_cases
+    vcf = ch_input_vcf
+    phenotype = ch_phenotype
+    all_samples = ch_all_samples
     versions    = ch_versions
 }
 

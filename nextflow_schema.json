@@ -10,7 +10,7 @@
             "type": "object",
             "fa_icon": "fas fa-terminal",
             "description": "Define where the pipeline should find input data and save output data.",
-            "required": ["input_vcf", "input_controls", "input_cases", "outdir"],
+            "required": ["input_vcf", "outdir"],
             "properties": {
                 "input_vcf": {
                     "type": "string",
@@ -35,6 +35,14 @@
                     "exists": true,
                     "mimetype": "text/tab-separated-values",
                     "description": "Path to the cases file.",
+                    "fa_icon": "fas fa-briefcase-medical"
+                },
+                "input_phenotype": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/tab-separated-values",
+                    "description": "Path to the phenotype file.",
                     "fa_icon": "fas fa-briefcase-medical"
                 },
                 "input_masks": {
@@ -175,6 +183,20 @@
                     "fa_icon": "fas fa-gear",
                     "hidden": false
                 },
+                "bcftools_filter_1_options": {
+                    "type": "string",
+                    "description": "Options for bcftools filter 1: filters out low quality variants.",
+                    "default": "--exclude 'QUAL<25 || AVG(FORMAT/GQ)<25 || AVG(FORMAT/DP)<25 || AVG(FORMAT/DP)>200' --output-type z --write-index=tbi",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "bcftools_filter_2_options": {
+                    "type": "string",
+                    "description": "Options for bcftools filter 2: set low quality genotypes to missing.",
+                    "default": "--exclude 'FORMAT/GQ<20 | FORMAT/DP < 20 | FORMAT/DP > 250' --set-GTs '.' --output-type z --write-index=tbi",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
                 "inbreeding_outliers_range_stds": {
                     "type": "number",
                     "description": "Number of standard deviations for detecting inbreeding outliers.",
@@ -301,10 +323,24 @@
                     "fa_icon": "fas fa-pen-to-square",
                     "hidden": false
                 },
+                "plink2_write_snplist_step2_options": {
+                    "type": "string",
+                    "description": "Options to pass to plink2 write-snplist call for Regenie step 2.",
+                    "default": "--mind 0.2",
+                    "fa_icon": "fas fa-pen-to-square",
+                    "hidden": false
+                },
                 "plink2_export_bgen_options": {
                     "type": "string",
                     "description": "Options to pass to plink2 export bgen call.",
                     "default": "--1 --export bgen-1.2 bits=8 id-paste=iid ref-first",
+                    "fa_icon": "fas fa-pen-to-square",
+                    "hidden": false
+                },
+                "plink2_makepgen_options": {
+                    "type": "string",
+                    "description": "Options to pass to plink2 makepgen call.",
+                    "default": "--mind 0.2 --1 --make-pgen",
                     "fa_icon": "fas fa-pen-to-square",
                     "hidden": false
                 },

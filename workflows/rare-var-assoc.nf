@@ -54,23 +54,6 @@ include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_rare
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-process JOIN_CASES_AND_CONTROLS {
-    label 'process_single'
-
-    input:
-    path(cases)
-    path(controls)
-
-    output:
-    path("all.samples"), emit: output_file
-
-    script:
-    """
-    cut -f1 ${cases} > all.samples
-    cut -f1 ${controls} >> all.samples
-    """
-}
-
 process CHECK_X_CHROM_PRESENT {
     input:
     tuple val(meta), path(bed), path(bim), path(fam)
@@ -94,8 +77,8 @@ workflow RARE_VAR_ASSOC {
 
     take:
     ch_input_vcf // channel: vcf read in from --input
-    ch_controls // channel: controls read in from --input
-    ch_cases // channel: cases read in from --input
+    ch_phenotype
+    ch_all_samples
 
     main:
 
@@ -109,16 +92,6 @@ workflow RARE_VAR_ASSOC {
     ch_meta = ch_input_vcf.map { t -> t[0] }
 
 
-    r_script_build_phenotypes_ch = Channel.fromPath(params.rscript_build_phenotypes_path, checkIfExists: true)
-    RSCRIPT_BUILD_PHENOTYPES (
-        r_script_build_phenotypes_ch,
-        ch_controls.join(ch_cases, by: 0),
-        Channel.value(params.rscript_build_phenotypes_options)
-    )
-    ch_phenotype  = RSCRIPT_BUILD_PHENOTYPES.out.phenotype
-    ch_versions = ch_versions.mix(RSCRIPT_BUILD_PHENOTYPES.out.versions.first())
-
-
     VEP_UPDATECACHE (
         ch_meta,
         ch_vep_cachedir,
@@ -130,11 +103,6 @@ workflow RARE_VAR_ASSOC {
     ch_vep_cachesubdir = VEP_UPDATECACHE.out.cachesubdir.first()
     ch_versions = ch_versions.mix(VEP_UPDATECACHE.out.versions.first())
     
-    JOIN_CASES_AND_CONTROLS (
-        ch_cases.map { t -> t[1] },
-        ch_controls.map { t -> t[1] }
-    )
-    ch_all_samples = JOIN_CASES_AND_CONTROLS.out.output_file
 
     BCFTOOLS_INDEX_1 (
         ch_input_vcf
