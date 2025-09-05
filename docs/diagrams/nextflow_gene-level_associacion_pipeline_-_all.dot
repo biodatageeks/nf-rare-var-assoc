@@ -1,0 +1,538 @@
+digraph "Nextflow gene-level associacion pipeline - all" {
+	graph [bb="0,0,1252,2196.9",
+		compound=true,
+		fontcolor="#2D3436",
+		fontname="Sans-Serif",
+		fontsize=24.0,
+		label="",
+		nodesep=0.60,
+		pad=0,
+		rankdir=TB,
+		ranksep=0.1,
+		splines=ortho
+	];
+	node [fixedsize=true,
+		fontcolor="#2D3436",
+		fontname="Sans-Serif",
+		fontsize=24.0,
+		height=1.4,
+		imagescale=true,
+		label="\N",
+		labelloc=b,
+		shape=box,
+		style=rounded,
+		width=1.4
+	];
+	edge [color="#7B8894"];
+	subgraph cluster_Inputs {
+		graph [bb="237,1969.8,1244,2188.9",
+			bgcolor="#E5F5FD",
+			fixedsize=false,
+			fontname="Sans-Serif",
+			fontsize=26.0,
+			height=6.1,
+			label=Inputs,
+			labeljust=l,
+			lheight=0.51,
+			lp="284.38,2166.5",
+			lwidth=1.09,
+			pad=5.0,
+			pencolor="#AEB6BE",
+			rankdir=LR,
+			shape=box,
+			size=5,
+			style=rounded
+		];
+		"1c9d7a26a2aa4fcfb6219f821bb0ae69"	[fixedsize=shape,
+			fontsize=22,
+			height=2.2,
+			image="/data/git/playground_all/python/.venv/lib64/python3.13/site-packages/resources/aws/compute/elastic-container-service-service.png",
+			imagepos=tc,
+			label="
+
+
+
+FASTA reference",
+			pos="337,2057",
+			shape=none,
+			width=2.566];
+		bb52f7cbb21c471ca5f452463c4bc44e	[fixedsize=shape,
+			fontsize=22,
+			height=2.2,
+			image="/data/git/playground_all/python/.venv/lib64/python3.13/site-packages/resources/aws/compute/elastic-container-service-service.png",
+			imagepos=tc,
+			label="
+
+
+
+BAM/CRAM files",
+			pos="564,2057",
+			shape=none,
+			width=2.5556];
+		"7c876c786ebb4a6db2260a0964bd0127"	[fixedsize=shape,
+			fontsize=22,
+			height=2.2,
+			image="/data/git/playground_all/python/.venv/lib64/python3.13/site-packages/resources/aws/compute/elastic-container-service-service.png",
+			imagepos=tc,
+			label="
+
+
+
+gVCF files",
+			pos="757,2057",
+			shape=none,
+			width=1.6181];
+		fd8ddd398b4d4e62863efabdd7f7fa9a	[fixedsize=shape,
+			fontsize=22,
+			height=2.2,
+			image="/data/git/playground_all/python/.venv/lib64/python3.13/site-packages/resources/aws/compute/elastic-container-service-service.png",
+			imagepos=tc,
+			label="
+
+
+
+Phenotype file",
+			pos="1153,2057",
+			shape=none,
+			width=2.316];
+		a78f73d154534a86838d8d1d669a981c	[fixedsize=shape,
+			fontsize=22,
+			height=2.2,
+			image="/data/git/playground_all/python/.venv/lib64/python3.13/site-packages/resources/aws/compute/elastic-container-service-service.png",
+			imagepos=tc,
+			label="
+
+
+
+Input pVCF file",
+			pos="942,2057",
+			shape=none,
+			width=2.3368];
+	}
+	subgraph "cluster_Reports and outputs" {
+		graph [bb="103,8,654,242.25",
+			bgcolor="#E5F5FD",
+			fixedsize=false,
+			fontname="Sans-Serif",
+			fontsize=26.0,
+			height=6.1,
+			label="Reports and outputs",
+			labeljust=l,
+			lheight=0.51,
+			lp="236.25,219.88",
+			lwidth=3.48,
+			pad=5.0,
+			pencolor="#AEB6BE",
+			rankdir=LR,
+			shape=box,
+			size=5,
+			style=rounded
+		];
+		"9d66ab9cbb594268966eeb6dc3a304b5"	[fixedsize=shape,
+			fontsize=22,
+			height=2.4097,
+			image="/data/git/playground_all/python/.venv/lib64/python3.13/site-packages/resources/aws/analytics/amazon-opensearch-service.png",
+			imagepos=tc,
+			label="
+
+
+
+HTML Report with 
+Mahattan and QQ plots",
+			pos="241,102.75",
+			shape=none,
+			width=3.5972];
+		"695167d2cced458e9c822b42c9f70a4f"	[fixedsize=shape,
+			fontsize=22,
+			height=2.2,
+			image="/data/git/playground_all/python/.venv/lib64/python3.13/site-packages/resources/aws/analytics/amazon-opensearch-service.png",
+			imagepos=tc,
+			label="
+
+
+
+CSV files with results",
+			pos="530,102.75",
+			shape=none,
+			width=3.2222];
+	}
+	subgraph "cluster_Data Preprocessing" {
+		graph [bb="487,1476.4,1172,1952.8",
+			bgcolor="#E5F5FD",
+			fixedsize=false,
+			fontname="Sans-Serif",
+			fontsize=26.0,
+			height=6.1,
+			label="Data Preprocessing",
+			labeljust=l,
+			lheight=0.51,
+			lp="614.25,1930.4",
+			lwidth=3.31,
+			pad=5.0,
+			pencolor="#AEB6BE",
+			rankdir=LR,
+			shape=box,
+			size=5,
+			style=rounded
+		];
+		ba21dc0e84cb46648417080eca5176d3	[fillcolor=dodgerblue3,
+			fontcolor=white,
+			height=1.7,
+			label=<<font point-size="24"><b>Python script</b></font><br/><br/><font point-size="22">Iput Data Characteristics<br/>Analysis<br/></font>>,
+			labelloc=c,
+			pos="1013,1831.6",
+			shape=rect,
+			style=filled,
+			width=4.2];
+		"5ff67cee5aad46a2b77bdf28e7bf6e6f"	[fillcolor=dodgerblue3,
+			fontcolor=white,
+			height=1.9,
+			label=<<font point-size="24"><b>BCFTools</b></font><br/><br/><font point-size="22">1) Genotype quality and depth<br/>of coverage filtering<br/>2) variant normalization,<br/>duplicates removal</font>>,
+			labelloc=c,
+			pos="657,1831.6",
+			shape=rect,
+			style=filled,
+			width=4.5];
+		"9f461868180b46cca7e67247a5fa7cce"	[fillcolor=dodgerblue3,
+			fontcolor=white,
+			height=1.7,
+			label=<<font point-size="24"><b>VEP</b></font><br/><br/><font point-size="22">Variant annotation<br/><br/></font>>,
+			labelloc=c,
+			pos="660,1685",
+			shape=rect,
+			style=filled,
+			width=4.2];
+		"5ff67cee5aad46a2b77bdf28e7bf6e6f" -> "9f461868180b46cca7e67247a5fa7cce"	[color=gray60,
+			dir=forward,
+			fontcolor="#2D3436",
+			fontname="Sans-Serif",
+			fontsize=13,
+			pos="e,660,1746.5 660,1763 660,1763 660,1758 660,1758",
+			style=dashed];
+		"8cc8261ca38a402ab233f700ba488d5c"	[fillcolor=dodgerblue3,
+			fontcolor=white,
+			height=1.7,
+			label=<<font point-size="24"><b>BCFTools</b></font><br/><br/><font point-size="22">Extract gnomad allele<br/>frequency data<br/></font>>,
+			labelloc=c,
+			pos="1008,1545.6",
+			shape=rect,
+			style=filled,
+			width=4.2];
+		"9f461868180b46cca7e67247a5fa7cce" -> "8cc8261ca38a402ab233f700ba488d5c"	[color=gray60,
+			dir=forward,
+			fontcolor="#2D3436",
+			fontname="Sans-Serif",
+			fontsize=13,
+			pos="e,1010.5,1607.1 811.7,1685 906.42,1685 1010.5,1685 1010.5,1685 1010.5,1685 1010.5,1618.7 1010.5,1618.7",
+			style=dashed];
+		"23eab4c689654bbead0af7323a85821c"	[fillcolor=dodgerblue3,
+			fontcolor=white,
+			height=1.7,
+			label=<<font point-size="24"><b>Plink</b></font><br/><br/><font point-size="22">Impute sex, missingness<br/>filtering per phenotype<br/></font>>,
+			labelloc=c,
+			pos="660,1545.6",
+			shape=rect,
+			style=filled,
+			width=4.2];
+		"9f461868180b46cca7e67247a5fa7cce" -> "23eab4c689654bbead0af7323a85821c"	[color=gray60,
+			dir=forward,
+			fontcolor="#2D3436",
+			fontname="Sans-Serif",
+			fontsize=13,
+			pos="e,609.6,1607.2 609.6,1623.5 609.6,1623.5 609.6,1618.7 609.6,1618.7",
+			style=dashed];
+	}
+	subgraph "cluster_Data Filtering for Regenie Step 1" {
+		graph [bb="78,767.95,930,1459.4",
+			bgcolor="#E5F5FD",
+			fixedsize=false,
+			fontname="Sans-Serif",
+			fontsize=26.0,
+			height=6.1,
+			label="Data Filtering for Regenie Step 1",
+			labeljust=l,
+			lheight=0.51,
+			lp="284,1437",
+			lwidth=5.50,
+			pad=5.0,
+			pencolor="#AEB6BE",
+			rankdir=LR,
+			shape=box,
+			size=5,
+			style=rounded
+		];
+		subgraph "cluster_Inbreeding Coefficient Filtering" {
+			graph [bb="86,1012.1,922,1231.3",
+				bgcolor="#EBF3E7",
+				fixedsize=false,
+				fontname="Sans-Serif",
+				fontsize=26.0,
+				height=6.1,
+				label="Inbreeding Coefficient Filtering",
+				labeljust=l,
+				lheight=0.51,
+				lp="284.5,1208.9",
+				lwidth=5.29,
+				pad=5.0,
+				pencolor="#AEB6BE",
+				rankdir=LR,
+				shape=box,
+				size=5,
+				style=rounded
+			];
+			"51cf5f51faf74c8aad71d97a1cdf8e15"	[fillcolor=dodgerblue3,
+				fontcolor=white,
+				height=2.2,
+				label=<<font point-size="24"><b>Plink</b></font><br/><br/><font point-size="22">1) --indep-pairwise linkage equilibrium calculation<br/>2) --het F-coefficient calculation   3) Calculate inbreeding outliers in a<br/>Python script and then remove them using Plink</font>>,
+				labelloc=c,
+				pos="504,1099.3",
+				shape=rect,
+				style=filled,
+				width=11.4];
+		}
+		subgraph "cluster_Principal Component Analysis" {
+			graph [bb="86,775.95,922,995.1",
+				bgcolor="#EBF3E7",
+				fixedsize=false,
+				fontname="Sans-Serif",
+				fontsize=26.0,
+				height=6.1,
+				label="Principal Component Analysis",
+				labeljust=l,
+				lheight=0.51,
+				lp="274.75,972.73",
+				lwidth=5.02,
+				pad=5.0,
+				pencolor="#AEB6BE",
+				rankdir=LR,
+				shape=box,
+				size=5,
+				style=rounded
+			];
+			bbc2be05b3c743c5a0e0e5278971dc55	[fillcolor=dodgerblue3,
+				fontcolor=white,
+				height=2.2,
+				label=<<font point-size="24"><b>Plink and Python script</b></font><br/><br/><font point-size="22">1) Remove high-LD regions   2) Remove related individuals (--king-cutoff)<br/>3) Perform PCA   4) Draw Principal Components plot<br/></font>>,
+				labelloc=c,
+				pos="504,863.15",
+				shape=rect,
+				style=filled,
+				width=11.4];
+		}
+		"0dac3ab8250545aab523abb445a07c06"	[fillcolor=dodgerblue3,
+			fontcolor=white,
+			height=2.2,
+			label=<<font point-size="24"><b>Plink</b></font><br/><br/><font point-size="22">1) Minor allele frequency and count filtering<br/>2) Hardy-Weinberg equilibrium deviations filtering<br/></font>>,
+			labelloc=c,
+			pos="500,1327.5",
+			shape=rect,
+			style=filled,
+			width=11.4];
+		"0dac3ab8250545aab523abb445a07c06" -> "51cf5f51faf74c8aad71d97a1cdf8e15"	[color=gray60,
+			dir=forward,
+			fontcolor="#2D3436",
+			fontname="Sans-Serif",
+			fontsize=13,
+			pos="e,502,1178.9 502,1248 502,1248 502,1190.4 502,1190.4",
+			style=dashed];
+		"51cf5f51faf74c8aad71d97a1cdf8e15" -> bbc2be05b3c743c5a0e0e5278971dc55	[color=gray60,
+			dir=forward,
+			fontcolor="#2D3436",
+			fontname="Sans-Serif",
+			fontsize=13,
+			pos="e,504,942.83 504,1019.7 504,1019.7 504,954.34 504,954.34",
+			style=dashed];
+	}
+	subgraph cluster_Regenie {
+		graph [bb="8,398.65,830,721.2",
+			bgcolor="#E5F5FD",
+			fixedsize=false,
+			fontname="Sans-Serif",
+			fontsize=26.0,
+			height=6.1,
+			label=Regenie,
+			labeljust=l,
+			lheight=0.51,
+			lp="65.875,698.83",
+			lwidth=1.39,
+			pad=5.0,
+			pencolor="#AEB6BE",
+			rankdir=LR,
+			shape=box,
+			size=5,
+			style=rounded
+		];
+		f46a634d081b47419cfad46d85274aaa	[fillcolor=dodgerblue3,
+			fontcolor=white,
+			height=1.7,
+			label=<<font point-size="24"><b>Regenie</b></font><br/><br/><font point-size="22">Step 1<br/><br/></font>>,
+			labelloc=c,
+			pos="124,607.25",
+			shape=rect,
+			style=filled,
+			width=3];
+		"3d58ab4ea9664513995965528c299b94"	[fillcolor=dodgerblue3,
+			fontcolor=white,
+			height=1.7,
+			label=<<font point-size="24"><b>Regenie</b></font><br/><br/><font point-size="22">Step 2<br/><br/></font>>,
+			labelloc=c,
+			pos="383,467.85",
+			shape=rect,
+			style=filled,
+			width=3];
+		f46a634d081b47419cfad46d85274aaa -> "3d58ab4ea9664513995965528c299b94"	[color=gray60,
+			dir=forward,
+			fontcolor="#2D3436",
+			fontname="Sans-Serif",
+			fontsize=13,
+			pos="e,274.59,467.85 171.75,545.7 171.75,508.36 171.75,467.85 171.75,467.85 171.75,467.85 263.08,467.85 263.08,467.85",
+			style=dashed];
+		"9d98632dacb145a79c74fd6c8e7907ef"	[fillcolor=dodgerblue3,
+			fontcolor=white,
+			height=1.7,
+			label=<<font point-size="24"><b>RScript</b></font><br/><br/><font point-size="22">Assign masks<br/><br/></font>>,
+			labelloc=c,
+			pos="383,607.25",
+			shape=rect,
+			style=filled,
+			width=3];
+		"9d98632dacb145a79c74fd6c8e7907ef" -> "3d58ab4ea9664513995965528c299b94"	[color=gray60,
+			dir=forward,
+			fontcolor="#2D3436",
+			fontname="Sans-Serif",
+			fontsize=13,
+			pos="e,383,529.44 383,545.7 383,545.7 383,540.96 383,540.96",
+			style=dashed];
+		"7852e07c0bf54cc1ad0e267933ac2f3b"	[fillcolor=dodgerblue3,
+			fontcolor=white,
+			height=1.7,
+			label=<<font point-size="24"><b>Plink</b></font><br/><br/><font point-size="22">Make PGEN/PVAR/PSAM files<br/>for optimal Regenie<br/>performance</font>>,
+			labelloc=c,
+			pos="678,607.25",
+			shape=rect,
+			style=filled,
+			width=4];
+		"7852e07c0bf54cc1ad0e267933ac2f3b" -> "3d58ab4ea9664513995965528c299b94"	[color=gray60,
+			dir=forward,
+			fontcolor="#2D3436",
+			fontname="Sans-Serif",
+			fontsize=13,
+			pos="e,491.35,467.85 590,545.7 590,508.36 590,467.85 590,467.85 590,467.85 502.86,467.85 502.86,467.85",
+			style=dashed];
+	}
+	fd8ddd398b4d4e62863efabdd7f7fa9a -> ba21dc0e84cb46648417080eca5176d3	[color=gray60,
+		dir=forward,
+		fontcolor="#2D3436",
+		fontname="Sans-Serif",
+		fontsize=13,
+		pos="e,1116.9,1893.2 1116.9,1977.8 1116.9,1977.8 1116.9,1904.7 1116.9,1904.7",
+		style=dashed];
+	fd8ddd398b4d4e62863efabdd7f7fa9a -> "23eab4c689654bbead0af7323a85821c"	[color=gray60,
+		dir=forward,
+		fontcolor="#2D3436",
+		fontname="Sans-Serif",
+		fontsize=13,
+		pos="e,710.4,1607 1200.3,2056.9 1200.3,2050.1 1200.3,1615.3 1200.3,1615.3 1200.3,1615.3 710.4,1615.3 710.4,1615.3 710.4,1615.3 710.4,\
+1614.5 710.4,1614.5",
+		style=dashed];
+	a78f73d154534a86838d8d1d669a981c -> ba21dc0e84cb46648417080eca5176d3	[color=gray60,
+		dir=forward,
+		fontcolor="#2D3436",
+		fontname="Sans-Serif",
+		fontsize=13,
+		pos="e,971.35,1893.2 971.35,1977.8 971.35,1977.8 971.35,1904.7 971.35,1904.7",
+		style=dashed];
+	a78f73d154534a86838d8d1d669a981c -> "5ff67cee5aad46a2b77bdf28e7bf6e6f"	[color=gray60,
+		dir=forward,
+		fontcolor="#2D3436",
+		fontname="Sans-Serif",
+		fontsize=13,
+		pos="e,819.18,1896.4 916.57,1978.1 916.57,1937.5 916.57,1896.4 916.57,1896.4 916.57,1896.4 830.69,1896.4 830.69,1896.4",
+		style=dashed];
+	"8cc8261ca38a402ab233f700ba488d5c" -> bbc2be05b3c743c5a0e0e5278971dc55	[color=gray60,
+		dir=forward,
+		fontcolor="#2D3436",
+		fontname="Sans-Serif",
+		fontsize=13,
+		pos="e,914.9,863.15 1036.8,1484.1 1036.8,1316.4 1036.8,863.15 1036.8,863.15 1036.8,863.15 926.41,863.15 926.41,863.15",
+		style=dashed];
+	"8cc8261ca38a402ab233f700ba488d5c" -> "9d98632dacb145a79c74fd6c8e7907ef"	[color=gray60,
+		constraint=false,
+		dir=forward,
+		fontcolor="#2D3436",
+		fontname="Sans-Serif",
+		fontsize=13,
+		pos="e,383,668.82 1098,1484 1098,1293.5 1098,726.2 1098,726.2 1098,726.2 383,726.2 383,726.2 383,726.2 383,680.33 383,680.33",
+		style=dashed];
+	"23eab4c689654bbead0af7323a85821c" -> "0dac3ab8250545aab523abb445a07c06"	[color=gray60,
+		dir=forward,
+		fontcolor="#2D3436",
+		fontname="Sans-Serif",
+		fontsize=13,
+		pos="e,609.6,1406.9 609.6,1484 609.6,1484 609.6,1418.4 609.6,1418.4",
+		style=dashed];
+	"23eab4c689654bbead0af7323a85821c" -> "51cf5f51faf74c8aad71d97a1cdf8e15"	[color=gray60,
+		constraint=false,
+		dir=forward,
+		fontcolor="#2D3436",
+		fontname="Sans-Serif",
+		fontsize=13,
+		pos="e,93.192,1125.7 508.33,1545.6 332.07,1545.6 65.067,1545.6 65.067,1545.6 65.067,1545.6 65.067,1125.7 65.067,1125.7 65.067,1125.7 \
+81.678,1125.7 81.678,1125.7",
+		style=dashed];
+	"23eab4c689654bbead0af7323a85821c" -> "7852e07c0bf54cc1ad0e267933ac2f3b"	[color=gray60,
+		constraint=false,
+		dir=forward,
+		fontcolor="#2D3436",
+		fontname="Sans-Serif",
+		fontsize=13,
+		pos="e,822.44,607.25 710.4,1483.9 710.4,1463.3 710.4,1445.5 710.4,1445.5 710.4,1445.5 975.6,1445.5 975.6,1445.5 975.6,1445.5 975.6,607.25 \
+975.6,607.25 975.6,607.25 833.95,607.25 833.95,607.25",
+		style=dashed];
+	bbc2be05b3c743c5a0e0e5278971dc55 -> f46a634d081b47419cfad46d85274aaa	[color=gray60,
+		dir=forward,
+		fontcolor="#2D3436",
+		fontname="Sans-Serif",
+		fontsize=13,
+		label=<<font point-size="22">covariates file</font>>,
+		lp="217.62,744.58",
+		pos="e,162.8,668.88 162.8,783.58 162.8,783.58 162.8,680.39 162.8,680.39",
+		style=dashed];
+	"51cf5f51faf74c8aad71d97a1cdf8e15" -> f46a634d081b47419cfad46d85274aaa	[color=gray60,
+		dir=forward,
+		fontcolor="#2D3436",
+		fontname="Sans-Serif",
+		fontsize=13,
+		pos="e,40.533,668.6 93.248,1072.9 60.965,1072.9 40.533,1072.9 40.533,1072.9 40.533,1072.9 40.533,680.12 40.533,680.12",
+		style=dashed];
+	d850898b23e24f0bbdc598aba131049e	[fillcolor=dodgerblue3,
+		fontcolor=white,
+		height=1.7,
+		label=<<font point-size="24"><b>RScript</b></font><br/><br/><font point-size="22">Build reports<br/><br/></font>>,
+		labelloc=c,
+		pos="383,320.45",
+		shape=rect,
+		style=filled,
+		width=3];
+	"3d58ab4ea9664513995965528c299b94" -> d850898b23e24f0bbdc598aba131049e	[color=gray60,
+		dir=forward,
+		fontcolor="#2D3436",
+		fontname="Sans-Serif",
+		fontsize=13,
+		pos="e,383,381.86 383,406.19 383,406.19 383,393.37 383,393.37",
+		style=dashed];
+	d850898b23e24f0bbdc598aba131049e -> "9d66ab9cbb594268966eeb6dc3a304b5"	[color=gray60,
+		dir=forward,
+		fontcolor="#2D3436",
+		fontname="Sans-Serif",
+		fontsize=13,
+		pos="e,322.75,102.82 322.75,258.94 322.75,258.94 322.75,114.33 322.75,114.33",
+		style=dashed];
+	d850898b23e24f0bbdc598aba131049e -> "695167d2cced458e9c822b42c9f70a4f"	[color=gray60,
+		dir=forward,
+		fontcolor="#2D3436",
+		fontname="Sans-Serif",
+		fontsize=13,
+		pos="e,452.5,102.82 452.5,258.94 452.5,258.94 452.5,114.33 452.5,114.33",
+		style=dashed];
+}

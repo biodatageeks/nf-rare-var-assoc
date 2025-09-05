@@ -14,6 +14,7 @@ process DRAW_PC_PLOT {
     
     output:
     tuple val(meta), path("*_${out_name_part}.png"), emit: plot_file
+    tuple val(meta), path("*_${out_name_part}.svg"), emit: plot_file_svg
     path "versions.yml", emit: versions
 
     script:
@@ -26,6 +27,8 @@ process DRAW_PC_PLOT {
     import matplotlib.pyplot as plt
     import seaborn as sns
 
+    plt.rcParams.update({'font.size': 16})
+
     pca = pd.read_table("${sscore_file}", sep="\t")
     pheno = pd.read_table("${pheno_file}", sep="\t")
     pheno_cols = [c for c in pheno.columns if c not in ['FID', 'IID']]
@@ -33,8 +36,14 @@ process DRAW_PC_PLOT {
 
     merged_data = pd.merge(pca, pheno, on='IID', how='left')
 
-    sns.scatterplot(x='PC1_AVG', y='PC2_AVG', hue=first_pheno_col, data=merged_data, size=20)
+    plt.figure(figsize=(9, 6))
+    plt.title(f'Plot of first two principal components')
+    plt.xlabel('PC1')
+    plt.ylabel('PC2')
+    sns.scatterplot(x='PC1_AVG', y='PC2_AVG', hue=first_pheno_col, data=merged_data, s=65)
     plt.savefig('${prefix}_${out_name_part}.png')
+    plt.savefig('${prefix}_${out_name_part}.svg', format="svg")
+    plt.close()
 
     # Write versions.yml
     with open('versions.yml', 'w') as f:

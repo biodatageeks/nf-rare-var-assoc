@@ -8,8 +8,6 @@ output:
     gallery: true
     highlight: tango
     toc_depth: 3
-    fig_width: 16
-    fig_height: 10
 params:
   project: test-gene-level
   date: 2022-05-27
@@ -40,6 +38,10 @@ Copied from: https://github.com/genepi/nf-gwas/blob/main/reports/gene_level_repo
 
  Modified by:
     Piotr Suszyński
+  
+  toc_depth: 3
+  fig_width: 16
+  fig_height: 10
 -->
 
 ```{r setup, include=FALSE}

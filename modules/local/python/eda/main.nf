@@ -11,6 +11,7 @@ process EXPLORATORY_DATA_ANALYSIS {
     
     output:
     tuple val(meta), path("plots/*.png"), emit: plots
+    tuple val(meta), path("plots/*.svg"), emit: plots_svg
     path "versions.yml", emit: versions
 
     script:
@@ -30,6 +31,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pysam
 import time
+
+
+plt.rcParams.update({'font.size': 20})
 
 
 def current_milli_time():
@@ -108,20 +112,22 @@ def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], sta
     
     # Mean
     mean_values = df.select(stat_cols).mean_horizontal().to_numpy()
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(9, 6))
     sns.histplot(mean_values[~np.isnan(mean_values)], bins=50)
     plt.title(f'Mean {stat} Across Variants')
     plt.xlabel(stat_label)
     plt.ylabel('Variant Count')
     plt.savefig(f'{output_dir}/1_{stat}_mean_variants.png')
+    plt.savefig(f'{output_dir}/1_{stat}_mean_variants.svg', format="svg")
     plt.close()
 
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(9, 6))
     sns.histplot(mean_values[~np.isnan(mean_values)], bins=50, log_scale=True)
     plt.title(f'Mean {stat} Across Variants - log scale')
     plt.xlabel(f'{stat_label} (log)')
     plt.ylabel('Variant Count')
     plt.savefig(f'{output_dir}/1b_{stat}_mean_variants.png')
+    plt.savefig(f'{output_dir}/1b_{stat}_mean_variants.svg', format="svg")
     plt.close()
 
     if len(phenotypes) > 5:
@@ -129,20 +135,22 @@ def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], sta
         for perc in percentiles:
             perc_values = np.quantile(df.select(stat_cols).to_numpy(), perc / 100, axis=1)
             
-            plt.figure(figsize=(8, 6))
+            plt.figure(figsize=(9, 6))
             sns.histplot(perc_values[~np.isnan(perc_values)], bins=50)
             plt.title(f'{stat} ({perc}th Percentile) Across Variants')
             plt.xlabel(stat_label)
             plt.ylabel('Variant Count')
             plt.savefig(f'{output_dir}/2_{stat}_percentile_{perc}_variants.png')
+            plt.savefig(f'{output_dir}/2_{stat}_percentile_{perc}_variants.svg', format="svg")
             plt.close()
 
-            plt.figure(figsize=(8, 6))
+            plt.figure(figsize=(9, 6))
             sns.histplot(perc_values[~np.isnan(perc_values)], bins=50, log_scale=True)
             plt.title(f'{stat} ({perc}th Percentile) Across Variants - log scale')
             plt.xlabel(f'{stat_label} (log)')
             plt.ylabel('Variant Count')
             plt.savefig(f'{output_dir}/2b_{stat}_percentile_{perc}_variants.png')
+            plt.savefig(f'{output_dir}/2b_{stat}_percentile_{perc}_variants.svg', format="svg")
             plt.close()
     else:
         # Per-phenotype histograms
@@ -162,6 +170,7 @@ def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], sta
             plt.ylabel('Variant Count')
             plt.legend()
             plt.savefig(f'{output_dir}/3_{stat}_percentile_{perc}_by_phenotype_variants.png')
+            plt.savefig(f'{output_dir}/3_{stat}_percentile_{perc}_by_phenotype_variants.svg', format="svg")
             plt.close()
 
             plt.figure(figsize=(10, 6))
@@ -179,6 +188,7 @@ def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], sta
             plt.ylabel('Variant Count')
             plt.legend()
             plt.savefig(f'{output_dir}/3b_{stat}_percentile_{perc}_by_phenotype_variants.png')
+            plt.savefig(f'{output_dir}/3b_{stat}_percentile_{perc}_by_phenotype_variants.svg', format="svg")
             plt.close()
 
 # Plotting function for sample-level statistics
@@ -192,12 +202,13 @@ def plot_sample_stats(df, pheno_df, samples, stat, stat_label='Statistic'):
     phenotypes = pheno_df['Y1'].unique().to_list()
     
     if len(phenotypes) > 5:
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(9, 6))
         sns.histplot(sample_stats['value'].drop_nulls().to_numpy(), bins=50)
         plt.title(f'Mean {stat} Across Samples')
         plt.xlabel(stat_label)
         plt.ylabel('Sample Count')
         plt.savefig(f'{output_dir}/4_{stat}_samples.png')
+        plt.savefig(f'{output_dir}/4_{stat}_samples.svg', format="svg")
         plt.close()
     else:
         plt.figure(figsize=(10, 6))
@@ -210,6 +221,7 @@ def plot_sample_stats(df, pheno_df, samples, stat, stat_label='Statistic'):
         plt.ylabel('Sample Count')
         plt.legend()
         plt.savefig(f'{output_dir}/5_{stat}_by_phenotype_samples.png')
+        plt.savefig(f'{output_dir}/5_{stat}_by_phenotype_samples.svg', format="svg")
         plt.close()
 
 # Plot missingness per variant and sample
@@ -229,12 +241,13 @@ def plot_missingness(df, pheno_df, samples):
     phenotypes = pheno_df['Y1'].unique().to_list()
     
     if len(phenotypes) > 5:
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(9, 6))
         sns.histplot(missingness_variants, bins=50)
         plt.title('Missingness Rate Across Variants')
         plt.xlabel('Missingness Rate')
         plt.ylabel('Variant Count')
         plt.savefig(f'{output_dir}/6_missingness_variants.png')
+        plt.savefig(f'{output_dir}/6_missingness_variants.svg', format="svg")
         plt.close()
     else:
         plt.figure(figsize=(10, 6))
@@ -249,15 +262,17 @@ def plot_missingness(df, pheno_df, samples):
         plt.ylabel('Variant Count')
         plt.legend()
         plt.savefig(f'{output_dir}/7_missingness_by_phenotype_variants.png')
+        plt.savefig(f'{output_dir}/7_missingness_by_phenotype_variants.svg', format="svg")
         plt.close()
     
     if len(phenotypes) > 5:
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(9, 6))
         sns.histplot(missingness_samples['missing_rate'].drop_nulls().to_numpy(), bins=50)
         plt.title('Missingness Rate Across Samples')
         plt.xlabel('Missingness Rate')
         plt.ylabel('Sample Count')
         plt.savefig(f'{output_dir}/8_missingness_samples.png')
+        plt.savefig(f'{output_dir}/8_missingness_samples.svg', format="svg")
         plt.close()
     else:
         plt.figure(figsize=(10, 6))
@@ -270,6 +285,7 @@ def plot_missingness(df, pheno_df, samples):
         plt.ylabel('Sample Count')
         plt.legend()
         plt.savefig(f'{output_dir}/9_missingness_by_phenotype_samples.png')
+        plt.savefig(f'{output_dir}/9_missingness_by_phenotype_samples.svg', format="svg")
         plt.close()
 
 # Plot absolute DP differences for cases vs controls
@@ -286,40 +302,44 @@ def plot_dp_differences(df, pheno_df, samples):
             case_dp = df.select(case_cols).mean_horizontal().to_numpy()
             control_dp = df.select(control_cols).mean_horizontal().to_numpy()
             abs_diff = np.abs(case_dp - control_dp)
-            plt.figure(figsize=(8, 6))
+            plt.figure(figsize=(9, 6))
             sns.histplot(abs_diff[~np.isnan(abs_diff)], bins=50)
             plt.title('Absolute DP Differences (Cases vs Controls)')
             plt.xlabel('Absolute DP Difference')
             plt.ylabel('Variant Count')
             plt.savefig(f'{output_dir}/10_dp_abs_diff_cases_controls.png')
+            plt.savefig(f'{output_dir}/10_dp_abs_diff_cases_controls.svg', format="svg")
             plt.close()
 
-            plt.figure(figsize=(8, 6))
+            plt.figure(figsize=(9, 6))
             sns.histplot(abs_diff[~np.isnan(abs_diff)], bins=50, log_scale=True)
             plt.title('Absolute DP Differences (Cases vs Controls) - log scale')
             plt.xlabel('Absolute DP Difference (log)')
             plt.ylabel('Variant Count')
             plt.savefig(f'{output_dir}/10b_dp_abs_diff_cases_controls.png')
+            plt.savefig(f'{output_dir}/10b_dp_abs_diff_cases_controls.svg', format="svg")
             plt.close()
 
 def plot_allele_frequency(vcf_df):
     print(f"plot_allele_frequency()  ts = \${current_milli_time()}")
     af = vcf_df['AF'].to_numpy()
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(9, 6))
     sns.histplot(af[~np.isnan(af)], bins=100, log_scale=True)
     plt.title('Alternate Allele Frequency Distribution - log scale')
     plt.xlabel('Allele Frequency')
     plt.ylabel('Variant Count')
     plt.savefig(f'{output_dir}/11_allele_frequency.png')
+    plt.savefig(f'{output_dir}/11_allele_frequency.svg', format="svg")
     plt.close()
 
 def plot_variant_types(vcf_df, samples):
     print(f"plot_variant_types()  ts = \${current_milli_time()}")
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(9, 6))
     sns.countplot(data=vcf_df.to_pandas(), x='Variant_Type')
     plt.title('Variant Type Distribution')
     plt.ylabel('Variant Count')
     plt.savefig(f'{output_dir}/12_variant_types.png')
+    plt.savefig(f'{output_dir}/12_variant_types.svg', format="svg")
     plt.close()
 
 def plot_chrom_density(vcf_df):
@@ -332,6 +352,7 @@ def plot_chrom_density(vcf_df):
     plt.ylabel('Variant Count')
     plt.xticks(rotation=45)
     plt.savefig(f'{output_dir}/13_chrom_variant_density.png')
+    plt.savefig(f'{output_dir}/13_chrom_variant_density.svg', format="svg")
     plt.close()
 
 def plot_heterozygosity(vcf_df, pheno_df, samples):
@@ -350,12 +371,13 @@ def plot_heterozygosity(vcf_df, pheno_df, samples):
     phenotypes = pheno_df['Y1'].unique().to_list()
 
     if len(phenotypes) > 5:
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(9, 6))
         sns.histplot(het_df['Heterozygosity'].to_numpy(), bins=50)
         plt.title('Heterozygosity Rate Across Samples')
         plt.xlabel('Heterozygosity Rate')
         plt.ylabel('Sample Count')
         plt.savefig(f'{output_dir}/14_heterozygosity_samples.png')
+        plt.savefig(f'{output_dir}/14_heterozygosity_samples.svg', format="svg")
         plt.close()
     else:
         plt.figure(figsize=(10, 6))
@@ -368,6 +390,7 @@ def plot_heterozygosity(vcf_df, pheno_df, samples):
         plt.ylabel('Sample Count')
         plt.legend()
         plt.savefig(f'{output_dir}/15_heterozygosity_by_phenotype_samples.png')
+        plt.savefig(f'{output_dir}/15_heterozygosity_by_phenotype_samples.svg', format="svg")
         plt.close()
 
 def plot_boxplots(vcf_df, pheno_df, samples, stat, stat_label):
@@ -384,6 +407,7 @@ def plot_boxplots(vcf_df, pheno_df, samples, stat, stat_label):
     plt.xlabel('Phenotype')
     plt.ylabel(stat_label)
     plt.savefig(f'{output_dir}/16_{stat}_boxplot_by_phenotype.png')
+    plt.savefig(f'{output_dir}/16_{stat}_boxplot_by_phenotype.svg', format="svg")
     plt.close()
 
 # Main execution
