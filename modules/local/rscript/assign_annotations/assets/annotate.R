@@ -94,27 +94,106 @@ create_variant_id <- function(row, feature_type) {
     }
 }
 
-csq_info <- get_csq_format(r_in_vcf_path)
-processed_csq <- sapply(dd2$CSQ, function(csq_entry) {
-    # Split the CSQ entry by pipe character
-    fields <- strsplit(csq_entry, "\\|")[[1]]
-    expected_fields <- length(csq_info$fields)
-    
-    # Pad or trim to match expected length
-    if (length(fields) < expected_fields) {
-        fields <- c(fields, rep("", expected_fields - length(fields)))
-    } else if (length(fields) > expected_fields) {
-        fields <- fields[1:expected_fields]
-    }
-    # Select only the required fields using indices and combine with tab separator
-    paste(fields[csq_info$indices], collapse="\t")
-})
+#csq_info <- get_csq_format(r_in_vcf_path)
+#processed_csq <- sapply(dd2$CSQ, function(csq_entry) {
+#    # Split the CSQ entry by pipe character
+#    fields <- strsplit(csq_entry, "\\|")[[1]]
+#    expected_fields <- length(csq_info$fields)
+#    
+#    # Pad or trim to match expected length
+#    if (length(fields) < expected_fields) {
+#        fields <- c(fields, rep("", expected_fields - length(fields)))
+#    } else if (length(fields) > expected_fields) {
+#        fields <- fields[1:expected_fields]
+#    }
+#    # Select only the required fields using indices and combine with tab separator
+#    paste(fields[csq_info$indices], collapse="\t")
+#})
+#
+#out_csq_file <- "./csq_split.tsv"
+#writeLines(processed_csq, out_csq_file)
+#dd3 <- fread(out_csq_file, fill=length(csq_info$indices), header=F)
+#field_names <- names(csq_info$indices)
+#setnames(dd3, field_names)
 
-out_csq_file <- "./csq_split.tsv"
-writeLines(processed_csq, out_csq_file)
-dd3 <- fread(out_csq_file, fill=length(csq_info$indices), header=F)
-field_names <- names(csq_info$indices)
-setnames(dd3, field_names)
+csq_info <- get_csq_format(r_in_vcf_path)
+# Assert: Verify all required fields are in csq_info$indices
+required_fields <- c("Consequence", "SYMBOL", "Feature_type", "Feature", "DISTANCE")
+if (!all(required_fields %in% names(csq_info$indices))) {
+    stop("Missing required fields in CSQ format: ",
+         paste(setdiff(required_fields, names(csq_info$indices)), collapse=", "))
+}
+# Debug: Print csq_info to verify field indices
+cat("CSQ fields:", csq_info$fields, "\n")
+cat("Required field indices:", names(csq_info$indices), "=", csq_info$indices, "\n")
+
+# Process all CSQ annotations by splitting on commas
+processed_csq <- rbindlist(lapply(seq_along(dd2$CSQ), function(i) {
+    csq_entry <- dd2$CSQ[i]
+    annotations <- strsplit(csq_entry, ",")[[1]]  # Split by comma for multiple annotations
+    # Debug: Print first few CSQ entries to inspect format
+    if (i <= 3) {
+        cat("CSQ entry", i, ":", csq_entry, "\n")
+    }
+    rbindlist(lapply(annotations, function(ann) {
+        fields <- strsplit(ann, "\\|")[[1]]
+        expected_fields_len <- length(csq_info$fields)
+        # Pad or trim to match expected length
+        if (length(fields) < expected_fields_len) {
+            fields <- c(fields, rep("", expected_fields_len - length(fields)))
+        } else if (length(fields) > expected_fields_len) {
+            fields <- fields[1:expected_fields_len]
+        }
+        # Assert: Verify required fields can be accessed
+        if (any(csq_info$indices > length(fields))) {
+            stop("CSQ annotation ", ann, " in variant ", i, " has too few fields (", length(fields),
+                 ") for required indices: ", paste(names(csq_info$indices), "=", csq_info$indices, collapse=", "))
+        }
+        # Create a data table with required fields and original row index
+        #data.table(
+        #    row_index = i,
+        #    setNames(as.list(fields[csq_info$indices]), names(csq_info$indices))
+        #)
+
+        selected_fields <- fields[csq_info$indices]
+        names(selected_fields) <- names(csq_info$indices)
+        # Debug: Print selected fields for problematic annotations
+        if (i <= 3 && ann <= 2) {
+            cat("Annotation", ann, "in variant", i, "selected fields:", paste(names(selected_fields), "=", selected_fields, collapse=", "), "\n")
+        }
+        data.table(
+            row_index = i,
+            Consequence = selected_fields["Consequence"],
+            SYMBOL = selected_fields["SYMBOL"],
+            Feature_type = selected_fields["Feature_type"],
+            Feature = selected_fields["Feature"],
+            DISTANCE = selected_fields["DISTANCE"]
+        )
+    }))
+}))
+# Assert: Verify processed_csq has the expected number of columns
+field_names <- c("row_index", names(csq_info$indices))
+if (ncol(processed_csq) != length(field_names)) {
+    stop("processed_csq has ", ncol(processed_csq), " columns, expected ", length(field_names),
+         ". Columns found: ", paste(colnames(processed_csq), collapse=", "))
+}
+# Debug: Print column names and structure of processed_csq
+cat("Processed CSQ columns:", colnames(processed_csq), "\n")
+cat("Processed CSQ nrow:", nrow(processed_csq), "\n")
+# Explicitly set column names for processed_csq
+setnames(processed_csq, field_names)
+
+# Update main data table by joining with processed CSQ annotations
+dd3 <- processed_csq
+# Update main data table with annotations, expanding rows for multiple annotations
+dd <- dd[rep(seq_len(nrow(dd)), times = processed_csq[, .N, by = row_index]$N)]
+dd[, (names(csq_info$indices)) := dd3[, names(csq_info$indices), with = FALSE]]
+
+cn <- colnames(dd)
+cn[1] <- "CHROM"
+setnames(dd, cn)
+
+
 
 # Update main data table with annotations
 dd[, (field_names) := dd3[, field_names, with = FALSE]]
@@ -239,18 +318,39 @@ anno <- filter_annotations(anno, r_in_masks_path, quantile_threshold, min_top_an
 
 
 # Setlist creation with grouping by Symbol
+# unique_features <- unique(anno$Symbol)
+# setlist <- rbindlist(lapply(unique_features, function(feature) {
+#     feature_rows <- dd[Symbol == feature]
+#     data.table(
+#         symbol = feature,
+#         chrom = feature_rows$CHROM[1],
+#         pos = feature_rows$POS[1],
+#         variants = paste(feature_rows$key, collapse=",")
+#     )
+# }))
+# # Filter and process setlist (same chrM/chrY filtering as annotations)
+# setlist <- setlist[!grepl("^chrM|^chrY|^M|^Y", chrom)]
+
+
+
+# Setlist creation with grouping by Symbol
 unique_features <- unique(anno$Symbol)
 setlist <- rbindlist(lapply(unique_features, function(feature) {
     feature_rows <- dd[Symbol == feature]
+    # Use unique keys to avoid duplicates if a variant appears multiple times
+    unique_keys <- unique(feature_rows$key)
     data.table(
         symbol = feature,
         chrom = feature_rows$CHROM[1],
-        pos = feature_rows$POS[1],
-        variants = paste(feature_rows$key, collapse=",")
+        pos = min(feature_rows$POS),  # Use min POS if multiple positions
+        variants = paste(unique_keys, collapse=",")
     )
 }))
 # Filter and process setlist (same chrM/chrY filtering as annotations)
 setlist <- setlist[!grepl("^chrM|^chrY|^M|^Y", chrom)]
+
+
+
 setlist$variants <- gsub(":", "_", setlist$variants)
 
 

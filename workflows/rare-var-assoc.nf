@@ -12,10 +12,11 @@ include { RSCRIPT_BUILDREPORTS   } from '../modules/local/rscript/buildreports'
 include { REGENIE_STEP2          } from '../modules/local/regenie/step2'
 include { REGENIE_STEP1          } from '../modules/local/regenie/step1'
 include { RSCRIPT_VCFTOAAF       } from '../modules/local/rscript/vcf2aaf'
-include { RSCRIPT_BUILD_PHENOTYPES           } from '../modules/local/rscript/build_phenotypes'
 include { RSCRIPT_ASSIGN_ANNOTATIONS         } from '../modules/local/rscript/assign_annotations'
 include { BGENIX                 } from '../modules/local/bgenix'
 include { QCTOOL                 } from '../modules/local/qctool'
+include { PLINK2_IMPORT_DOSAGE   } from '../modules/local/plink2/import_dosage'
+include { PLINK2_EXPORT_OTHER    } from '../modules/local/plink2/export_other'
 include { PLINK2_EXPORT_BGEN     } from '../modules/local/plink2/export_bgen'
 include { PLINK2_MAKEPGEN        } from '../modules/local/plink2/makepgen'
 include { PLINK2_WRITE_SNPLIST as PLINK2_WRITE_SNPLIST_1 } from '../modules/local/plink2/write_snplist'
@@ -30,6 +31,7 @@ include { VEP_UPDATECACHE        } from '../modules/local/vep/updatecache'
 include { BCFTOOLS_VCF2FRQ       } from '../modules/local/bcftools/vcf2frq'
 //include { BCFTOOLS_FILTER_QUAL_DP as BCFTOOLS_FILTER_QUAL_DP_1 } from '../modules/local/bcftools/filter_qual_dp'
 //include { BCFTOOLS_FILTER_QUAL_DP as BCFTOOLS_FILTER_QUAL_DP_2 } from '../modules/local/bcftools/filter_qual_dp'
+include { BCFTOOLS_TAG2TAG       } from '../modules/local/bcftools/tag2tag'
 include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_1   } from '../modules/local/bcftools/view'
 include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_2   } from '../modules/local/bcftools/view'
 include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_1   } from '../modules/local/bcftools/filter'
@@ -211,6 +213,28 @@ workflow RARE_VAR_ASSOC {
     ch_frq = BCFTOOLS_VCF2FRQ.out.frq
     ch_versions = ch_versions.mix(BCFTOOLS_VCF2FRQ.out.versions.first())
 
+    BCFTOOLS_TAG2TAG (
+        ch_vep_vcf_with_index,
+        Channel.value(params.bcftools_tag2tag_tag_from),
+        Channel.value(params.bcftools_tag2tag_tag_to)
+    )
+    ch_vcf_with_dosage_tag = BCFTOOLS_TAG2TAG.out.vcf
+    ch_vcf_with_dosage_tag_tbi = BCFTOOLS_TAG2TAG.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_TAG2TAG.out.versions.first())
+
+    ch_vcf_with_dosage_tag_with_index = ch_vcf_with_dosage_tag
+        .join(ch_vcf_with_dosage_tag_tbi, by: 0)
+        .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) }
+
+    PLINK2_EXPORT_OTHER (
+        ch_vcf_with_dosage_tag,
+        Channel.value('traw'),
+        Channel.value(params.plink2_export_other_options)
+    )
+    ch_traw = PLINK2_EXPORT_OTHER.out.out_file
+    ch_versions = ch_versions.mix(PLINK2_EXPORT_OTHER.out.versions.first())
+
+
     //PLINK2_MAKEBED_1 (
     //    ch_vep_vcf.map { t -> tuple(t[0], [], [], [], t[1], []) },
     //    Channel.of('load_vcf'),
@@ -220,7 +244,7 @@ workflow RARE_VAR_ASSOC {
     //ch_versions = ch_versions.mix(PLINK2_MAKEBED_1.out.versions.first())
 
     PLINK19_MAKEBED (
-        ch_vep_vcf.join(ch_phenotype, by: 0),
+        ch_vcf_with_dosage_tag.join(ch_phenotype, by: 0),
         BCFTOOLS_NORM.out.tracking_out.first()
     )
     ch_bed_bim_fam_1  = PLINK19_MAKEBED.out.out_bed_bim_fam
@@ -368,6 +392,27 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(PLINK2_MAKEPGEN.out.versions.first())
     ch_tracking_step2 = ch_tracking_step2.mix(PLINK2_MAKEPGEN.out.tracking_out.first())
 
+    PLINK2_IMPORT_DOSAGE (
+        ch_pgen_pvar_psam
+            .join(ch_traw, by: 0)
+            .map { meta, pgen, pvar, psam, traw -> tuple(meta, psam, traw) },
+        Channel.value('import_dosage'),
+        Channel.value(params.plink2_import_dosage_options)
+    )
+    ch_psam_with_dosage = PLINK2_IMPORT_DOSAGE.out.out_psam
+    ch_versions = ch_versions.mix(PLINK2_IMPORT_DOSAGE.out.versions.first())
+
+    renamed_psam_file_name = ch_meta.map { t -> "${t.id}_step2_input.psam" }.first()
+    RENAME (
+       ch_psam_with_dosage,
+       renamed_psam_file_name
+    )
+    ch_renamed_psam_with_dosage  = RENAME.out.output
+
+    ch_pgen_pvar_psam_with_dosage = ch_pgen_pvar_psam
+        .join(ch_renamed_psam_with_dosage, by: 0)
+        .map { meta, pgen, pvar, psam_old, psam_with_dosage -> tuple(meta, pgen, pvar, psam_with_dosage) }
+
     
     PLINK2_WRITE_SNPLIST_2 (
         ch_bed_bim_fam_5.map { meta, bed_file, bim_file, fam_file -> tuple(meta, bed_file, bim_file, fam_file, []) },
@@ -381,7 +426,7 @@ workflow RARE_VAR_ASSOC {
     ch_tracking_step2 = ch_tracking_step2.mix(PLINK2_WRITE_SNPLIST_2.out.tracking_out.first())
 
     BCFTOOLS_VIEW_2 (
-        ch_vep_vcf_with_index,
+        ch_vcf_with_dosage_tag_with_index,
         Channel.of([]),                     // No regions file
         Channel.of([]),                     // No targets file
         ch_step2_sample_ids.map { t -> t[1] },    // Samples file
@@ -433,7 +478,7 @@ workflow RARE_VAR_ASSOC {
     r_script_vcf2aaf_ch = Channel.fromPath(params.rscript_vcf2aaf_path, checkIfExists: true)
     RSCRIPT_VCFTOAAF (
         r_script_vcf2aaf_ch,
-        ch_vep_vcf_with_index.map { meta, vcf, tbi -> tuple(meta, vcf) },
+        ch_vcf_with_dosage_tag_with_index.map { meta, vcf, tbi -> tuple(meta, vcf) },
         Channel.value(params.rscript_vcf2aaf_options)
     )
     ch_aaf  = RSCRIPT_VCFTOAAF.out.aaf
@@ -453,7 +498,7 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(RSCRIPT_ASSIGN_ANNOTATIONS.out.versions.first())
 
     
-    ch_regenie_step_2_input_part = ch_pgen_pvar_psam
+    ch_regenie_step_2_input_part = ch_pgen_pvar_psam_with_dosage
             .join(ch_phenotype, by: 0)
             .join(ch_annotations, by: 0)
             .join(ch_setlist, by: 0)

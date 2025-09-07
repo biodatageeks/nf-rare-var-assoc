@@ -17,9 +17,9 @@ process BCFTOOLS_FILTER_QUAL_DP {
     path(tracking_in)
 
     output:
-    tuple val(meta), path("*.{vcf,vcf.gz,bcf,bcf.gz}"), emit: vcf
-    tuple val(meta), path("*.tbi")                    , emit: tbi, optional: true
-    tuple val(meta), path("*.csi")                    , emit: csi, optional: true
+    tuple val(meta), path("*_filter_qual_dp.{vcf,vcf.gz,bcf,bcf.gz}"), emit: vcf
+    tuple val(meta), path("*_filter_qual_dp*.tbi")                    , emit: tbi, optional: true
+    tuple val(meta), path("*_filter_qual_dp*.csi")                    , emit: csi, optional: true
     path "versions.yml"                               , emit: versions
     path "*_filter_qual_dp_tracking.json"             , emit: tracking_out
 

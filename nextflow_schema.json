@@ -197,6 +197,20 @@
                     "fa_icon": "fas fa-gear",
                     "hidden": false
                 },
+                "bcftools_tag2tag_tag_from": {
+                    "type": "string",
+                    "description": "Tag from for bcftools tag2tag plugin.",
+                    "default": "PL",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "bcftools_tag2tag_tag_to": {
+                    "type": "string",
+                    "description": "Tag to for bcftools tag2tag plugin.",
+                    "default": "GP",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
                 "inbreeding_outliers_range_stds": {
                     "type": "number",
                     "description": "Number of standard deviations for detecting inbreeding outliers.",
@@ -263,6 +277,20 @@
                     "type": "string",
                     "description": "Options for PLINK2 projection score computation.",
                     "default": "--score-col-nums 7-16",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "plink2_export_other_options": {
+                    "type": "string",
+                    "description": "Options for PLINK2 generic export.",
+                    "default": "",
+                    "fa_icon": "fas fa-gear",
+                    "hidden": false
+                },
+                "plink2_import_dosage_options": {
+                    "type": "string",
+                    "description": "Options for PLINK2 import dosage.",
+                    "default": "",
                     "fa_icon": "fas fa-gear",
                     "hidden": false
                 },
