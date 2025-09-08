@@ -32,7 +32,7 @@ process PLINK2_IMPORT_DOSAGE {
         --threads ${task.cpus} \\
         --memory $mem_mb \\
         ${psam_input} \\
-        --import-dosage ${traw} skip0=1 skip1=2 id-delim=_ chr-col-num=1 pos-col-num=4 ref-first \\
+        --import-dosage ${traw} \\
         $args $input_args \\
         --out ${prefix}_${out_name_part}
 
