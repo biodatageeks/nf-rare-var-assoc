@@ -293,7 +293,7 @@ workflow RARE_VAR_ASSOC {
 
     ch_pgen_pvar_psam_before_quality_filtering = split_data.with_x
         .join(ch_renamed_psam, by: 0)
-        .map { meta, has_x, pgen, pvar, psam, psam_imputesex -> tuple(meta, has_x, pgen, pvar, psam_imputesex) }
+        .map { meta, has_x, pgen, pvar, psam, psam_imputesex -> tuple(meta, pgen, pvar, psam_imputesex) }
         .mix(split_data.without_x.map { meta, has_x, pgen, pvar, psam -> tuple(meta, pgen, pvar, psam) })
 
     FILTER_MISSING_PER_PHENO (
