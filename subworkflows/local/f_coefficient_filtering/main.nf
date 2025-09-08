@@ -1,12 +1,12 @@
 include { CALCULATE_F_OUTLIERS   } from '../../../modules/local/python/calc_f_outliers'
 include { PLINK2_HET             } from '../../../modules/local/plink2/het'
 include { PLINK2_INDEP_PAIRWISE  } from '../../../modules/local/plink2/indep_pairwise'
-include { PLINK2_MAKEBED         } from '../../../modules/local/plink2/makebed'
+include { PLINK2_MAKEPGEN        } from '../../../modules/local/plink2/makepgen'
 
 workflow F_COEFFICIENT_FILTERING {
 
     take:
-    ch_bed_bim_fam
+    ch_pgen_pvar_psam
     ch_tracking_in
 
     main:
@@ -14,7 +14,7 @@ workflow F_COEFFICIENT_FILTERING {
     ch_versions = Channel.empty()
     
     PLINK2_INDEP_PAIRWISE (
-        ch_bed_bim_fam.map { meta, bed_file, bim_file, fam_file -> tuple(meta, bed_file, bim_file, fam_file, []) },
+        ch_pgen_pvar_psam.map { meta, pgen_file, pvar_file, psam_file -> tuple(meta, pgen_file, pvar_file, psam_file, []) },
         Channel.value(params.plink2_indep_pairwise_window),
         Channel.value('indep_pairwise'),
         Channel.value(params.plink2_indep_pairwise_options),
@@ -26,9 +26,9 @@ workflow F_COEFFICIENT_FILTERING {
     ch_tracking = PLINK2_INDEP_PAIRWISE.out.tracking_out.first()
 
     PLINK2_HET (
-        ch_bed_bim_fam
+        ch_pgen_pvar_psam
             .join(ch_indep_pairwise_prune_in, by: 0)
-            .map { meta, bed_file, bim_file, fam_file, het_file -> tuple(meta, bed_file, bim_file, fam_file, het_file) },
+            .map { meta, pgen_file, pvar_file, psam_file, het_file -> tuple(meta, pgen_file, pvar_file, psam_file, het_file) },
         Channel.value('het'),
         Channel.value(''),
         PLINK2_INDEP_PAIRWISE.out.tracking_out.first()
@@ -45,19 +45,20 @@ workflow F_COEFFICIENT_FILTERING {
     ch_inbreeding_outliers  = CALCULATE_F_OUTLIERS.out.outliers
     ch_versions = ch_versions.mix(CALCULATE_F_OUTLIERS.out.versions.first())
 
-    PLINK2_MAKEBED (
-        ch_bed_bim_fam
+    PLINK2_MAKEPGEN (
+        ch_pgen_pvar_psam
             .join(ch_inbreeding_outliers, by: 0)
-            .map { meta, bed_file, bim_file, fam_file, outliers_file -> tuple(meta, bed_file, bim_file, fam_file, [], [], outliers_file, []) },
+            .map { meta, pgen_file, pvar_file, psam_file, outliers_file -> tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], outliers_file, []) },
         Channel.value('--remove'),
         Channel.value('--exclude'),
+        Channel.value(''),
         Channel.value('remove_inbreeding_outliers'),
         Channel.value(''),
         PLINK2_HET.out.tracking_out.first()
     )
-    ch_bed_bim_fam_out  = PLINK2_MAKEBED.out.out_bed_bim_fam
-    ch_versions = ch_versions.mix(PLINK2_MAKEBED.out.versions.first())
-    ch_tracking = ch_tracking.mix(PLINK2_MAKEBED.out.tracking_out.first())
+    ch_pgen_pvar_psam_out  = PLINK2_MAKEPGEN.out.out_pgen_pvar_psam
+    ch_versions = ch_versions.mix(PLINK2_MAKEPGEN.out.versions.first())
+    ch_tracking = ch_tracking.mix(PLINK2_MAKEPGEN.out.tracking_out.first())
 
 
     workflow.onError {
@@ -65,7 +66,7 @@ workflow F_COEFFICIENT_FILTERING {
     }
 
     emit:
-    bed_bim_fam_out = ch_bed_bim_fam_out
+    pgen_pvar_psam_out = ch_pgen_pvar_psam_out
     versions        = ch_versions
     tracking        = ch_tracking
 }

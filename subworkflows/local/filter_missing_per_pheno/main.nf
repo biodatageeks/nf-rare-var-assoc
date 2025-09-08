@@ -1,12 +1,12 @@
 include { PLINK2_WRITE_SNPLIST            } from '../../../modules/local/plink2/write_snplist'
-include { PLINK2_MAKEBED                  } from '../../../modules/local/plink2/makebed'
+include { PLINK2_MAKEPGEN                  } from '../../../modules/local/plink2/makepgen'
 include { EXTRACT_PHENOTYPES_AND_SAMPLES  } from '../../../modules/local/cmds/extract_phenotypes_and_samples'
 
 
 workflow FILTER_MISSING_PER_PHENO {
 
     take:
-    ch_bed_bim_fam
+    ch_pgen_pvar_psam
     ch_phenotype
     ch_tracking_in
 
@@ -20,16 +20,13 @@ workflow FILTER_MISSING_PER_PHENO {
     )
     ch_sample_files = EXTRACT_PHENOTYPES_AND_SAMPLES.out.samples
         .map { meta, files -> files }.flatten()
-    
-    //ch_sample_files = ch_sample_files_together.map { meta, files -> meta }
-    //    .combine(ch_sample_files_together.map { meta, files -> files }.flatten())
 
 
     PLINK2_WRITE_SNPLIST (
-        ch_bed_bim_fam
+        ch_pgen_pvar_psam
             .combine(ch_sample_files)
-            .map { meta, bed_file, bim_file, fam_file, sample_file ->
-                tuple(meta + ['orig_id': meta.id, 'id': sample_file.getBaseName()], bed_file, bim_file, fam_file, sample_file)
+            .map { meta, pgen_file, pvar_file, psam_file, sample_file ->
+                tuple(meta + ['orig_id': meta.id, 'id': sample_file.getBaseName()], pgen_file, pvar_file, psam_file, sample_file)
             },
         Channel.value('identify_acceptable_variants'),
         Channel.value(params.plink2_missing_per_pheno_options),
@@ -40,23 +37,24 @@ workflow FILTER_MISSING_PER_PHENO {
     ch_tracking = PLINK2_WRITE_SNPLIST.out.tracking_out
 
 
-    PLINK2_MAKEBED (
-        ch_bed_bim_fam
+    PLINK2_MAKEPGEN (
+        ch_pgen_pvar_psam
             .join(ch_snplist.map { meta, snplist_files ->
                 tuple(['id': meta.orig_id], snplist_files)
             }.groupTuple(), by: 0)
-            .map { meta, bed_file, bim_file, fam_file, snplist_files ->
-                tuple(meta, bed_file, bim_file, fam_file, [], [], [], snplist_files)
+            .map { meta, pgen_file, pvar_file, psam_file, snplist_files ->
+                tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], [], snplist_files)
             },
         Channel.value(''),
         Channel.value('--extract-intersect'),
+        Channel.value(''),
         Channel.value('intersect_variants_to_keep'),
         Channel.value(''),
         PLINK2_WRITE_SNPLIST.out.tracking_out.collect()
     )
-    ch_bed_bim_fam_out = PLINK2_MAKEBED.out.out_bed_bim_fam
-    ch_versions = ch_versions.mix(PLINK2_MAKEBED.out.versions.first())
-    ch_tracking = ch_tracking.mix(PLINK2_MAKEBED.out.tracking_out.first())
+    ch_pgen_pvar_psam_out = PLINK2_MAKEPGEN.out.out_pgen_pvar_psam
+    ch_versions = ch_versions.mix(PLINK2_MAKEPGEN.out.versions.first())
+    ch_tracking = ch_tracking.mix(PLINK2_MAKEPGEN.out.tracking_out.first())
 
 
     workflow.onError {
@@ -64,7 +62,7 @@ workflow FILTER_MISSING_PER_PHENO {
     }
 
     emit:
-    bed_bim_fam_out = ch_bed_bim_fam_out
+    pgen_pvar_psam_out = ch_pgen_pvar_psam_out
     versions        = ch_versions
     tracking        = ch_tracking
 }

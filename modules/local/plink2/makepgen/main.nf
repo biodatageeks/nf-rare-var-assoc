@@ -8,9 +8,10 @@ process PLINK2_MAKEPGEN {
         params.cpu_support_avx2 ? 'docker.io/psuszynski/plink:2.0-alpha.6.9': 'docker.io/psuszynski/plink:2.0-alpha.6.9.noavx2' }"
 
     input:
-    tuple val(meta), path(bed), path(bim), path(fam), path(vcf), path(frq), path(samples_filtering_file), path(variants_filtering_file)
+    tuple val(meta), path(pgen), path(pvar), path(psam), path(vcf), path(tbi), path(frq), path(samples_filtering_file), path(variants_filtering_file)
     val(samples_filtering_type)  // for example: '--remove', '--keep'
     val(variants_filtering_type) // for example: '--extract', '--extract-intersect', '--exclude'
+    val(vcf_input_options)
     val(out_name_part)
     val(input_args)
     path(tracking_in)
@@ -29,10 +30,10 @@ process PLINK2_MAKEPGEN {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def mem_mb = task.memory.toMega()
 
-    def bed_input = bed ? "--bed ${bed}" : ""
-    def bim_input = bim ? "--bim ${bim}" : ""
-    def fam_input = fam ? "--fam ${fam}" : ""
-    def vcf_input = vcf ? "--vcf ${vcf}" : ""
+    def pgen_input = pgen ? "--pgen ${pgen}" : ""
+    def pvar_input = pvar ? "--pvar ${pvar}" : ""
+    def psam_input = psam ? "--psam ${psam}" : ""
+    def vcf_input = vcf ? "--vcf ${vcf} ${vcf_input_options}" : ""
     def frq_input = frq ? "--read-freq ${frq}" : ""
     def samples_filtering_input = samples_filtering_file ? "${samples_filtering_type} ${samples_filtering_file}" : ""
     def variants_filtering_input = variants_filtering_file ? "${variants_filtering_type} ${variants_filtering_file}" : ""
@@ -42,13 +43,14 @@ process PLINK2_MAKEPGEN {
         --threads ${task.cpus} \\
         --memory $mem_mb \\
         $args $input_args \\
-        ${bed_input} \\
-        ${bim_input} \\
-        ${fam_input} \\
+        ${pgen_input} \\
+        ${pvar_input} \\
+        ${psam_input} \\
         ${vcf_input} \\
         ${frq_input} \\
         ${samples_filtering_input} \\
         ${variants_filtering_input} \\
+        --make-pgen \\
         --out ${prefix}_${out_name_part}
 
     echo "wc -l ${prefix}_${out_name_part}.log: \$(wc -l ${prefix}_${out_name_part}.log)"
@@ -121,9 +123,9 @@ process PLINK2_MAKEPGEN {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    touch ${prefix}_${out_name_part}.bed
-    touch ${prefix}_${out_name_part}.bim
-    touch ${prefix}_${out_name_part}.fam
+    touch ${prefix}_${out_name_part}.pgen
+    touch ${prefix}_${out_name_part}.pvar
+    touch ${prefix}_${out_name_part}.psam
     touch ${prefix}_${out_name_part}.log
 
     cat <<-END_VERSIONS > versions.yml

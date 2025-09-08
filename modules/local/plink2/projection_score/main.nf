@@ -8,7 +8,7 @@ process PLINK2_PROJECTION_SCORE {
         params.cpu_support_avx2 ? 'docker.io/psuszynski/plink:2.0-alpha.6.9': 'docker.io/psuszynski/plink:2.0-alpha.6.9.noavx2' }"
 
     input:
-    tuple val(meta), path(bed), path(bim), path(fam), path(frq), path(eigenvec_allele)
+    tuple val(meta), path(pgen), path(pvar), path(psam), path(frq), path(eigenvec_allele)
     val(score_options)
     val(out_name_part)
     val(input_args)
@@ -28,18 +28,18 @@ process PLINK2_PROJECTION_SCORE {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def mem_mb = task.memory.toMega()
 
-    def bed_input = bed ? "--bed ${bed}" : ""
-    def bim_input = bim ? "--bim ${bim}" : ""
-    def fam_input = fam ? "--fam ${fam}" : ""
+    def pgen_input = pgen ? "--pgen ${pgen}" : ""
+    def pvar_input = pvar ? "--pvar ${pvar}" : ""
+    def psam_input = psam ? "--psam ${psam}" : ""
 
     """
     plink2 \\
         --threads ${task.cpus} \\
         --memory $mem_mb \\
         $args $input_args \\
-        ${bed_input} \\
-        ${bim_input} \\
-        ${fam_input} \\
+        ${pgen_input} \\
+        ${pvar_input} \\
+        ${psam_input} \\
         --read-freq ${frq} \\
         --score ${eigenvec_allele} ${score_options} \\
         --out ${prefix}_${out_name_part}
