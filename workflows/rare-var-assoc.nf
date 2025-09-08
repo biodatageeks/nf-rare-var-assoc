@@ -5,7 +5,8 @@
 */
 include { DOWNLOAD_FILE          } from '../modules/local/cmds/download_file'
 include { MERGE_RESULTS          } from '../modules/local/cmds/merge_results'
-include { RENAME                 } from '../modules/local/cmds/rename'
+include { RENAME as RENAME_1     } from '../modules/local/cmds/rename'
+include { RENAME as RENAME_2     } from '../modules/local/cmds/rename'
 include { GENERATE_TRACKING_REPORT           } from '../modules/local/python/generate_tracking_report'
 include { EXPLORATORY_DATA_ANALYSIS          } from '../modules/local/python/eda'
 include { RSCRIPT_BUILDREPORTS   } from '../modules/local/rscript/buildreports'
@@ -232,6 +233,14 @@ workflow RARE_VAR_ASSOC {
     ch_unk_sex_psam = BCFTOOLS_VCF2PSAM.out.psam
     ch_versions = ch_versions.mix(BCFTOOLS_VCF2PSAM.out.versions.first())
 
+    PLINK2_EXPORT_OTHER (
+        ch_vcf_with_dosage_tag_with_index
+            .join(ch_unk_sex_psam, by: 0),
+        Channel.value('traw'),
+        Channel.value(params.plink2_export_other_options)
+    )
+    ch_traw = PLINK2_EXPORT_OTHER.out.out_file
+    ch_versions = ch_versions.mix(PLINK2_EXPORT_OTHER.out.versions.first())
 
     PLINK2_MAKEPGEN_1 (
         ch_vcf_with_dosage_tag_with_index
@@ -275,9 +284,16 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(PLINK2_MAKEPGEN_2.out.versions.first())
     ch_tracking = ch_tracking.mix(PLINK2_MAKEPGEN_2.out.tracking_out.first())
 
+    renamed_file_name = ch_meta.map { t -> "${t.id}_plink2_makepgen_1.psam" }.first()
+    RENAME_1 (
+        ch_pgen_pvar_psam_2.map { meta, pgen, pvar, psam -> tuple(meta, psam) },
+        renamed_file_name
+    )
+    ch_renamed_psam  = RENAME_1.out.output
+
     ch_pgen_pvar_psam_before_quality_filtering = split_data.with_x
-        .join(ch_pgen_pvar_psam_2, by: 0)
-        .map { meta, has_x, pgen, pvar, psam, pgen_imputesex, pvar_imputesex, psam_imputesex -> tuple(meta, has_x, pgen, pvar, psam_imputesex) }
+        .join(ch_renamed_psam, by: 0)
+        .map { meta, has_x, pgen, pvar, psam, psam_imputesex -> tuple(meta, has_x, pgen, pvar, psam_imputesex) }
         .mix(split_data.without_x.map { meta, has_x, pgen, pvar, psam -> tuple(meta, pgen, pvar, psam) })
 
     FILTER_MISSING_PER_PHENO (
@@ -442,7 +458,31 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(RSCRIPT_ASSIGN_ANNOTATIONS.out.versions.first())
 
     
-    ch_regenie_step_2_input_part = ch_pgen_pvar_psam_6
+
+    PLINK2_IMPORT_DOSAGE (
+        ch_pgen_pvar_psam_6
+            .join(ch_traw, by: 0)
+            .map { meta, pgen, pvar, psam, traw -> tuple(meta, psam, traw) },
+        Channel.value('import_dosage'),
+        Channel.value(params.plink2_import_dosage_options)
+    )
+    ch_psam_with_dosage = PLINK2_IMPORT_DOSAGE.out.out_psam
+    ch_versions = ch_versions.mix(PLINK2_IMPORT_DOSAGE.out.versions.first())
+
+    renamed_psam_file_name = ch_meta.map { t -> "${t.id}_step2_input.psam" }.first()
+    RENAME_2 (
+       ch_psam_with_dosage,
+       renamed_psam_file_name
+    )
+    ch_renamed_psam_with_dosage  = RENAME_2.out.output
+
+    ch_pgen_pvar_psam_with_dosage = ch_pgen_pvar_psam_6
+        .join(ch_renamed_psam_with_dosage, by: 0)
+        .map { meta, pgen, pvar, psam_old, psam_with_dosage -> tuple(meta, pgen, pvar, psam_with_dosage) }
+
+
+
+    ch_regenie_step_2_input_part = ch_pgen_pvar_psam_with_dosage
             .join(ch_phenotype, by: 0)
             .join(ch_annotations, by: 0)
             .join(ch_setlist, by: 0)
