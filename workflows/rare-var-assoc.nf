@@ -233,15 +233,6 @@ workflow RARE_VAR_ASSOC {
     ch_unk_sex_psam = BCFTOOLS_VCF2PSAM.out.psam
     ch_versions = ch_versions.mix(BCFTOOLS_VCF2PSAM.out.versions.first())
 
-    PLINK2_EXPORT_OTHER (
-        ch_vcf_with_dosage_tag_with_index
-            .join(ch_unk_sex_psam, by: 0),
-        Channel.value('traw'),
-        Channel.value(params.plink2_export_other_options)
-    )
-    ch_traw = PLINK2_EXPORT_OTHER.out.out_file
-    ch_versions = ch_versions.mix(PLINK2_EXPORT_OTHER.out.versions.first())
-
     PLINK2_MAKEPGEN_1 (
         ch_vcf_with_dosage_tag_with_index
             .join(ch_unk_sex_psam, by: 0)
@@ -295,6 +286,15 @@ workflow RARE_VAR_ASSOC {
         .join(ch_renamed_psam, by: 0)
         .map { meta, has_x, pgen, pvar, psam, psam_imputesex -> tuple(meta, pgen, pvar, psam_imputesex) }
         .mix(split_data.without_x.map { meta, has_x, pgen, pvar, psam -> tuple(meta, pgen, pvar, psam) })
+
+    PLINK2_EXPORT_OTHER (
+        ch_vcf_with_dosage_tag_with_index
+            .join(ch_renamed_psam, by: 0),
+        Channel.value('traw'),
+        Channel.value(params.plink2_export_other_options)
+    )
+    ch_traw = PLINK2_EXPORT_OTHER.out.out_file
+    ch_versions = ch_versions.mix(PLINK2_EXPORT_OTHER.out.versions.first())
 
     FILTER_MISSING_PER_PHENO (
         ch_pgen_pvar_psam_before_quality_filtering,
