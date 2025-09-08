@@ -275,7 +275,9 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(PLINK2_MAKEPGEN_2.out.versions.first())
     ch_tracking = ch_tracking.mix(PLINK2_MAKEPGEN_2.out.tracking_out.first())
 
-    ch_pgen_pvar_psam_before_quality_filtering = ch_pgen_pvar_psam_2
+    ch_pgen_pvar_psam_before_quality_filtering = split_data.with_x
+        .join(ch_pgen_pvar_psam_2, by: 0)
+        .map { meta, has_x, pgen, pvar, psam, pgen_imputesex, pvar_imputesex, psam_imputesex -> tuple(meta, has_x, pgen, pvar, psam_imputesex) }
         .mix(split_data.without_x.map { meta, has_x, pgen, pvar, psam -> tuple(meta, pgen, pvar, psam) })
 
     FILTER_MISSING_PER_PHENO (
