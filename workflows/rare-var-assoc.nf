@@ -28,6 +28,7 @@ include { PLINK2_MAKEPGEN as PLINK2_MAKEPGEN_4 } from '../modules/local/plink2/m
 include { PLINK2_MAKEPGEN as PLINK2_MAKEPGEN_5 } from '../modules/local/plink2/makepgen'
 include { VEP_ANNOTATE           } from '../modules/local/vep/annotate'
 include { VEP_UPDATECACHE        } from '../modules/local/vep/updatecache'
+include { BCFTOOLS_REPLACE_SAMPLE_NAMES      } from '../modules/local/bcftools/replace_sample_names'
 include { BCFTOOLS_VCF2PSAM      } from '../modules/local/bcftools/vcf2psam'
 include { BCFTOOLS_VCF2FRQ       } from '../modules/local/bcftools/vcf2frq'
 include { BCFTOOLS_TAG2TAG       } from '../modules/local/bcftools/tag2tag'
@@ -198,24 +199,33 @@ workflow RARE_VAR_ASSOC {
     ch_vep_vcf  = VEP_ANNOTATE.out.vcf
     ch_versions = ch_versions.mix(VEP_ANNOTATE.out.versions.first())
 
+    BCFTOOLS_REPLACE_SAMPLE_NAMES (
+        ch_vep_vcf,
+        Channel.value(params.bcftools_replace_sample_names_sed_arg),
+        Channel.value('replace_sample_names')
+    )
+    ch_vcf_with_sample_names_corrected = BCFTOOLS_REPLACE_SAMPLE_NAMES.out.vcf
+    ch_versions = ch_versions.mix(BCFTOOLS_REPLACE_SAMPLE_NAMES.out.versions.first())
+
     BCFTOOLS_INDEX_2 (
-        ch_vep_vcf
+        ch_vcf_with_sample_names_corrected
     )
     ch_vep_vcf_tbi = BCFTOOLS_INDEX_2.out.tbi
     ch_versions = ch_versions.mix(BCFTOOLS_INDEX_2.out.versions.first())
 
-    ch_vep_vcf_with_index = ch_vep_vcf
+    ch_vep_vcf_corr_sample_names_with_index = ch_vcf_with_sample_names_corrected
         .join(ch_vep_vcf_tbi, by: 0)
         .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) }
 
+
     BCFTOOLS_VCF2FRQ (
-        ch_vep_vcf_with_index
+        ch_vep_vcf_corr_sample_names_with_index
     )
     ch_frq = BCFTOOLS_VCF2FRQ.out.frq
     ch_versions = ch_versions.mix(BCFTOOLS_VCF2FRQ.out.versions.first())
 
     BCFTOOLS_TAG2TAG (
-        ch_vep_vcf_with_index,
+        ch_vep_vcf_corr_sample_names_with_index,
         Channel.value(params.bcftools_tag2tag_tag_from),
         Channel.value(params.bcftools_tag2tag_tag_to)
     )
@@ -228,7 +238,7 @@ workflow RARE_VAR_ASSOC {
         .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) }
 
     BCFTOOLS_VCF2PSAM (
-        ch_vep_vcf_with_index
+        ch_vep_vcf_corr_sample_names_with_index
     )
     ch_unk_sex_psam = BCFTOOLS_VCF2PSAM.out.psam
     ch_versions = ch_versions.mix(BCFTOOLS_VCF2PSAM.out.versions.first())
