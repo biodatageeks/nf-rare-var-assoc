@@ -52,7 +52,7 @@ def encode_genotype(gt):
 
 # Function to load VCF.gz and extract DP, GQ, and missingness
 def load_vcf(vcf_file):
-    print(f"load_vcf(\${vcf_file})  ts = \${current_milli_time()}", flush=True)
+    print(f"load_vcf({vcf_file})  ts = {current_milli_time()}", flush=True)
     vcf = pysam.VariantFile(vcf_file)
     samples = list(vcf.header.samples)
     data = {'CHROM': [], 'POS': [], 'Variant_Type': [], 'AF': []}
@@ -87,7 +87,7 @@ def load_vcf(vcf_file):
             gt = sample_data['GT']
             data[f'GT_{sample}'].append(encode_genotype(gt))
  
-    print(f"Loaded \${i} records from the vcf file  ts = \${current_milli_time()}", flush=True)
+    print(f"Loaded {i} records from the vcf file  ts = {current_milli_time()}", flush=True)
     
     # Convert to Polars DataFrame with appropriate dtypes
     dtypes = {'CHROM': pl.Utf8, 'POS': pl.Int32, 'Variant_Type': pl.Int8, 'AF': pl.Float32}
@@ -100,13 +100,13 @@ def load_vcf(vcf_file):
 
 # Load phenotype file
 def load_phenotype(phenotype_file):
-    print(f"load_phenotype(\${phenotype_file})  ts = \${current_milli_time()}")
-    pheno_df = pl.read_csv(phenotype_file, separator='\t')
+    print(f"load_phenotype({phenotype_file})  ts = {current_milli_time()}")
+    pheno_df = pl.read_csv(phenotype_file, separator='\\t')
     return pheno_df
 
 # Plotting function for variant-level statistics
 def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], stat_label='Statistic'):
-    print(f"plot_variant_stats(stat=\${stat})  ts = \${current_milli_time()}")
+    print(f"plot_variant_stats(stat={stat})  ts = {current_milli_time()}")
     stat_cols = [f'{stat}_{sample}' for sample in samples]
     phenotypes = pheno_df['Y1'].unique().to_list()
     
@@ -193,7 +193,7 @@ def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], sta
 
 # Plotting function for sample-level statistics
 def plot_sample_stats(df, pheno_df, samples, stat, stat_label='Statistic'):
-    print(f"plot_sample_stats(stat=\${stat})  ts = \${current_milli_time()}")
+    print(f"plot_sample_stats(stat={stat})  ts = {current_milli_time()}")
     stat_cols = [f'{stat}_{sample}' for sample in samples]
     sample_stats = df.select(stat_cols).to_pandas().mean().reset_index()
     sample_stats['IID'] = sample_stats['index'].str.replace(f'{stat}_', '')
@@ -226,7 +226,7 @@ def plot_sample_stats(df, pheno_df, samples, stat, stat_label='Statistic'):
 
 # Plot missingness per variant and sample
 def plot_missingness(df, pheno_df, samples):
-    print(f"plot_missingness()  ts = \${current_milli_time()}")
+    print(f"plot_missingness()  ts = {current_milli_time()}")
     gt_cols = [f'GT_{sample}' for sample in samples]
     missingness_samples = (
         df.select(pl.col(gt_cols).is_null().mean())  # Calculate mean of nulls per column
@@ -290,7 +290,7 @@ def plot_missingness(df, pheno_df, samples):
 
 # Plot absolute DP differences for cases vs controls
 def plot_dp_differences(df, pheno_df, samples):
-    print(f"plot_dp_differences()  ts = \${current_milli_time()}")
+    print(f"plot_dp_differences()  ts = {current_milli_time()}")
     phenotypes = pheno_df['Y1'].unique().to_list()
     if len(phenotypes) == 2:
         case_samples = pheno_df.filter(pl.col('Y1') == phenotypes[0])['IID'].to_list()
@@ -321,7 +321,7 @@ def plot_dp_differences(df, pheno_df, samples):
             plt.close()
 
 def plot_allele_frequency(vcf_df):
-    print(f"plot_allele_frequency()  ts = \${current_milli_time()}")
+    print(f"plot_allele_frequency()  ts = {current_milli_time()}")
     af = vcf_df['AF'].to_numpy()
     plt.figure(figsize=(9, 6))
     sns.histplot(af[~np.isnan(af)], bins=100, log_scale=True)
@@ -333,7 +333,7 @@ def plot_allele_frequency(vcf_df):
     plt.close()
 
 def plot_variant_types(vcf_df, samples):
-    print(f"plot_variant_types()  ts = \${current_milli_time()}")
+    print(f"plot_variant_types()  ts = {current_milli_time()}")
     plt.figure(figsize=(9, 6))
     sns.countplot(data=vcf_df.to_pandas(), x='Variant_Type')
     plt.title('Variant Type Distribution')
@@ -343,7 +343,7 @@ def plot_variant_types(vcf_df, samples):
     plt.close()
 
 def plot_chrom_density(vcf_df):
-    print(f"plot_chrom_density()  ts = \${current_milli_time()}")
+    print(f"plot_chrom_density()  ts = {current_milli_time()}")
     chrom_counts = vcf_df.group_by('CHROM').len().sort('CHROM').to_pandas()
     plt.figure(figsize=(12, 6))
     sns.barplot(x='CHROM', y='len', data=chrom_counts)
@@ -356,7 +356,7 @@ def plot_chrom_density(vcf_df):
     plt.close()
 
 def plot_heterozygosity(vcf_df, pheno_df, samples):
-    print(f"plot_heterozygosity()  ts = \${current_milli_time()}")
+    print(f"plot_heterozygosity()  ts = {current_milli_time()}")
     het_rates = []
     for sample in samples:
         gt_col = f'GT_{sample}'
@@ -394,15 +394,18 @@ def plot_heterozygosity(vcf_df, pheno_df, samples):
         plt.close()
 
 def plot_boxplots(vcf_df, pheno_df, samples, stat, stat_label):
-    print(f"plot_boxplots(stat=\${stat})  ts = \${current_milli_time()}")
+    print(f"plot_boxplots(stat={stat})  ts = {current_milli_time()}")
     stat_cols = [f'{stat}_{sample}' for sample in samples]
     sample_stats = vcf_df.select(stat_cols).to_pandas().mean().reset_index()
     sample_stats['IID'] = sample_stats['index'].str.replace(f'{stat}_', '')
-    sample_stats['value'] = sample_stats[0]
-    sample_stats = pl.from_pandas(sample_stats[['IID', 'value']]).join(pheno_df.select(['IID', 'Y1']), on='IID', how='left')
+    sample_stats['value'] = sample_stats[0].astype(float)
+    sample_stats = pl.from_pandas(sample_stats[['IID', 'value']]).join(pheno_df.select(['IID', 'Y1']), on='IID', how='left').to_pandas()
     
     plt.figure(figsize=(10, 6))
-    sns.boxplot(data=sample_stats.to_pandas(), x='Y1', y='value')
+    try:
+        sns.boxplot(data=sample_stats, x='Y1', y='value')
+    except ValueError:
+        print(f"ValueError   sample_stats:\\n{sample_stats}")
     plt.title(f'{stat_label} by Phenotype (Samples)')
     plt.xlabel('Phenotype')
     plt.ylabel(stat_label)
@@ -412,7 +415,7 @@ def plot_boxplots(vcf_df, pheno_df, samples, stat, stat_label):
 
 # Main execution
 def main(vcf_file, phenotype_file, percentiles):
-    print(f"main()  ts = \${current_milli_time()}", flush=True)
+    print(f"main()  ts = {current_milli_time()}", flush=True)
 
     vcf_df, samples = load_vcf(vcf_file)
     pheno_df = load_phenotype(phenotype_file)
