@@ -26,7 +26,7 @@ process PLINK2_EXPORT_OTHER {
     def mem_mb = task.memory.toMega()
 
     def vcf_input = vcf ? "--vcf ${vcf}" : ""
-    def psam_input = psam ? "--psam ${psam}" : ""
+    def psam_input = psam ? "--psam ${psam} --keep ${psam}" : ""
 
     """
     plink2 \\

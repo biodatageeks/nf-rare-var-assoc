@@ -297,15 +297,6 @@ workflow RARE_VAR_ASSOC {
         .map { meta, has_x, pgen, pvar, psam, psam_imputesex -> tuple(meta, pgen, pvar, psam_imputesex) }
         .mix(split_data.without_x.map { meta, has_x, pgen, pvar, psam -> tuple(meta, pgen, pvar, psam) })
 
-    PLINK2_EXPORT_OTHER (
-        ch_vcf_with_dosage_tag_with_index
-            .join(ch_renamed_psam, by: 0),
-        Channel.value('traw'),
-        Channel.value(params.plink2_export_other_options)
-    )
-    ch_traw = PLINK2_EXPORT_OTHER.out.out_file
-    ch_versions = ch_versions.mix(PLINK2_EXPORT_OTHER.out.versions.first())
-
     FILTER_MISSING_PER_PHENO (
         ch_pgen_pvar_psam_before_quality_filtering,
         ch_phenotype,
@@ -467,7 +458,16 @@ workflow RARE_VAR_ASSOC {
     ch_setlist  = RSCRIPT_ASSIGN_ANNOTATIONS.out.setlist
     ch_versions = ch_versions.mix(RSCRIPT_ASSIGN_ANNOTATIONS.out.versions.first())
 
-    
+
+    PLINK2_EXPORT_OTHER (
+        ch_vcf_with_dosage_tag_with_index
+            .join(ch_pgen_pvar_psam_6.map { meta, pgen, pvar, psam -> tuple(meta, psam) }, by: 0),
+        //    .join(ch_renamed_psam, by: 0),
+        Channel.value('traw'),
+        Channel.value(params.plink2_export_other_options)
+    )
+    ch_traw = PLINK2_EXPORT_OTHER.out.out_file
+    ch_versions = ch_versions.mix(PLINK2_EXPORT_OTHER.out.versions.first())
 
     PLINK2_IMPORT_DOSAGE (
         ch_pgen_pvar_psam_6
