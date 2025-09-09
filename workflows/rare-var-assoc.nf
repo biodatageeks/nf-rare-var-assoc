@@ -462,7 +462,6 @@ workflow RARE_VAR_ASSOC {
     PLINK2_EXPORT_OTHER (
         ch_vcf_with_dosage_tag_with_index
             .join(ch_pgen_pvar_psam_6.map { meta, pgen, pvar, psam -> tuple(meta, psam) }, by: 0),
-        //    .join(ch_renamed_psam, by: 0),
         Channel.value('traw'),
         Channel.value(params.plink2_export_other_options)
     )

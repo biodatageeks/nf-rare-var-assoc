@@ -25,10 +25,15 @@ process PLINK2_EXPORT_OTHER {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def mem_mb = task.memory.toMega()
 
+    //def extract_ids_from_psam = psam ? "tail -n +2 ${psam} | cut -f 2 | tr '\\n' ' ' | sed 's/ \$//' > sample_ids.txt": ""
+    def extract_ids_from_psam = psam ? "(echo '#IID'; tail -n +2 ${psam} | cut -f 2) > sample_ids.txt": ""
     def vcf_input = vcf ? "--vcf ${vcf}" : ""
-    def psam_input = psam ? "--psam ${psam} --keep ${psam}" : ""
+    def psam_input = psam ? "--update-sex ${psam} --keep ${psam}" : ""  // sample_ids.txt" : ""
 
+    
     """
+    ${extract_ids_from_psam}
+
     plink2 \\
         --threads ${task.cpus} \\
         --memory $mem_mb \\
