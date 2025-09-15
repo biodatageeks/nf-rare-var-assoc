@@ -475,20 +475,8 @@ workflow RARE_VAR_ASSOC {
         Channel.value('import_dosage'),
         Channel.value(params.plink2_import_dosage_options)
     )
-    ch_psam_with_dosage = PLINK2_IMPORT_DOSAGE.out.out_psam
+    ch_pgen_pvar_psam_with_dosage = PLINK2_IMPORT_DOSAGE.out.out_pgen_pvar_psam
     ch_versions = ch_versions.mix(PLINK2_IMPORT_DOSAGE.out.versions.first())
-
-    renamed_psam_file_name = ch_meta.map { t -> "${t.id}_step2_input.psam" }.first()
-    RENAME_2 (
-       ch_psam_with_dosage,
-       renamed_psam_file_name
-    )
-    ch_renamed_psam_with_dosage  = RENAME_2.out.output
-
-    ch_pgen_pvar_psam_with_dosage = ch_pgen_pvar_psam_6
-        .join(ch_renamed_psam_with_dosage, by: 0)
-        .map { meta, pgen, pvar, psam_old, psam_with_dosage -> tuple(meta, pgen, pvar, psam_with_dosage) }
-
 
 
     ch_regenie_step_2_input_part = ch_pgen_pvar_psam_with_dosage

@@ -13,7 +13,7 @@ process PLINK2_IMPORT_DOSAGE {
     val(input_args)
 
     output:
-    tuple val(meta), path("*_${out_name_part}.psam"), emit: out_psam
+    tuple val(meta), path("*_${out_name_part}.pgen"), path("*_${out_name_part}.pvar"), path("*_${out_name_part}.psam"), emit: out_pgen_pvar_psam
     tuple val(meta), path("*_${out_name_part}.log"), emit: log
     path "versions.yml"           , emit: versions
 
@@ -47,6 +47,8 @@ process PLINK2_IMPORT_DOSAGE {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
+    touch ${prefix}_${out_name_part}.pgen
+    touch ${prefix}_${out_name_part}.pvar
     touch ${prefix}_${out_name_part}.psam
     touch ${prefix}_${out_name_part}.log
 
