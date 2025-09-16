@@ -233,18 +233,19 @@ workflow RARE_VAR_ASSOC {
     ch_frq = BCFTOOLS_VCF2FRQ.out.frq
     ch_versions = ch_versions.mix(BCFTOOLS_VCF2FRQ.out.versions.first())
 
-    BCFTOOLS_TAG2TAG (
-        ch_vep_vcf_corr_sample_names_with_index,
-        Channel.value(params.bcftools_tag2tag_tag_from),
-        Channel.value(params.bcftools_tag2tag_tag_to)
-    )
-    ch_vcf_with_dosage_tag = BCFTOOLS_TAG2TAG.out.vcf
-    ch_vcf_with_dosage_tag_tbi = BCFTOOLS_TAG2TAG.out.tbi
-    ch_versions = ch_versions.mix(BCFTOOLS_TAG2TAG.out.versions.first())
-
-    ch_vcf_with_dosage_tag_with_index = ch_vcf_with_dosage_tag
-        .join(ch_vcf_with_dosage_tag_tbi, by: 0)
-        .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) }
+    // tag2tag plugin returns invalid results when run for PL -> GP. Acording to VCF v4.1 specification GP should be a Phred-scaled value, but tag2tag writes just bare float proabilities
+    //BCFTOOLS_TAG2TAG (
+    //    ch_vep_vcf_corr_sample_names_with_index,
+    //    Channel.value(params.bcftools_tag2tag_tag_from),
+    //    Channel.value(params.bcftools_tag2tag_tag_to)
+    //)
+    //ch_vcf_with_dosage_tag = BCFTOOLS_TAG2TAG.out.vcf
+    //ch_vcf_with_dosage_tag_tbi = BCFTOOLS_TAG2TAG.out.tbi
+    //ch_versions = ch_versions.mix(BCFTOOLS_TAG2TAG.out.versions.first())
+    //
+    //ch_vcf_with_dosage_tag_with_index = ch_vcf_with_dosage_tag
+    //    .join(ch_vcf_with_dosage_tag_tbi, by: 0)
+    //    .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) }
 
     BCFTOOLS_VCF2PSAM (
         ch_vep_vcf_corr_sample_names_with_index
@@ -253,7 +254,7 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(BCFTOOLS_VCF2PSAM.out.versions.first())
 
     PLINK2_MAKEPGEN_1 (
-        ch_vcf_with_dosage_tag_with_index
+        ch_vep_vcf_corr_sample_names_with_index
             .join(ch_unk_sex_psam, by: 0)
             .map { meta, vcf_file, tbi_file, unk_sex_psam_file -> tuple(meta, [], [], unk_sex_psam_file, vcf_file, tbi_file, [], [], []) },
         Channel.value(''),
@@ -406,7 +407,7 @@ workflow RARE_VAR_ASSOC {
     ch_tracking_step2 = ch_tracking_step2.mix(PLINK2_WRITE_SNPLIST_2.out.tracking_out.first())
 
     BCFTOOLS_VIEW_2 (
-        ch_vcf_with_dosage_tag_with_index,
+        ch_vep_vcf_corr_sample_names_with_index,
         Channel.of([]),                     // No regions file
         Channel.of([]),                     // No targets file
         ch_step2_sample_ids.map { t -> t[1] },    // Samples file
@@ -450,7 +451,7 @@ workflow RARE_VAR_ASSOC {
     r_script_vcf2aaf_ch = Channel.fromPath(params.rscript_vcf2aaf_path, checkIfExists: true)
     RSCRIPT_VCFTOAAF (
         r_script_vcf2aaf_ch,
-        ch_vcf_with_dosage_tag_with_index.map { meta, vcf, tbi -> tuple(meta, vcf) },
+        ch_vep_vcf_corr_sample_names_with_index.map { meta, vcf, tbi -> tuple(meta, vcf) },
         Channel.value(params.rscript_vcf2aaf_options)
     )
     ch_aaf  = RSCRIPT_VCFTOAAF.out.aaf
@@ -469,7 +470,7 @@ workflow RARE_VAR_ASSOC {
 
 
     PLINK2_EXPORT_OTHER (
-        ch_vcf_with_dosage_tag_with_index
+        ch_vep_vcf_corr_sample_names_with_index
             .join(ch_pgen_pvar_psam_6.map { meta, pgen, pvar, psam -> tuple(meta, psam) }, by: 0),
         Channel.value('traw'),
         Channel.value(params.plink2_export_other_options)
