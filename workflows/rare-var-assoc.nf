@@ -7,6 +7,7 @@ include { DOWNLOAD_FILE          } from '../modules/local/cmds/download_file'
 include { MERGE_RESULTS          } from '../modules/local/cmds/merge_results'
 include { RENAME as RENAME_1     } from '../modules/local/cmds/rename'
 include { RENAME as RENAME_2     } from '../modules/local/cmds/rename'
+include { FIX_ZERO_PL            } from '../modules/local/python/fix_zero_PL'
 include { GENERATE_TRACKING_REPORT           } from '../modules/local/python/generate_tracking_report'
 include { EXPLORATORY_DATA_ANALYSIS          } from '../modules/local/python/eda'
 include { RSCRIPT_BUILDREPORTS   } from '../modules/local/rscript/buildreports'
@@ -207,13 +208,21 @@ workflow RARE_VAR_ASSOC {
     ch_vcf_with_sample_names_corrected = BCFTOOLS_REPLACE_SAMPLE_NAMES.out.vcf
     ch_versions = ch_versions.mix(BCFTOOLS_REPLACE_SAMPLE_NAMES.out.versions.first())
 
+    FIX_ZERO_PL (
+        ch_vcf_with_sample_names_corrected,
+        Channel.value(params.fix_zero_pl_min_gq),
+        Channel.value('fix_zero_PL')
+    )
+    ch_vcf_with_pl_corrected = FIX_ZERO_PL.out.vcf
+    ch_versions = ch_versions.mix(FIX_ZERO_PL.out.versions.first())
+
     BCFTOOLS_INDEX_2 (
-        ch_vcf_with_sample_names_corrected
+        ch_vcf_with_pl_corrected
     )
     ch_vep_vcf_tbi = BCFTOOLS_INDEX_2.out.tbi
     ch_versions = ch_versions.mix(BCFTOOLS_INDEX_2.out.versions.first())
 
-    ch_vep_vcf_corr_sample_names_with_index = ch_vcf_with_sample_names_corrected
+    ch_vep_vcf_corr_sample_names_with_index = ch_vcf_with_pl_corrected
         .join(ch_vep_vcf_tbi, by: 0)
         .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) }
 
