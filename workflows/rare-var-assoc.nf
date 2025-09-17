@@ -211,6 +211,7 @@ workflow RARE_VAR_ASSOC {
     FIX_ZERO_PL (
         ch_vcf_with_sample_names_corrected,
         Channel.value(params.fix_zero_pl_min_gq),
+        Channel.value(params.fix_zero_pl_set_ds_to_missing_if_gt_missing),
         Channel.value('fix_zero_PL')
     )
     ch_vcf_with_pl_corrected = FIX_ZERO_PL.out.vcf
