@@ -28,14 +28,26 @@ process JOIN_CASES_AND_CONTROLS {
     input:
     path(cases)
     path(controls)
+    val(options)
 
     output:
     path("all.samples"), emit: output_file
 
     script:
+    def fromMatcher = (options =~ /--replace-char-from\s*['"](.?)['"]/)
+    def toMatcher = (options =~ /--replace-char-to\s*['"](.?)['"]/)
+
+    def sedArg = "s///g"
+    if (fromMatcher.find() && toMatcher.find()) {
+        def fromChar = fromMatcher[0][1]
+        def toChar = toMatcher[0][1]
+        sedArg = "s/${fromChar}/${toChar}/g"
+    }
     """
+    echo "sedArg = ${sedArg}"
     cut -f1 ${cases} > all.samples
     cut -f1 ${controls} >> all.samples
+    sed -i ${sedArg} all.samples
     """
 }
 
@@ -144,7 +156,8 @@ workflow PIPELINE_INITIALISATION {
             
             JOIN_CASES_AND_CONTROLS (
                 ch_input_cases.map { t -> t[1] },
-                ch_input_controls.map { t -> t[1] }
+                ch_input_controls.map { t -> t[1] },
+                Channel.value(params.rscript_build_phenotypes_options)
             )
             ch_all_samples = JOIN_CASES_AND_CONTROLS.out.output_file
 
