@@ -60,6 +60,7 @@ def load_vcf(vcf_file):
         data[f'DP_{sample}'] = []
         data[f'GQ_{sample}'] = []
         data[f'GT_{sample}'] = []
+        data[f'DS_{sample}'] = []
 
     i = 0
     for record in vcf.fetch():
@@ -77,15 +78,22 @@ def load_vcf(vcf_file):
         
         for sample in samples:
             sample_data = record.samples[sample]
+            
             # Depth of coverage (DP)
             dp = sample_data.get('DP', np.nan)
             data[f'DP_{sample}'].append(dp)
+            
             # Genotype quality (GQ)
             gq = sample_data.get('GQ', np.nan)
             data[f'GQ_{sample}'].append(gq)
+            
             # Genotype (encoded as integer)
             gt = sample_data['GT']
             data[f'GT_{sample}'].append(encode_genotype(gt))
+
+            # Genotype dosage (DS)
+            ds = sample_data.get('DS', np.nan)
+            data[f'DS_{sample}'].append(ds)
  
     print(f"Loaded {i} records from the vcf file  ts = {current_milli_time()}", flush=True)
     
@@ -95,6 +103,7 @@ def load_vcf(vcf_file):
         dtypes[f'DP_{sample}'] = pl.Float32
         dtypes[f'GQ_{sample}'] = pl.Float32
         dtypes[f'GT_{sample}'] = pl.Int16  # Int16 for multiallelic support
+        dtypes[f'DS_{sample}'] = pl.Float32
     vcf_df = pl.DataFrame(data, schema=dtypes)
     return vcf_df, samples
 
@@ -105,7 +114,7 @@ def load_phenotype(phenotype_file):
     return pheno_df
 
 # Plotting function for variant-level statistics
-def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], stat_label='Statistic'):
+def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], stat_label='Statistic', include_log_scale=True):
     print(f"plot_variant_stats(stat={stat})  ts = {current_milli_time()}")
     stat_cols = [f'{stat}_{sample}' for sample in samples]
     phenotypes = pheno_df['Y1'].unique().to_list()
@@ -121,14 +130,15 @@ def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], sta
     plt.savefig(f'{output_dir}/1_{stat}_mean_variants.svg', format="svg")
     plt.close()
 
-    plt.figure(figsize=(9, 6))
-    sns.histplot(mean_values[~np.isnan(mean_values)], bins=50, log_scale=True)
-    plt.title(f'Mean {stat} Across Variants - log scale')
-    plt.xlabel(f'{stat_label} (log)')
-    plt.ylabel('Variant Count')
-    plt.savefig(f'{output_dir}/1b_{stat}_mean_variants.png')
-    plt.savefig(f'{output_dir}/1b_{stat}_mean_variants.svg', format="svg")
-    plt.close()
+    if include_log_scale:
+        plt.figure(figsize=(9, 6))
+        sns.histplot(mean_values[~np.isnan(mean_values)], bins=50, log_scale=True)
+        plt.title(f'Mean {stat} Across Variants - log scale')
+        plt.xlabel(f'{stat_label} (log)')
+        plt.ylabel('Variant Count')
+        plt.savefig(f'{output_dir}/1b_{stat}_mean_variants.png')
+        plt.savefig(f'{output_dir}/1b_{stat}_mean_variants.svg', format="svg")
+        plt.close()
 
     if len(phenotypes) > 5:
         # Overall histograms
@@ -144,14 +154,15 @@ def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], sta
             plt.savefig(f'{output_dir}/2_{stat}_percentile_{perc}_variants.svg', format="svg")
             plt.close()
 
-            plt.figure(figsize=(9, 6))
-            sns.histplot(perc_values[~np.isnan(perc_values)], bins=50, log_scale=True)
-            plt.title(f'{stat} ({perc}th Percentile) Across Variants - log scale')
-            plt.xlabel(f'{stat_label} (log)')
-            plt.ylabel('Variant Count')
-            plt.savefig(f'{output_dir}/2b_{stat}_percentile_{perc}_variants.png')
-            plt.savefig(f'{output_dir}/2b_{stat}_percentile_{perc}_variants.svg', format="svg")
-            plt.close()
+            if include_log_scale:
+                plt.figure(figsize=(9, 6))
+                sns.histplot(perc_values[~np.isnan(perc_values)], bins=50, log_scale=True)
+                plt.title(f'{stat} ({perc}th Percentile) Across Variants - log scale')
+                plt.xlabel(f'{stat_label} (log)')
+                plt.ylabel('Variant Count')
+                plt.savefig(f'{output_dir}/2b_{stat}_percentile_{perc}_variants.png')
+                plt.savefig(f'{output_dir}/2b_{stat}_percentile_{perc}_variants.svg', format="svg")
+                plt.close()
     else:
         # Per-phenotype histograms
         for perc in percentiles + ['mean']:
@@ -173,23 +184,24 @@ def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], sta
             plt.savefig(f'{output_dir}/3_{stat}_percentile_{perc}_by_phenotype_variants.svg', format="svg")
             plt.close()
 
-            plt.figure(figsize=(10, 6))
-            for pheno in phenotypes:
-                pheno_samples = pheno_df.filter(pl.col('Y1') == pheno)['IID'].to_list()
-                pheno_cols = [f'{stat}_{sample}' for sample in pheno_samples if f'{stat}_{sample}' in df]
-                if pheno_cols:
-                    if perc == 'mean':
-                        pheno_values = df.select(pheno_cols).mean_horizontal().to_numpy()
-                    else:
-                        pheno_values = df.select(pheno_cols).quantile(perc / 100).to_numpy()
-                    sns.histplot(pheno_values[~np.isnan(pheno_values)], bins=50, label=f'{pheno} ({perc})', alpha=0.5, log_scale=True)
-            plt.title(f'Mean {stat} by Phenotype - log scale' if perc == 'mean' else f'{stat} ({perc}th Percentile) by Phenotype - log scale')
-            plt.xlabel(f'{stat_label} (log)')
-            plt.ylabel('Variant Count')
-            plt.legend()
-            plt.savefig(f'{output_dir}/3b_{stat}_percentile_{perc}_by_phenotype_variants.png')
-            plt.savefig(f'{output_dir}/3b_{stat}_percentile_{perc}_by_phenotype_variants.svg', format="svg")
-            plt.close()
+            if include_log_scale:
+                plt.figure(figsize=(10, 6))
+                for pheno in phenotypes:
+                    pheno_samples = pheno_df.filter(pl.col('Y1') == pheno)['IID'].to_list()
+                    pheno_cols = [f'{stat}_{sample}' for sample in pheno_samples if f'{stat}_{sample}' in df]
+                    if pheno_cols:
+                        if perc == 'mean':
+                            pheno_values = df.select(pheno_cols).mean_horizontal().to_numpy()
+                        else:
+                            pheno_values = df.select(pheno_cols).quantile(perc / 100).to_numpy()
+                        sns.histplot(pheno_values[~np.isnan(pheno_values)], bins=50, label=f'{pheno} ({perc})', alpha=0.5, log_scale=True)
+                plt.title(f'Mean {stat} by Phenotype - log scale' if perc == 'mean' else f'{stat} ({perc}th Percentile) by Phenotype - log scale')
+                plt.xlabel(f'{stat_label} (log)')
+                plt.ylabel('Variant Count')
+                plt.legend()
+                plt.savefig(f'{output_dir}/3b_{stat}_percentile_{perc}_by_phenotype_variants.png')
+                plt.savefig(f'{output_dir}/3b_{stat}_percentile_{perc}_by_phenotype_variants.svg', format="svg")
+                plt.close()
 
 # Plotting function for sample-level statistics
 def plot_sample_stats(df, pheno_df, samples, stat, stat_label='Statistic'):
@@ -404,14 +416,65 @@ def plot_boxplots(vcf_df, pheno_df, samples, stat, stat_label):
     plt.figure(figsize=(10, 6))
     try:
         sns.boxplot(data=sample_stats, x='Y1', y='value')
-    except ValueError:
-        print(f"ValueError   sample_stats:\\n{sample_stats}")
+    except ValueError as e:
+        print(f"ValueError {e}   sample_stats:\\n{sample_stats}")
     plt.title(f'{stat_label} by Phenotype (Samples)')
     plt.xlabel('Phenotype')
     plt.ylabel(stat_label)
     plt.savefig(f'{output_dir}/16_{stat}_boxplot_by_phenotype.png')
     plt.savefig(f'{output_dir}/16_{stat}_boxplot_by_phenotype.svg', format="svg")
     plt.close()
+
+def plot_ds_vs_gq(vcf_df, pheno_df, samples):
+    print(f"plot_ds_vs_gq()  ts = {current_milli_time()}")
+    phenotypes = pheno_df['Y1'].unique().to_list()
+
+    GQ_cols = [f'GQ_{sample}' for sample in samples]
+    DS_cols = [f'DS_{sample}' for sample in samples]
+    gq_values = vcf_df.select(GQ_cols).to_numpy().ravel()
+    ds_values = vcf_df.select(DS_cols).to_numpy().ravel()
+
+    gq_bins = np.arange(0, max(gq_values) + 1, 1)
+    ds_bins = np.linspace(0, 2, 201)
+
+    # Create 2D histogram for heatmap
+    heatmap, xedges, yedges = np.histogram2d(gq_values, ds_values, bins=[gq_bins, ds_bins])
+
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(heatmap.T, cmap='viridis', norm='log', cbar_kws={'label': 'Count (log scale)'})
+    plt.xlabel('GQ (Genotype Quality)')
+    plt.ylabel('DS (Dosage)')
+    plt.title('Heatmap of DS Distribution per GQ')
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}/17_ds_vs_gq.png')
+    plt.savefig(f'{output_dir}/17_ds_vs_gq.svg', format="svg")
+    plt.close()
+
+    if len(phenotypes) <= 5:
+        for pheno in phenotypes:
+            pheno_samples = pheno_df.filter(pl.col('Y1') == pheno)['IID'].to_list()
+
+            GQ_cols = [f'GQ_{sample}' for sample in pheno_samples if f'GQ_{sample}' in vcf_df]
+            DS_cols = [f'DS_{sample}' for sample in pheno_samples if f'DS_{sample}' in vcf_df]
+            gq_values = vcf_df.select(GQ_cols).to_numpy().ravel()
+            ds_values = vcf_df.select(DS_cols).to_numpy().ravel()
+
+            print(f"max(gq_values) = {np.nanmax(gq_values)}  max(ds_values) = {np.nanmax(ds_values)}")
+            gq_bins = np.arange(0, np.nanmax(gq_values) + 1, 1)
+            ds_bins = np.linspace(0, np.nanmax(ds_values), 201)
+
+            # Create 2D histogram for heatmap
+            heatmap, xedges, yedges = np.histogram2d(gq_values, ds_values, bins=[gq_bins, ds_bins])
+
+            plt.figure(figsize=(12, 10))
+            sns.heatmap(heatmap.T, cmap='viridis', norm='log', cbar_kws={'label': 'Count (log scale)'})
+            plt.xlabel('GQ (Genotype Quality)')
+            plt.ylabel('DS (Dosage)')
+            plt.title(f'Heatmap of DS Distribution per GQ by Phenotype {pheno}')
+            plt.tight_layout()
+            plt.savefig(f'{output_dir}/17_ds_vs_gq_by_phenotype_{pheno}.png')
+            plt.savefig(f'{output_dir}/17_ds_vs_gq_by_phenotype_{pheno}.svg', format="svg")
+            plt.close()
 
 # Main execution
 def main(vcf_file, phenotype_file, percentiles):
@@ -426,6 +489,9 @@ def main(vcf_file, phenotype_file, percentiles):
     plot_variant_stats(vcf_df, pheno_df, samples, 'GQ', percentiles=percentiles, stat_label='Genotype Quality')
     plot_sample_stats(vcf_df, pheno_df, samples, 'GQ', stat_label='Genotype Quality')
     
+    plot_variant_stats(vcf_df, pheno_df, samples, 'DS', percentiles=percentiles, stat_label='Genotype Dosage', include_log_scale=False)
+    plot_sample_stats(vcf_df, pheno_df, samples, 'DS', stat_label='Genotype Dosage')
+
     plot_missingness(vcf_df, pheno_df, samples)
     
     plot_dp_differences(vcf_df, pheno_df, samples)
@@ -436,6 +502,9 @@ def main(vcf_file, phenotype_file, percentiles):
     
     plot_boxplots(vcf_df, pheno_df, samples, 'DP', 'Depth of Coverage')
     plot_boxplots(vcf_df, pheno_df, samples, 'GQ', 'Genotype Quality')
+    plot_boxplots(vcf_df, pheno_df, samples, 'DS', 'Genotype Dosage')
+
+    plot_ds_vs_gq(vcf_df, pheno_df, samples)
 
 # Run the analysis
 vcf_file = "${vcf}"

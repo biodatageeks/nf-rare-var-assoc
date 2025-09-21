@@ -11,7 +11,6 @@ process FIX_ZERO_PL {
     input:
     tuple val(meta), path(vcf_file)
     val(min_gq)
-    val(set_ds_to_missing_if_gt_missing)  // 'Y' or 'N'
     val(out_name_part)
     
     output:
@@ -77,10 +76,10 @@ process FIX_ZERO_PL {
                     new_pl[i] = [int(round(pl_ref)), int(round(pl_het)), int(round(pl_alt))]
                 else:
                     # Set GT to missing (./.)
-                    new_gt[i] = [0, 0, 1]  # [allele1, allele2, is_phased]; 0,0,1 = ./. (unphased missing)
+                    new_gt[i] = [0, 0, False]  # [allele1, allele2, is_phased]; 0,0,False = ./. (unphased missing)
             
             # Step 2: Calculate DS for all samples
-            if '${set_ds_to_missing_if_gt_missing}' == 'Y' and (gt[i] == 2 or new_gt[i] == [0, 0, 1]):  # GT:./.
+            if gq[i][0] < min_gq:
                 new_ds[i] = np.nan  #'.'  # Missing genotype
                 # print(f"i={i}  gt[i] = {gt[i]}  new_pl[i] = {new_pl[i]}  new_ds[i] = {new_ds[i]}")
             else:
