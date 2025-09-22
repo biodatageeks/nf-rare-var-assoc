@@ -39,6 +39,7 @@ include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_1   } from '../modules/local/bcftoo
 include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_2   } from '../modules/local/bcftools/filter'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_1 } from '../modules/local/bcftools/index'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_2 } from '../modules/local/bcftools/index'
+include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_3 } from '../modules/local/bcftools/index'
 include { BCFTOOLS_NORM          } from '../modules/local/bcftools/norm'
 include { BCFTOOLS_ANNOTATE      } from '../modules/nf-core/bcftools/annotate'
 include { MULTIQC                } from '../modules/nf-core/multiqc'
@@ -115,37 +116,69 @@ workflow RARE_VAR_ASSOC {
     ch_vcf_with_sample_names_corrected = BCFTOOLS_REPLACE_SAMPLE_NAMES.out.vcf
     ch_versions = ch_versions.mix(BCFTOOLS_REPLACE_SAMPLE_NAMES.out.versions.first())
 
+    BCFTOOLS_INDEX_1 (
+        ch_vcf_with_sample_names_corrected
+    )
+    ch_vcf_with_sample_names_corrected_tbi = BCFTOOLS_INDEX_1.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_INDEX_1.out.versions.first())
+
+    ch_vcf_with_sample_names_corrected_with_index = ch_vcf_with_sample_names_corrected.join(ch_vcf_with_sample_names_corrected_tbi, by: 0)
+
+
+    BCFTOOLS_NORM (
+        ch_vcf_with_sample_names_corrected_with_index,
+        ch_vep_cachesubdir.map { t -> "${t}/${params.vep_fasta_path}" },
+        Channel.value("norm"),
+        Channel.of([])
+    )
+    ch_normalized_vcf = BCFTOOLS_NORM.out.vcf
+    ch_normalized_vcf_tbi = BCFTOOLS_NORM.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_NORM.out.versions.first())
+    ch_tracking = BCFTOOLS_NORM.out.tracking_out.first()
+
+    BCFTOOLS_ANNOTATE (
+        ch_normalized_vcf
+            .join(ch_normalized_vcf_tbi, by: 0)  // Join by the first element (meta)
+            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], []) },
+        Channel.of([]),
+        ch_rename_chr
+    )
+    ch_annotated_vcf = BCFTOOLS_ANNOTATE.out.vcf
+    ch_annotated_vcf_tbi = BCFTOOLS_ANNOTATE.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_ANNOTATE.out.versions.first())
+
+
     FIX_ZERO_PL (
-        ch_vcf_with_sample_names_corrected,
+        ch_annotated_vcf,
         Channel.value(params.fix_zero_pl_min_gq),
         Channel.value('fix_zero_PL')
     )
     ch_vcf_with_pl_corrected = FIX_ZERO_PL.out.vcf
     ch_versions = ch_versions.mix(FIX_ZERO_PL.out.versions.first())
 
-    BCFTOOLS_INDEX_1 (
+    BCFTOOLS_INDEX_2 (
         ch_vcf_with_pl_corrected
     )
-    ch_vcf_with_pl_corrected_tbi = BCFTOOLS_INDEX_1.out.tbi
-    ch_versions = ch_versions.mix(BCFTOOLS_INDEX_1.out.versions.first())
+    ch_vcf_with_pl_corrected_tbi = BCFTOOLS_INDEX_2.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_INDEX_2.out.versions.first())
 
-    ch_vep_vcf_corr_sample_names_with_index = ch_vcf_with_pl_corrected.join(ch_vcf_with_pl_corrected_tbi, by: 0)
+    ch_vcf_with_pl_corrected_with_index = ch_vcf_with_pl_corrected.join(ch_vcf_with_pl_corrected_tbi, by: 0)
 
 
     BCFTOOLS_VIEW_1 (
-        ch_vep_vcf_corr_sample_names_with_index,
+        ch_vcf_with_pl_corrected_with_index,
         Channel.of([]),                                       // No regions file
         Channel.of([]),                                       // No targets file
         ch_all_samples,                                       // Samples file
         Channel.of([]),                                       // SNPs file
         Channel.value("--output-type z --write-index=tbi"),       // input args
         Channel.value("view1"),
-        Channel.of([])
+        BCFTOOLS_NORM.out.tracking_out.first()
     )
     ch_all_samples_vcf  = BCFTOOLS_VIEW_1.out.vcf
     ch_all_samples_vcf_tbi  = BCFTOOLS_VIEW_1.out.tbi
     ch_versions = ch_versions.mix(BCFTOOLS_VIEW_1.out.versions.first())
-    ch_tracking = BCFTOOLS_VIEW_1.out.tracking_out.first()
+    ch_tracking = ch_tracking.mix(BCFTOOLS_VIEW_1.out.tracking_out.first())
 
 
     EXPLORATORY_DATA_ANALYSIS (
@@ -169,8 +202,7 @@ workflow RARE_VAR_ASSOC {
     ch_filter_1_vcf  = BCFTOOLS_FILTER_1.out.vcf
     ch_filter_1_vcf_tbi  = BCFTOOLS_FILTER_1.out.tbi
     ch_versions = ch_versions.mix(BCFTOOLS_FILTER_1.out.versions.first())
-    ch_tracking = BCFTOOLS_FILTER_1.out.tracking_out.first()
-    // shouldn't this be: ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_1.out.tracking_out.first())
+    ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_1.out.tracking_out.first())
 
     BCFTOOLS_FILTER_2 (
         ch_filter_1_vcf.join(ch_filter_1_vcf_tbi, by: 0),
@@ -185,33 +217,10 @@ workflow RARE_VAR_ASSOC {
     ch_filter_2_vcf  = BCFTOOLS_FILTER_2.out.vcf
     ch_filter_2_vcf_tbi  = BCFTOOLS_FILTER_2.out.tbi
     ch_versions = ch_versions.mix(BCFTOOLS_FILTER_2.out.versions.first())
-    ch_tracking = BCFTOOLS_FILTER_2.out.tracking_out.first()
-    // shouldn't this be: ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_2.out.tracking_out.first())
-    
-    BCFTOOLS_NORM (
-        ch_filter_2_vcf.join(ch_filter_2_vcf_tbi, by: 0),
-        ch_vep_cachesubdir.map { t -> "${t}/${params.vep_fasta_path}" },
-        Channel.value("norm"),
-        BCFTOOLS_FILTER_2.out.tracking_out.first()
-    )
-    ch_normalized_vcf = BCFTOOLS_NORM.out.vcf
-    ch_normalized_vcf_tbi = BCFTOOLS_NORM.out.tbi
-    ch_versions = ch_versions.mix(BCFTOOLS_NORM.out.versions.first())
-    ch_tracking = ch_tracking.mix(BCFTOOLS_NORM.out.tracking_out.first())
-
-    BCFTOOLS_ANNOTATE (
-        ch_normalized_vcf
-            .join(ch_normalized_vcf_tbi, by: 0)  // Join by the first element (meta)
-            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], []) },
-        Channel.of([]),
-        ch_rename_chr
-    )
-    ch_annotated_vcf = BCFTOOLS_ANNOTATE.out.vcf
-    ch_annotated_vcf_tbi = BCFTOOLS_ANNOTATE.out.tbi
-    ch_versions = ch_versions.mix(BCFTOOLS_ANNOTATE.out.versions.first())
+    ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_2.out.tracking_out.first())
 
     VEP_ANNOTATE (
-        ch_annotated_vcf.join(ch_annotated_vcf_tbi, by: 0),
+        ch_filter_2_vcf.join(ch_filter_2_vcf_tbi, by: 0),
         ch_vep_cachesubdir,
         Channel.value(params.vep_annotate_species),
         Channel.value(params.vep_fasta_path),
@@ -221,11 +230,11 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(VEP_ANNOTATE.out.versions.first())
 
 
-    BCFTOOLS_INDEX_2 (
+    BCFTOOLS_INDEX_3 (
         ch_vep_vcf
     )
-    ch_vep_vcf_tbi = BCFTOOLS_INDEX_2.out.tbi
-    ch_versions = ch_versions.mix(BCFTOOLS_INDEX_2.out.versions.first())
+    ch_vep_vcf_tbi = BCFTOOLS_INDEX_3.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_INDEX_3.out.versions.first())
 
     ch_vep_vcf_with_index = ch_vep_vcf.join(ch_vep_vcf_tbi, by: 0)
 
