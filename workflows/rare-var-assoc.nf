@@ -480,26 +480,28 @@ workflow RARE_VAR_ASSOC {
     ch_setlist  = RSCRIPT_ASSIGN_ANNOTATIONS.out.setlist
     ch_versions = ch_versions.mix(RSCRIPT_ASSIGN_ANNOTATIONS.out.versions.first())
 
+    if (params.use_dosage) {
+        PLINK2_EXPORT_OTHER (
+            ch_vep_vcf_with_index
+                .join(ch_pgen_pvar_psam_6.map { meta, pgen, pvar, psam -> tuple(meta, psam) }, by: 0),
+            Channel.value('traw'),
+            Channel.value(params.plink2_export_other_options)
+        )
+        ch_traw = PLINK2_EXPORT_OTHER.out.out_file
+        ch_versions = ch_versions.mix(PLINK2_EXPORT_OTHER.out.versions.first())
 
-    PLINK2_EXPORT_OTHER (
-        ch_vep_vcf_with_index
-            .join(ch_pgen_pvar_psam_6.map { meta, pgen, pvar, psam -> tuple(meta, psam) }, by: 0),
-        Channel.value('traw'),
-        Channel.value(params.plink2_export_other_options)
-    )
-    ch_traw = PLINK2_EXPORT_OTHER.out.out_file
-    ch_versions = ch_versions.mix(PLINK2_EXPORT_OTHER.out.versions.first())
-
-    PLINK2_IMPORT_DOSAGE (
-        ch_pgen_pvar_psam_6
-            .join(ch_traw, by: 0)
-            .map { meta, pgen, pvar, psam, traw -> tuple(meta, psam, traw) },
-        Channel.value('import_dosage'),
-        Channel.value(params.plink2_import_dosage_options)
-    )
-    ch_pgen_pvar_psam_with_dosage = PLINK2_IMPORT_DOSAGE.out.out_pgen_pvar_psam
-    ch_versions = ch_versions.mix(PLINK2_IMPORT_DOSAGE.out.versions.first())
-
+        PLINK2_IMPORT_DOSAGE (
+            ch_pgen_pvar_psam_6
+                .join(ch_traw, by: 0)
+                .map { meta, pgen, pvar, psam, traw -> tuple(meta, psam, traw) },
+            Channel.value('import_dosage'),
+            Channel.value(params.plink2_import_dosage_options)
+        )
+        ch_pgen_pvar_psam_with_dosage = PLINK2_IMPORT_DOSAGE.out.out_pgen_pvar_psam
+        ch_versions = ch_versions.mix(PLINK2_IMPORT_DOSAGE.out.versions.first())
+    } else {
+        ch_pgen_pvar_psam_with_dosage = ch_pgen_pvar_psam_6
+    }
 
     ch_regenie_step_2_input_part = ch_pgen_pvar_psam_with_dosage
             .join(ch_phenotype, by: 0)

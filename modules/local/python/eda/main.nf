@@ -425,55 +425,55 @@ def plot_boxplots(vcf_df, pheno_df, samples, stat, stat_label):
     plt.savefig(f'{output_dir}/16_{stat}_boxplot_by_phenotype.svg', format="svg")
     plt.close()
 
-def plot_ds_vs_gq(vcf_df, pheno_df, samples):
-    print(f"plot_ds_vs_gq()  ts = {current_milli_time()}")
+def plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1, stat2):
+    print(f"plot_stat_vs_stat()  ts = {current_milli_time()}")
     phenotypes = pheno_df['Y1'].unique().to_list()
 
-    GQ_cols = [f'GQ_{sample}' for sample in samples]
-    DS_cols = [f'DS_{sample}' for sample in samples]
-    gq_values = vcf_df.select(GQ_cols).to_numpy().ravel()
-    ds_values = vcf_df.select(DS_cols).to_numpy().ravel()
+    stat1_cols = [f'{stat1}_{sample}' for sample in samples]
+    stat2_cols = [f'{stat2}_{sample}' for sample in samples]
+    stat1_values = vcf_df.select(stat1_cols).to_numpy().ravel()
+    stat2_values = vcf_df.select(stat2_cols).to_numpy().ravel()
 
-    gq_bins = np.arange(0, max(gq_values) + 1, 1)
-    ds_bins = np.linspace(0, 2, 201)
+    stat1_bins = np.arange(0, max(stat1_values) + 1, 1)
+    stat2_bins = np.linspace(0, 2, 201)
 
     # Create 2D histogram for heatmap
-    heatmap, xedges, yedges = np.histogram2d(gq_values, ds_values, bins=[gq_bins, ds_bins])
+    heatmap, xedges, yedges = np.histogram2d(stat1_values, stat2_values, bins=[stat1_bins, stat2_bins])
 
     plt.figure(figsize=(12, 10))
     sns.heatmap(heatmap.T, cmap='viridis', norm='log', cbar_kws={'label': 'Count (log scale)'})
-    plt.xlabel('GQ (Genotype Quality)')
-    plt.ylabel('DS (Dosage)')
-    plt.title('Heatmap of DS Distribution per GQ')
+    plt.xlabel(f'{stat1}')
+    plt.ylabel(f'{stat2}')
+    plt.title(f'Heatmap of {stat2} distribution per {stat1}')
     plt.tight_layout()
-    plt.savefig(f'{output_dir}/17_ds_vs_gq.png')
-    plt.savefig(f'{output_dir}/17_ds_vs_gq.svg', format="svg")
+    plt.savefig(f'{output_dir}/17_{stat2}_vs_{stat1}.png')
+    plt.savefig(f'{output_dir}/17_{stat2}_vs_{stat1}.svg', format="svg")
     plt.close()
 
     if len(phenotypes) <= 5:
         for pheno in phenotypes:
             pheno_samples = pheno_df.filter(pl.col('Y1') == pheno)['IID'].to_list()
 
-            GQ_cols = [f'GQ_{sample}' for sample in pheno_samples if f'GQ_{sample}' in vcf_df]
-            DS_cols = [f'DS_{sample}' for sample in pheno_samples if f'DS_{sample}' in vcf_df]
-            gq_values = vcf_df.select(GQ_cols).to_numpy().ravel()
-            ds_values = vcf_df.select(DS_cols).to_numpy().ravel()
+            stat1_cols = [f'{stat1}_{sample}' for sample in pheno_samples if f'{stat1}_{sample}' in vcf_df]
+            stat2_cols = [f'{stat2}_{sample}' for sample in pheno_samples if f'{stat2}_{sample}' in vcf_df]
+            stat1_values = vcf_df.select(stat1_cols).to_numpy().ravel()
+            stat2_values = vcf_df.select(stat2_cols).to_numpy().ravel()
 
-            print(f"max(gq_values) = {np.nanmax(gq_values)}  max(ds_values) = {np.nanmax(ds_values)}")
-            gq_bins = np.arange(0, np.nanmax(gq_values) + 1, 1)
-            ds_bins = np.linspace(0, np.nanmax(ds_values), 201)
+            print(f"max(stat1_values) = {np.nanmax(stat1_values)}  max(stat2_values) = {np.nanmax(stat2_values)}")
+            stat1_bins = np.arange(0, np.nanmax(stat1_values) + 1, 1)
+            stat2_bins = np.linspace(0, np.nanmax(stat2_values), 201)
 
             # Create 2D histogram for heatmap
-            heatmap, xedges, yedges = np.histogram2d(gq_values, ds_values, bins=[gq_bins, ds_bins])
+            heatmap, xedges, yedges = np.histogram2d(stat1_values, stat2_values, bins=[stat1_bins, stat2_bins])
 
             plt.figure(figsize=(12, 10))
             sns.heatmap(heatmap.T, cmap='viridis', norm='log', cbar_kws={'label': 'Count (log scale)'})
-            plt.xlabel('GQ (Genotype Quality)')
-            plt.ylabel('DS (Dosage)')
-            plt.title(f'Heatmap of DS Distribution per GQ by Phenotype {pheno}')
+            plt.xlabel(f'{stat1}')
+            plt.ylabel(f'{stat2}')
+            plt.title(f'Heatmap of {stat2} distribution per {stat1} by Phenotype {pheno}')
             plt.tight_layout()
-            plt.savefig(f'{output_dir}/17_ds_vs_gq_by_phenotype_{pheno}.png')
-            plt.savefig(f'{output_dir}/17_ds_vs_gq_by_phenotype_{pheno}.svg', format="svg")
+            plt.savefig(f'{output_dir}/17_{stat2}_vs_{stat1}_by_phenotype_{pheno}.png')
+            plt.savefig(f'{output_dir}/17_{stat2}_vs_{stat1}_by_phenotype_{pheno}.svg', format="svg")
             plt.close()
 
 # Main execution
@@ -504,7 +504,9 @@ def main(vcf_file, phenotype_file, percentiles):
     plot_boxplots(vcf_df, pheno_df, samples, 'GQ', 'Genotype Quality')
     plot_boxplots(vcf_df, pheno_df, samples, 'DS', 'Genotype Dosage')
 
-    plot_ds_vs_gq(vcf_df, pheno_df, samples)
+    plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1='GQ', stat2='DS')
+    plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1='DP', stat2='DS')
+    plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1='GQ', stat2='DP')
 
 # Run the analysis
 vcf_file = "${vcf}"
