@@ -31,7 +31,7 @@ process FIX_ZERO_PL {
     input_vcf = '${vcf_file}'
     output_vcf = '${prefix}_${out_name_part}.vcf.gz'
 
-    vcf = VCF(input_vcf)
+    vcf = VCF(input_vcf, threads=${task.cpus})
 
     # Add DS field to header
     vcf.add_format_to_header({

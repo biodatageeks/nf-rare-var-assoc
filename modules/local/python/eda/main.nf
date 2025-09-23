@@ -507,6 +507,7 @@ def main(vcf_file, phenotype_file, percentiles):
     plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1='GQ', stat2='DS')
     plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1='DP', stat2='DS')
     plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1='GQ', stat2='DP')
+    plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1='GT', stat2='DS')
 
 # Run the analysis
 vcf_file = "${vcf}"
