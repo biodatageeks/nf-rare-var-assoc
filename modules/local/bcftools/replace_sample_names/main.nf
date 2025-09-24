@@ -8,7 +8,7 @@ process BCFTOOLS_REPLACE_SAMPLE_NAMES {
         'biocontainers/bcftools:1.20--h8b25389_0' }"
 
     input:
-    tuple val(meta), path(vcf)
+    tuple val(meta), path(vcf_in)
     val(sed_arg)
     val(out_name_part)
 
@@ -22,16 +22,16 @@ process BCFTOOLS_REPLACE_SAMPLE_NAMES {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
-    def vcf_gz = vcf.extension.endsWith("gz") ? vcf : "${vcf.name}.gz"
+    def vcf_gz = vcf_in.extension.endsWith("gz") ? vcf_in : "${vcf_in.name}.gz"
 
     """
     # Check if the input is uncompressed VCF
-    if [[ "${vcf}" =~ \\.vcf\$ ]]; then
-        bgzip -c ${vcf} > ${vcf}.gz
+    if [[ "${vcf_in}" =~ \\.vcf\$ ]]; then
+        bgzip -c ${vcf_in} > ${vcf_in}.gz
     fi
 
     # Extract sample names
-    bcftools query -l ${vcf} > samples.txt
+    bcftools query -l ${vcf_in} > samples.txt
     
     # Replace underscores with specified character
     sed '${sed_arg}' samples.txt > new_samples.txt
