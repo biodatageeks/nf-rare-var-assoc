@@ -22,8 +22,14 @@ process BCFTOOLS_REPLACE_SAMPLE_NAMES {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
+    def vcf_gz = vcf.extension.endsWith("gz") ? vcf : "${vcf.name}.gz"
 
     """
+    # Check if the input is uncompressed VCF
+    if [[ "${vcf}" =~ \\.vcf\$ ]]; then
+        bgzip -c ${vcf} > ${vcf}.gz
+    fi
+
     # Extract sample names
     bcftools query -l ${vcf} > samples.txt
     
@@ -31,7 +37,7 @@ process BCFTOOLS_REPLACE_SAMPLE_NAMES {
     sed '${sed_arg}' samples.txt > new_samples.txt
     
     # Update VCF with new sample names
-    bcftools reheader -s new_samples.txt ${vcf} \\
+    bcftools reheader -s new_samples.txt ${vcf_gz} \\
        $args \\
        --threads $task.cpus \\
        -o ${prefix}_${out_name_part}.vcf.gz
