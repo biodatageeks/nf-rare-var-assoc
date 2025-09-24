@@ -13,7 +13,7 @@ process BCFTOOLS_REPLACE_SAMPLE_NAMES {
     val(out_name_part)
 
     output:
-    tuple val(meta), path("*.{vcf,vcf.gz,bcf,bcf.gz}"), emit: vcf
+    tuple val(meta), path("*_${out_name_part}.{vcf,vcf.gz,bcf,bcf.gz}"), emit: vcf
     path "versions.yml"           , emit: versions
 
     when:
@@ -27,7 +27,7 @@ process BCFTOOLS_REPLACE_SAMPLE_NAMES {
     """
     # Check if the input is uncompressed VCF
     if [[ "${vcf_in}" =~ \\.vcf\$ ]]; then
-        bgzip -c ${vcf_in} > ${vcf_in}.gz
+        bgzip -c ${vcf_in} > ${vcf_gz}
     fi
 
     # Extract sample names
@@ -51,7 +51,7 @@ process BCFTOOLS_REPLACE_SAMPLE_NAMES {
     stub:
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    touch ${prefix}_${out_name_part}.${extension} \\
+    touch ${prefix}_${out_name_part}.vcf.gz \\
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
