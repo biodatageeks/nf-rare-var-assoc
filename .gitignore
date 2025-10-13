@@ -2,6 +2,7 @@
 work/
 data/
 results/
+results_sim_chr22/
 .DS_Store
 testing/
 testing*
