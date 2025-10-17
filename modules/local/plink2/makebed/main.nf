@@ -8,12 +8,11 @@ process PLINK2_MAKEBED {
         params.cpu_support_avx2 ? 'docker.io/psuszynski/plink:2.0-alpha.6.9': 'docker.io/psuszynski/plink:2.0-alpha.6.9.noavx2' }"
 
     input:
-    tuple val(meta), path(pgen), path(pvar), path(psam), path(vcf), path(frq), path(samples_filtering_file), path(variants_filtering_file)
+    tuple val(meta), path(pgen), path(pvar), path(psam), path(vcf), path(frq), path(samples_filtering_file), path(variants_filtering_file), path(tracking_in)
     val(samples_filtering_type)  // for example: '--remove', '--keep'
     val(variants_filtering_type) // for example: '--extract', '--extract-intersect', '--exclude'
     val(out_name_part)
     val(input_args)
-    path(tracking_in)
 
     output:
     tuple val(meta), path("*.bed"), path("*.bim"), path("*.fam"), emit: out_bed_bim_fam

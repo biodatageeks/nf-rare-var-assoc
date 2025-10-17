@@ -8,8 +8,7 @@ process PLINK19_MAKESET {
         'biocontainers/plink:1.90b6.21--h7b50bb2_6' }"
 
     input:
-    tuple val(meta), path(bed), path(bim), path(fam), path(makeset_file)
-    path(tracking_in)
+    tuple val(meta), path(bed), path(bim), path(fam), path(makeset_file), path(tracking_in)
 
     output:
     tuple val(meta), path("*.set"), emit: out_set

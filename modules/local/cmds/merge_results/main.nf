@@ -5,11 +5,10 @@ process MERGE_RESULTS {
     container 'docker.io/psuszynski/r-ver:4.4.2.9'
 
     input:
-    path(csv_concat_py_script)
-    tuple val(phenotype), path(regenie_chromosomes)
+    tuple val(meta), val(phenotype), path(regenie_chromosomes), path(csv_concat_py_script)
 
     output:
-    tuple val(phenotype), path ("${phenotype}.regenie.gz"), emit: results_merged
+    tuple val(meta), val(phenotype), path ("${phenotype}.regenie.gz"), emit: results_merged
 
     script:
     """

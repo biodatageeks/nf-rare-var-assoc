@@ -8,10 +8,9 @@ process BCFTOOLS_FILTER_QUAL_DP {
         'docker.io/biocontainers/vcftools:v0.1.16-1-deb_cv1' }"
 
     input:
-    tuple val(meta), path(vcf), path(index)
+    tuple val(meta), path(vcf), path(index), path(tracking_in)
     val(input_args)
     val(out_name_part)
-    path(tracking_in)
 
     output:
     tuple val(meta), path("*.{vcf,vcf.gz,bcf,bcf.gz}"), emit: vcf

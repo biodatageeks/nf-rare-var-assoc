@@ -6,8 +6,7 @@ process RSCRIPT_BUILD_PHENOTYPES {
     container 'docker.io/psuszynski/r-ver:4.4.2.9'
 
     input:
-    path(r_script_ch)
-    tuple val(meta), path(controls), path(cases)
+    tuple val(meta), path(controls), path(cases), path(r_script_ch)
     val(input_args)
 
     output:

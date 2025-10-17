@@ -29,8 +29,8 @@ workflow PSUSZYNS_RARE_VAR_ASSOC {
 
     take:
     input_vcf // channel: samplesheet read in from --input
-    input_controls
-    input_cases
+    phenotype
+    all_samples
 
     main:
 
@@ -39,8 +39,8 @@ workflow PSUSZYNS_RARE_VAR_ASSOC {
     //
     RARE_VAR_ASSOC (
         input_vcf,
-        input_controls,
-        input_cases
+        phenotype,
+        all_samples
     )
     emit:
     multiqc_report = RARE_VAR_ASSOC.out.multiqc_report // channel: /path/to/multiqc_report.html

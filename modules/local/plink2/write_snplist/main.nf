@@ -9,10 +9,9 @@ process PLINK2_WRITE_SNPLIST {
         params.cpu_support_avx2 ? 'docker.io/psuszynski/plink:2.0-alpha.6.9': 'docker.io/psuszynski/plink:2.0-alpha.6.9.noavx2' }"
 
     input:
-    tuple val(meta), path(pgen), path(pvar), path(psam), path(keep)
+    tuple val(meta), path(pgen), path(pvar), path(psam), path(keep), path(tracking_in)
     val(out_name_part)
     val(input_args)
-    path(tracking_in)
 
     output:
     tuple val(meta), path("*.snplist"), emit: snplist

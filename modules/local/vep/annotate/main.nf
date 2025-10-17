@@ -11,8 +11,7 @@ process VEP_ANNOTATE {
         'docker.io/psuszynski/ensembl-vep:113.4.3' }"
 
     input:
-    tuple val(meta), path(input_vcf), path(input_vcf_tbi)
-    path(vep_cache)
+    tuple val(meta), path(input_vcf), path(input_vcf_tbi), path(vep_cache)
     val(species)
     val(fasta_path)
     val(input_args)

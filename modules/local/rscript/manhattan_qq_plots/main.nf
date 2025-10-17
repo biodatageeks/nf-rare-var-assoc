@@ -7,15 +7,7 @@ process RSCRIPT_MANHATTAN_QQ_PLOTS {
     container 'docker.io/psuszynski/r-ver:4.4.2.9'
 
     input:
-    tuple val(phenotype), path(regenie_merged)
-    path(gwas_report_template)
-    path(r_functions_file)
-    path(mask_file)
-    tuple val(meta), path(phenotype_file)
-    tuple val(meta2), path(pc_plot_file)
-    tuple val(meta3), path(eda_plots)
-    path(rmd_pheno_stats_file)
-    tuple val(meta4), path(setlist_file)
+    tuple val(meta), path(phenotype_file), path(pc_plot_file), path(eda_plots), path(setlist_file), val(phenotype), path(regenie_merged), path(mask_file), path(gwas_report_template), path(r_functions_file), path(rmd_pheno_stats_file)
 
     output:
     path("*.html"), emit: plots_report
@@ -34,6 +26,7 @@ process RSCRIPT_MANHATTAN_QQ_PLOTS {
     """
     gene_count=\$(cat ${setlist_file} | wc -l)
     echo "gene count: \$gene_count"
+    echo "PWD: \$PWD"
 
     Rscript -e "require( 'rmarkdown' ); render('${gwas_report_template}', \\
         params = list( \\

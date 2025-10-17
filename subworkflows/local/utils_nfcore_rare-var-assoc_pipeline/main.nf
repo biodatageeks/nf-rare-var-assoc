@@ -26,12 +26,11 @@ process JOIN_CASES_AND_CONTROLS {
     label 'process_single'
 
     input:
-    path(cases)
-    path(controls)
+    tuple val(meta), path(cases), path(controls)
     val(options)
 
     output:
-    path("all.samples"), emit: output_file
+    tuple val(meta), path("all.samples"), emit: output_file
 
     script:
     def fromMatcher = (options =~ /--replace-char-from\s*['"](.?)['"]/)
@@ -55,10 +54,10 @@ process PHENOTYPE_SAMPLES {
     label 'process_single'
 
     input:
-    path(phenotype)
+    tuple val(meta), path(phenotype)
 
     output:
-    path("all.samples"), emit: output_file
+    tuple val(meta), path("all.samples"), emit: output_file
 
     script:
     """
@@ -112,23 +111,24 @@ workflow PIPELINE_INITIALISATION {
     //
     // Create channel from input file provided through params.input
     //
-
-    Channel.fromPath(input_vcf, checkIfExists: true)
-        .map { files ->
-            tuple( [id: params.project_name], files ) // Add meta component
-        }
-        .set { ch_input_vcf }
-
-
-    if (input_phenotype != null && file(input_phenotype).isFile()) {
+    if (input_phenotype != null) {
         Channel.fromPath(input_phenotype, checkIfExists: true)
-            .map { files ->
-                tuple( [id: params.project_name], files ) // Add meta component
+            .map { file ->
+                log.info("Processing phenotype file: ${file.name}")
+                def matcher = (file.name =~ /.*_sample_(\d+)_.*\.phenotype\.txt/)
+                if (matcher.matches()) {
+                    def sample_number = matcher[0][1] // Extract the sample identifier
+                    def meta_id = "${params.project_name}_${sample_number}"
+                    tuple([id: meta_id], file)
+                } else {
+                    log.warn("Phenotype file name does not match expected pattern. Using project_name as id.")
+                    tuple( [id: params.project_name], file )
+                }
             }
             .set { ch_phenotype }
 
         PHENOTYPE_SAMPLES (
-            ch_phenotype.map { t -> t[1] }
+            ch_phenotype
         )
         ch_all_samples = PHENOTYPE_SAMPLES.out.output_file
     } else {
@@ -147,16 +147,15 @@ workflow PIPELINE_INITIALISATION {
             
             r_script_build_phenotypes_ch = Channel.fromPath(params.rscript_build_phenotypes_path, checkIfExists: true)
             RSCRIPT_BUILD_PHENOTYPES (
-                r_script_build_phenotypes_ch,
-                ch_input_controls.join(ch_input_cases, by: 0),
+                ch_input_controls.join(ch_input_cases, by: 0)
+                    .combine(r_script_build_phenotypes_ch),
                 Channel.value(params.rscript_build_phenotypes_options)
             )
             ch_phenotype  = RSCRIPT_BUILD_PHENOTYPES.out.phenotype
             ch_versions = ch_versions.mix(RSCRIPT_BUILD_PHENOTYPES.out.versions.first())
             
             JOIN_CASES_AND_CONTROLS (
-                ch_input_cases.map { t -> t[1] },
-                ch_input_controls.map { t -> t[1] },
+                ch_input_cases.join(ch_input_controls, by: 0),
                 Channel.value(params.rscript_build_phenotypes_options)
             )
             ch_all_samples = JOIN_CASES_AND_CONTROLS.out.output_file
@@ -166,6 +165,15 @@ workflow PIPELINE_INITIALISATION {
         }
     }
 
+    // Process VCF files and create Cartesian product with phenotype files
+    Channel.fromPath(input_vcf, checkIfExists: true)
+        .map { vcf -> tuple(vcf) } // Wrap VCF file in a tuple for combining
+        .combine(ch_phenotype) // Cartesian product: each VCF with each phenotype
+        .map { vcf, pheno_meta, pheno_file ->
+            // Create a new tuple with the same meta.id as the phenotype and the VCF file
+            tuple([id: pheno_meta.id], vcf)
+        }
+        .set { ch_input_vcf }
 
     emit:
     vcf = ch_input_vcf

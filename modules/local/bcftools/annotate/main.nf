@@ -8,9 +8,7 @@ process BCFTOOLS_ANNOTATE {
         'biocontainers/bcftools:1.20--h8b25389_0' }"
 
     input:
-    tuple val(meta), path(input), path(index), path(annotations), path(annotations_index)
-    path(header_lines)
-    path(rename_chrs)
+    tuple val(meta), path(input), path(index), path(annotations), path(annotations_index), path(header_lines), path(rename_chrs)
 
     output:
     tuple val(meta), path("*.{vcf,vcf.gz,bcf,bcf.gz}"), emit: vcf

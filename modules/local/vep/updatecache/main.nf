@@ -8,8 +8,7 @@ process VEP_UPDATECACHE {
         'docker.io/psuszynski/ensembl-vep:113.4.3' }"
 
     input:
-    val(meta)
-    path(vep_cache)
+    tuple val(meta), path(vep_cache)
     val(species)
     val(input_args)
     val(vep_cache_url)

@@ -10,14 +10,9 @@ process BCFTOOLS_VIEW {
         'biocontainers/bcftools:1.20--h8b25389_0' }"
 
     input:
-    tuple val(meta), path(vcf), path(index)
-    path(regions)
-    path(targets)
-    path(samples)
-    path(snplist)
+    tuple val(meta), path(vcf), path(index), path(regions), path(targets), path(samples), path(snplist), path(tracking_in)
     val(input_args)
     val(out_name_part)
-    path(tracking_in)
 
     output:
     tuple val(meta), path("*.{vcf,vcf.gz,bcf,bcf.gz}"), emit: vcf

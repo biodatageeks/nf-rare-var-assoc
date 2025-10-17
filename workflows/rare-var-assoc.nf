@@ -41,7 +41,7 @@ include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_1 } from '../modules/local/bcftools/i
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_2 } from '../modules/local/bcftools/index'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_3 } from '../modules/local/bcftools/index'
 include { BCFTOOLS_NORM          } from '../modules/local/bcftools/norm'
-include { BCFTOOLS_ANNOTATE      } from '../modules/nf-core/bcftools/annotate'
+include { BCFTOOLS_ANNOTATE      } from '../modules/local/bcftools/annotate'
 include { MULTIQC                } from '../modules/nf-core/multiqc'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { FILTER_MISSING_PER_PHENO           } from '../subworkflows/local/filter_missing_per_pheno'
@@ -97,8 +97,7 @@ workflow RARE_VAR_ASSOC {
 
 
     VEP_UPDATECACHE (
-        ch_meta,
-        ch_vep_cachedir,
+        ch_meta.first().combine(ch_vep_cachedir),
         Channel.value(params.vep_updatecache_species),
         Channel.value(params.vep_updatecache_options),
         Channel.value(params.vep_cache_url),
@@ -126,10 +125,10 @@ workflow RARE_VAR_ASSOC {
 
 
     BCFTOOLS_NORM (
-        ch_vcf_with_sample_names_corrected_with_index,
-        ch_vep_cachesubdir.map { t -> "${t}/${params.vep_fasta_path}" },
+        ch_vcf_with_sample_names_corrected_with_index
+            .combine(ch_vep_cachesubdir.map { t -> "${t}/${params.vep_fasta_path}" })
+            .map { meta, vcf_file, tbi_file, fasta_file -> tuple(meta, vcf_file, tbi_file, fasta_file, []) },
         Channel.value("norm"),
-        Channel.of([])
     )
     ch_normalized_vcf = BCFTOOLS_NORM.out.vcf
     ch_normalized_vcf_tbi = BCFTOOLS_NORM.out.tbi
@@ -139,9 +138,8 @@ workflow RARE_VAR_ASSOC {
     BCFTOOLS_ANNOTATE (
         ch_normalized_vcf
             .join(ch_normalized_vcf_tbi, by: 0)  // Join by the first element (meta)
-            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], []) },
-        Channel.of([]),
-        ch_rename_chr
+            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], []) }
+            .combine(ch_rename_chr),
     )
     ch_annotated_vcf = BCFTOOLS_ANNOTATE.out.vcf
     ch_annotated_vcf_tbi = BCFTOOLS_ANNOTATE.out.tbi
@@ -166,14 +164,12 @@ workflow RARE_VAR_ASSOC {
 
 
     BCFTOOLS_VIEW_1 (
-        ch_vcf_with_pl_corrected_with_index,
-        Channel.of([]),                                       // No regions file
-        Channel.of([]),                                       // No targets file
-        ch_all_samples,                                       // Samples file
-        Channel.of([]),                                       // SNPs file
+        ch_vcf_with_pl_corrected_with_index
+            .join(ch_all_samples, by: 0)
+            .map { meta, vcf_file, tbi_file, samples_file -> tuple(meta, vcf_file, tbi_file, [], [], samples_file, []) }
+            .combine(BCFTOOLS_NORM.out.tracking_out.first()),
         Channel.value("--output-type z --write-index=tbi"),       // input args
         Channel.value("view1"),
-        BCFTOOLS_NORM.out.tracking_out.first()
     )
     ch_all_samples_vcf  = BCFTOOLS_VIEW_1.out.vcf
     ch_all_samples_vcf_tbi  = BCFTOOLS_VIEW_1.out.tbi
@@ -189,15 +185,13 @@ workflow RARE_VAR_ASSOC {
     ch_eda_plots = EXPLORATORY_DATA_ANALYSIS.out.plots
     ch_versions = ch_versions.mix(EXPLORATORY_DATA_ANALYSIS.out.versions.first())
 
+
     BCFTOOLS_FILTER_1 (
-        ch_all_samples_vcf.join(ch_all_samples_vcf_tbi, by: 0),
-        Channel.of([]),                                       // No regions file
-        Channel.of([]),                                       // No targets file
-        Channel.of([]),                                       // No samples file
-        Channel.of([]),                                       // SNPs file
+        ch_all_samples_vcf.join(ch_all_samples_vcf_tbi, by: 0)
+            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
+            .combine(BCFTOOLS_VIEW_1.out.tracking_out.first()),
         Channel.value(params.bcftools_filter_1_options),        // input args
-        Channel.value("view2"),
-        BCFTOOLS_VIEW_1.out.tracking_out.first()
+        Channel.value("view2")
     )
     ch_filter_1_vcf  = BCFTOOLS_FILTER_1.out.vcf
     ch_filter_1_vcf_tbi  = BCFTOOLS_FILTER_1.out.tbi
@@ -205,14 +199,11 @@ workflow RARE_VAR_ASSOC {
     ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_1.out.tracking_out.first())
 
     BCFTOOLS_FILTER_2 (
-        ch_filter_1_vcf.join(ch_filter_1_vcf_tbi, by: 0),
-        Channel.of([]),                                       // No regions file
-        Channel.of([]),                                       // No targets file
-        Channel.of([]),                                       // No samples file
-        Channel.of([]),                                       // SNPs file
+        ch_filter_1_vcf.join(ch_filter_1_vcf_tbi, by: 0)
+            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
+            .combine(BCFTOOLS_FILTER_1.out.tracking_out.first()),
         Channel.value(params.bcftools_filter_2_options),        // input args
         Channel.value("view3"),
-        BCFTOOLS_FILTER_1.out.tracking_out.first()
     )
     ch_filter_2_vcf  = BCFTOOLS_FILTER_2.out.vcf
     ch_filter_2_vcf_tbi  = BCFTOOLS_FILTER_2.out.tbi
@@ -220,8 +211,8 @@ workflow RARE_VAR_ASSOC {
     ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_2.out.tracking_out.first())
 
     VEP_ANNOTATE (
-        ch_filter_2_vcf.join(ch_filter_2_vcf_tbi, by: 0),
-        ch_vep_cachesubdir,
+        ch_filter_2_vcf.join(ch_filter_2_vcf_tbi, by: 0)
+            .combine(ch_vep_cachesubdir),
         Channel.value(params.vep_annotate_species),
         Channel.value(params.vep_fasta_path),
         Channel.value(params.vep_annotate_options)
@@ -268,13 +259,13 @@ workflow RARE_VAR_ASSOC {
     PLINK2_MAKEPGEN_1 (
         ch_vep_vcf_with_index
             .join(ch_unk_sex_psam, by: 0)
-            .map { meta, vcf_file, tbi_file, unk_sex_psam_file -> tuple(meta, [], [], unk_sex_psam_file, vcf_file, tbi_file, [], [], []) },
+            .map { meta, vcf_file, tbi_file, unk_sex_psam_file -> tuple(meta, [], [], unk_sex_psam_file, vcf_file, tbi_file, [], [], []) }
+            .combine(BCFTOOLS_NORM.out.tracking_out.first()),
         Channel.value(''),
         Channel.value(''),
         Channel.value(params.plink2_makepgen_1_vcf_input_options),
         Channel.value('plink2_makepgen_1'),
-        Channel.value(params.plink2_makepgen_1_options),
-        BCFTOOLS_NORM.out.tracking_out.first()
+        Channel.value(params.plink2_makepgen_1_options)
     )
     ch_pgen_pvar_psam_1  = PLINK2_MAKEPGEN_1.out.out_pgen_pvar_psam
     ch_versions = ch_versions.mix(PLINK2_MAKEPGEN_1.out.versions.first())
@@ -295,22 +286,22 @@ workflow RARE_VAR_ASSOC {
     PLINK2_MAKEPGEN_2 (
         split_data.with_x
             .join(ch_frq, by: 0)
-            .map { meta, has_x, pgen, pvar, psam, frq -> tuple(meta, pgen, pvar, psam, [], [], frq, [], []) },
+            .map { meta, has_x, pgen, pvar, psam, frq -> tuple(meta, pgen, pvar, psam, [], [], frq, [], []) }
+            .combine(PLINK2_MAKEPGEN_1.out.tracking_out.first()),
         Channel.value('--remove'),
         Channel.value('--exclude'),
         Channel.value(''),
         Channel.value('plink2_makepgen_2_impute_sex'),
-        Channel.value(params.plink2_makepgen_2_options),
-        PLINK2_MAKEPGEN_1.out.tracking_out.first()
+        Channel.value(params.plink2_makepgen_2_options)
     )
     ch_pgen_pvar_psam_2  = PLINK2_MAKEPGEN_2.out.out_pgen_pvar_psam
     ch_versions = ch_versions.mix(PLINK2_MAKEPGEN_2.out.versions.first())
     ch_tracking = ch_tracking.mix(PLINK2_MAKEPGEN_2.out.tracking_out.first())
 
-    renamed_file_name = ch_meta.map { t -> "${t.id}_plink2_makepgen_1.psam" }.first()
+    renamed_file_name = ch_pgen_pvar_psam_2.map { meta, pgen, pvar, psam -> tuple(meta, "${meta.id}_plink2_makepgen_1.psam") }
     RENAME_1 (
-        ch_pgen_pvar_psam_2.map { meta, pgen, pvar, psam -> tuple(meta, psam) },
-        renamed_file_name
+        ch_pgen_pvar_psam_2.map { meta, pgen, pvar, psam -> tuple(meta, psam) }
+            .join(renamed_file_name, by: 0)
     )
     ch_renamed_psam  = RENAME_1.out.output
 
@@ -331,14 +322,14 @@ workflow RARE_VAR_ASSOC {
 
     PLINK2_MAKEPGEN_3 (
         ch_pgen_pvar_psam_filtered_per_pheno
-            .join(ch_meta.merge(ch_hild), by: 0)
-            .map { meta, pgen_file, pvar_file, psam_file, hild_file -> tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], [], hild_file) },
+            .combine(ch_hild)
+            .map { meta, pgen_file, pvar_file, psam_file, hild_file -> tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], [], hild_file) }
+            .combine(FILTER_MISSING_PER_PHENO.out.tracking.last()),
         Channel.value('--remove'),
         Channel.value('--exclude'),
         Channel.value(''),
         Channel.value('filter_pass'),
-        Channel.value(params.plink2_makepgen_3_options),
-        FILTER_MISSING_PER_PHENO.out.tracking.last()
+        Channel.value(params.plink2_makepgen_3_options)
     )
     ch_pgen_pvar_psam_3  = PLINK2_MAKEPGEN_3.out.out_pgen_pvar_psam
     ch_versions = ch_versions.mix(PLINK2_MAKEPGEN_3.out.versions.first())
@@ -365,10 +356,10 @@ workflow RARE_VAR_ASSOC {
     ch_tracking_step1 = ch_tracking_step1.mix(PCA.out.tracking)
 
     PLINK2_WRITE_SNPLIST_1 (
-        ch_pgen_pvar_psam_4.map { meta, pgen_file, pvar_file, psam_file -> tuple(meta, pgen_file, pvar_file, psam_file, []) },
+        ch_pgen_pvar_psam_4.map { meta, pgen_file, pvar_file, psam_file -> tuple(meta, pgen_file, pvar_file, psam_file, []) }
+            .combine(PCA.out.tracking.last()),
         Channel.value('writesnp_pass'),
-        Channel.value(params.plink2_write_snplist_qc_options),
-        PCA.out.tracking.last()
+        Channel.value(params.plink2_write_snplist_qc_options)
     )
     ch_snplist  = PLINK2_WRITE_SNPLIST_1.out.snplist
     ch_id  = PLINK2_WRITE_SNPLIST_1.out.id
@@ -378,14 +369,14 @@ workflow RARE_VAR_ASSOC {
 
     PLINK2_MAKEPGEN_4 (
         ch_pgen_pvar_psam_filtered_per_pheno
-            .join(ch_meta.merge(ch_hild), by: 0)
-            .map { meta, pgen_file, pvar_file, psam_file, hild_file -> tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], [], hild_file) },
+            .combine(ch_hild)
+            .map { meta, pgen_file, pvar_file, psam_file, hild_file -> tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], [], hild_file) }
+            .combine(FILTER_MISSING_PER_PHENO.out.tracking.last()),
         Channel.value('--remove'),
         Channel.value('--exclude'),
         Channel.value(''),
         Channel.value('step2_filter'),
-        Channel.value(params.plink2_makepgen_4_options),
-        FILTER_MISSING_PER_PHENO.out.tracking.last()
+        Channel.value(params.plink2_makepgen_4_options)
     )
     ch_pgen_pvar_psam_5  = PLINK2_MAKEPGEN_4.out.out_pgen_pvar_psam
     ch_versions = ch_versions.mix(PLINK2_MAKEPGEN_4.out.versions.first())
@@ -394,13 +385,13 @@ workflow RARE_VAR_ASSOC {
 
     PLINK2_MAKEPGEN_5 (
         ch_pgen_pvar_psam_5
-            .map { meta, pgen_file, pvar_file, psam_file -> tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], [], []) },
+            .map { meta, pgen_file, pvar_file, psam_file -> tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], [], []) }
+            .combine(PLINK2_MAKEPGEN_4.out.tracking_out.first()),
         Channel.value('--remove'),
         Channel.value('--exclude'),
         Channel.value(''),
         Channel.value('step2_input'),
-        Channel.value(params.plink2_makepgen_5_options),
-        PLINK2_MAKEPGEN_4.out.tracking_out.first()
+        Channel.value(params.plink2_makepgen_5_options)
     )
     ch_pgen_pvar_psam_6  = PLINK2_MAKEPGEN_5.out.out_pgen_pvar_psam
     ch_versions = ch_versions.mix(PLINK2_MAKEPGEN_5.out.versions.first())
@@ -408,10 +399,10 @@ workflow RARE_VAR_ASSOC {
 
     
     PLINK2_WRITE_SNPLIST_2 (
-        ch_pgen_pvar_psam_6.map { meta, pgen_file, pvar_file, psam_file -> tuple(meta, pgen_file, pvar_file, psam_file, []) },
+        ch_pgen_pvar_psam_6.map { meta, pgen_file, pvar_file, psam_file -> tuple(meta, pgen_file, pvar_file, psam_file, []) }
+            .combine(PLINK2_MAKEPGEN_5.out.tracking_out.first()),
         Channel.value('writesnp_step2'),
         Channel.value(params.plink2_write_snplist_step2_options),
-        PLINK2_MAKEPGEN_5.out.tracking_out.first()
     )
     ch_step2_snplist = PLINK2_WRITE_SNPLIST_2.out.snplist
     ch_step2_sample_ids = PLINK2_WRITE_SNPLIST_2.out.id
@@ -419,14 +410,13 @@ workflow RARE_VAR_ASSOC {
     ch_tracking_step2 = ch_tracking_step2.mix(PLINK2_WRITE_SNPLIST_2.out.tracking_out.first())
 
     BCFTOOLS_VIEW_2 (
-        ch_vep_vcf_with_index,
-        Channel.of([]),                     // No regions file
-        Channel.of([]),                     // No targets file
-        ch_step2_sample_ids.map { t -> t[1] },    // Samples file
-        ch_step2_snplist.map { t -> t[1] },       // SNPs file
+        ch_vep_vcf_with_index
+            .join(ch_step2_sample_ids, by: 0)            // Samples file
+            .join(ch_step2_snplist, by: 0)               // SNPs file
+            .map { meta, vcf_file, tbi_file, samples_file, snplist_file -> tuple(meta, vcf_file, tbi_file, [], [], samples_file, snplist_file) }
+            .combine(PLINK2_WRITE_SNPLIST_2.out.tracking_out.first()),
         Channel.value("--output-type z --write-index=tbi"),         // input args
-        Channel.value("view2"),
-        PLINK2_WRITE_SNPLIST_2.out.tracking_out.first()
+        Channel.value("view2")
     )
     ch_step2_vcf  = BCFTOOLS_VIEW_2.out.vcf
     ch_step2_vcf_tbi  = BCFTOOLS_VIEW_1.out.tbi
@@ -450,9 +440,9 @@ workflow RARE_VAR_ASSOC {
     }
 
     REGENIE_STEP1 (
-        ch_regenie_step_1_input,
-        Channel.value(params.regenie_step1_options),
-        PLINK2_WRITE_SNPLIST_1.out.tracking_out.first()
+        ch_regenie_step_1_input
+            .combine(PLINK2_WRITE_SNPLIST_1.out.tracking_out.first()),
+        Channel.value(params.regenie_step1_options)
     )
     ch_regenie_step1_loco  = REGENIE_STEP1.out.loco
     ch_regenie_step1_pred_list  = REGENIE_STEP1.out.pred_list
@@ -462,8 +452,8 @@ workflow RARE_VAR_ASSOC {
 
     r_script_vcf2aaf_ch = Channel.fromPath(params.rscript_vcf2aaf_path, checkIfExists: true)
     RSCRIPT_VCFTOAAF (
-        r_script_vcf2aaf_ch,
-        ch_vep_vcf_with_index.map { meta, vcf, tbi -> tuple(meta, vcf) },
+        ch_vep_vcf_with_index.map { meta, vcf, tbi -> tuple(meta, vcf) }
+            .combine(r_script_vcf2aaf_ch),
         Channel.value(params.rscript_vcf2aaf_options)
     )
     ch_aaf  = RSCRIPT_VCFTOAAF.out.aaf
@@ -471,9 +461,9 @@ workflow RARE_VAR_ASSOC {
     
     r_script_annotate_ch = Channel.fromPath(params.rscript_annotate_path, checkIfExists: true)
     RSCRIPT_ASSIGN_ANNOTATIONS (
-        r_script_annotate_ch,
-        ch_step2_vcf,
-        ch_masks,
+        ch_step2_vcf
+            .combine(ch_masks)
+            .combine(r_script_annotate_ch),
         Channel.value(params.rscript_annotate_options)
     )
     ch_annotations  = RSCRIPT_ASSIGN_ANNOTATIONS.out.annotations
@@ -520,10 +510,10 @@ workflow RARE_VAR_ASSOC {
     }
 
     REGENIE_STEP2 (
-        ch_regenie_step_2_input,
-        ch_masks,
-        Channel.value(params.regenie_step2_options),
-        BCFTOOLS_VIEW_2.out.tracking_out.first()
+        ch_regenie_step_2_input
+            .combine(ch_masks)
+            .combine(BCFTOOLS_VIEW_2.out.tracking_out.first()),
+        Channel.value(params.regenie_step2_options)
     )
     ch_regenie_step2_masks_bed_bim_fam  = REGENIE_STEP2.out.masks_bed_bim_fam
     ch_regenie_step2_masks_snplist  = REGENIE_STEP2.out.masks_snplist
@@ -533,27 +523,28 @@ workflow RARE_VAR_ASSOC {
 
     r_script_buildreports_ch = Channel.fromPath(params.rscript_buildreports_path, checkIfExists: true)
     RSCRIPT_BUILDREPORTS (
-        r_script_buildreports_ch,
-        ch_regenie_step2_masks_snplist,
-        ch_regenie_step2_regenie_out,
-        ch_step2_vcf,
-        ch_phenotype,
-        ch_annotations
+        ch_regenie_step2_masks_snplist
+            .join(ch_regenie_step2_regenie_out, by: 0)
+            .join(ch_step2_vcf, by: 0)
+            .join(ch_phenotype, by: 0)
+            .join(ch_annotations, by: 0)
+            .combine(r_script_buildreports_ch)
     )
     ch_annotated_snps  = RSCRIPT_BUILDREPORTS.out.annotated_snps
     ch_res_log10p_1_annotated  = RSCRIPT_BUILDREPORTS.out.res_log10p_1_annotated
     ch_annotated_snps_with_sample_ids  = RSCRIPT_BUILDREPORTS.out.annotated_snps_with_sample_ids
     ch_versions = ch_versions.mix(RSCRIPT_BUILDREPORTS.out.versions.first())
 
-    ch_regenie_step2_regenie_out.map { t -> [t[0].id, t[1]] }
+    ch_regenie_step2_regenie_out  //.map { t -> [t[0].id, t[1]] }
         .transpose()
-        .map { prefix, fl -> tuple(RegenieUtil.getPhenotypeByChunk(prefix, fl), fl) }
+        .map { meta, fl -> tuple(meta, RegenieUtil.getPhenotypeByChunk(meta.id, fl), fl) }
+        .groupTuple(by: [0, 1])
         .set { ch_regenie_step2_by_phenotype }
 
     py_script_csv_concat_ch = Channel.fromPath(params.py_script_csv_concat_path, checkIfExists: true)
     MERGE_RESULTS (
-        py_script_csv_concat_ch,
-        ch_regenie_step2_by_phenotype.groupTuple()
+        ch_regenie_step2_by_phenotype
+            .combine(py_script_csv_concat_ch)
     )
     ch_results_merged = MERGE_RESULTS.out.results_merged
 
@@ -562,7 +553,7 @@ workflow RARE_VAR_ASSOC {
         ch_masks,
         ch_phenotype,
         ch_pca_plot_file,
-        ch_eda_plots.collect(),
+        ch_eda_plots,
         ch_setlist
     )
 

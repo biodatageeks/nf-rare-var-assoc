@@ -33,8 +33,7 @@ process RSCRIPT_VCFTOAAF {
     //               https://github.com/nf-core/modules/blob/master/modules/nf-core/bwa/index/main.nf
     // TODO nf-core: Where applicable please provide/convert compressed files as input/output
     //               e.g. "*.fastq.gz" and NOT "*.fastq", "*.bam" and NOT "*.sam" etc.
-    path(r_script_ch)
-    tuple val(meta), path(vcf)
+    tuple val(meta), path(vcf), path(r_script_ch)
     val(input_args)
 
     output:

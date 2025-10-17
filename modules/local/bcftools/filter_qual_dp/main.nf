@@ -8,13 +8,12 @@ process BCFTOOLS_FILTER_QUAL_DP {
         'biocontainers/bcftools:1.20--h8b25389_0' }"
 
     input:
-    tuple val(meta), path(vcf), path(index)
+    tuple val(meta), path(vcf), path(index), path(tracking_in)
     val(qual_filter)
     val(info_filter)
     val(fmt_filter)
     val(info_filter_ensure_field_present)
     val(fmt_filter_ensure_field_present)
-    path(tracking_in)
 
     output:
     tuple val(meta), path("*_filter_qual_dp.{vcf,vcf.gz,bcf,bcf.gz}"), emit: vcf

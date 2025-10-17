@@ -7,10 +7,8 @@ process REGENIE_STEP2 {
     container 'ghcr.io/rgcgithub/regenie/regenie:v4.1.gz'
 
     input:
-    tuple val(meta), path(pgen), path(pvar), path(psam), path(phenotype), path(annotations), path(setlist), path(aaf), path(step1_pred_list), path(covar_file)
-    path(masks)
+    tuple val(meta), path(pgen), path(pvar), path(psam), path(phenotype), path(annotations), path(setlist), path(aaf), path(step1_pred_list), path(covar_file), path(masks), path(tracking_in)
     val(input_args)
-    path(tracking_in)
 
     output:
     tuple val(meta), path("*_masks.bed"), path("*_masks.bim"), path("*_masks.fam"), emit: masks_bed_bim_fam

@@ -8,10 +8,9 @@ process PLINK2_HET {
         params.cpu_support_avx2 ? 'docker.io/psuszynski/plink:2.0-alpha.6.9': 'docker.io/psuszynski/plink:2.0-alpha.6.9.noavx2' }"
 
     input:
-    tuple val(meta), path(pgen), path(pvar), path(psam), path(extract)
+    tuple val(meta), path(pgen), path(pvar), path(psam), path(extract), path(tracking_in)
     val(out_name_part)
     val(input_args)
-    path(tracking_in)
 
     output:
     tuple val(meta), path("*.het"), emit: out_het

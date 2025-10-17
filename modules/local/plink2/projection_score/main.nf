@@ -8,11 +8,10 @@ process PLINK2_PROJECTION_SCORE {
         params.cpu_support_avx2 ? 'docker.io/psuszynski/plink:2.0-alpha.6.9': 'docker.io/psuszynski/plink:2.0-alpha.6.9.noavx2' }"
 
     input:
-    tuple val(meta), path(pgen), path(pvar), path(psam), path(frq), path(eigenvec_allele)
+    tuple val(meta), path(pgen), path(pvar), path(psam), path(frq), path(eigenvec_allele), path(tracking_in)
     val(score_options)
     val(out_name_part)
     val(input_args)
-    path(tracking_in)
 
     output:
     tuple val(meta), path("*.sscore"), emit: sscore

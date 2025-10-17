@@ -33,12 +33,7 @@ process RSCRIPT_BUILDREPORTS {
     //               https://github.com/nf-core/modules/blob/master/modules/nf-core/bwa/index/main.nf
     // TODO nf-core: Where applicable please provide/convert compressed files as input/output
     //               e.g. "*.fastq.gz" and NOT "*.fastq", "*.bam" and NOT "*.sam" etc.
-    path(r_script_ch)
-    tuple val(meta), path(regenie_step2_masks_snplist)
-    tuple val(meta), path(regenie_step2_Y1_regenie)
-    tuple val(meta), path(vcf)
-    tuple val(meta), path(phenotype)
-    tuple val(meta), path(annotations)
+    tuple val(meta), path(regenie_step2_masks_snplist), path(regenie_step2_Y1_regenie), path(vcf), path(phenotype), path(annotations), path(r_script_ch)
 
     output:
     // TODO nf-core: Named file extensions MUST be emitted for ALL output channels

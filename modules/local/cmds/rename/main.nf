@@ -6,8 +6,7 @@ process RENAME {
     container 'docker.io/psuszynski/r-ver:4.4.2.9'
 
     input:
-    tuple val(meta), path(input_path)
-    val(output_path)
+    tuple val(meta), path(input_path), val(output_path)
 
     output:
     tuple val(meta), path(output_path), emit: output

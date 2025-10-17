@@ -6,10 +6,7 @@ process RSCRIPT_ASSIGN_ANNOTATIONS {
     container 'docker.io/psuszynski/r-ver:4.4.2.9'
 
     input:
-    path(r_script_ch)
-    tuple val(meta), path(vcf)
-    // tuple val(meta), path(sample)
-    path(masks)
+    tuple val(meta), path(vcf), path(masks), path(r_script_ch)
     val(input_args)
 
     output:

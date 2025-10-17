@@ -33,8 +33,7 @@ process QCTOOL {
     //               https://github.com/nf-core/modules/blob/master/modules/nf-core/bwa/index/main.nf
     // TODO nf-core: Where applicable please provide/convert compressed files as input/output
     //               e.g. "*.fastq.gz" and NOT "*.fastq", "*.bam" and NOT "*.sam" etc.
-    tuple val(meta), path(bgen_in)
-    tuple val(meta), path(sample_in)
+    tuple val(meta), path(bgen_in), path(sample_in)
     val(out_name_part)
     val(input_args)
 

@@ -7,9 +7,8 @@ process REGENIE_STEP1 {
     container 'ghcr.io/rgcgithub/regenie/regenie:v4.1.gz'
 
     input:
-    tuple val(meta), path(pgen), path(pvar), path(psam), path(qc_pass_id), path(qc_pass_snplist), path(phenotype), path(covar_file)
+    tuple val(meta), path(pgen), path(pvar), path(psam), path(qc_pass_id), path(qc_pass_snplist), path(phenotype), path(covar_file), path(tracking_in)
     val(input_args)
-    path(tracking_in)
 
     output:
     tuple val(meta), path("*.loco"), emit: loco
