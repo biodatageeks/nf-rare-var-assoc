@@ -115,10 +115,10 @@ workflow PIPELINE_INITIALISATION {
         Channel.fromPath(input_phenotype, checkIfExists: true)
             .map { file ->
                 log.info("Processing phenotype file: ${file.name}")
-                def matcher = (file.name =~ /.*_sample_(\d+)_.*\.phenotype\.txt/)
+                def matcher = (file.name =~ /.*_dataset_idx_(\d+)_.*\.phenotype\.txt/)
                 if (matcher.matches()) {
-                    def sample_number = matcher[0][1] // Extract the sample identifier
-                    def meta_id = "${params.project_name}_${sample_number}"
+                    def dataset_idx = matcher[0][1] // Extract the dataset identifier
+                    def meta_id = "${params.project_name}_dataset_idx_${dataset_idx}"
                     tuple([id: meta_id], file)
                 } else {
                     log.warn("Phenotype file name does not match expected pattern. Using project_name as id.")
