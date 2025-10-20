@@ -17,7 +17,7 @@
 
 process PLINK19_MAKEBED {
     tag "$meta.id"
-    label 'process_high_memory'
+    label 'process_medium_memory'
 
     // TODO nf-core: List required Conda package(s).
     //               Software MUST be pinned to channel (i.e. "bioconda"), version (i.e. "1.10").
