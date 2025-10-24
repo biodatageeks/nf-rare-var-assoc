@@ -34,7 +34,7 @@ include { BCFTOOLS_TAG2TAG       } from '../modules/local/bcftools/tag2tag'
 include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_2   } from '../modules/local/bcftools/view'
 include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_1   } from '../modules/local/bcftools/filter'
 include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_2   } from '../modules/local/bcftools/filter'
-include { BCFTOOLS_FILTER_2_TIMES } from '../modules/local/combo/filter2'
+//include { BCFTOOLS_FILTER_2_TIMES } from '../modules/local/combo/filter2'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_3 } from '../modules/local/bcftools/index'
 include { MULTIQC                } from '../modules/nf-core/multiqc'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
@@ -42,11 +42,11 @@ include { FILTER_MISSING_PER_PHENO           } from '../subworkflows/local/filte
 include { F_COEFFICIENT_FILTERING            } from '../subworkflows/local/f_coefficient_filtering'
 include { PCA                    } from '../subworkflows/local/pca'
 include { REPORTING              } from '../subworkflows/local/reporting'
-//include { PREPARE                } from '../subworkflows/local/prepare'
+include { PREPARE                } from '../subworkflows/local/prepare'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_rare-var-assoc_pipeline'
-include { PREPARE                } from '../modules/local/combo/prepare'
+//include { PREPARE                } from '../modules/local/combo/prepare'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -92,45 +92,50 @@ workflow RARE_VAR_ASSOC {
     ch_meta = ch_input_vcf.map { t -> t[0] }
 
 
-    VEP_UPDATECACHE (
-        ch_meta.first().combine(ch_vep_cachedir),
-        Channel.value(params.vep_updatecache_species),
-        Channel.value(params.vep_updatecache_options),
-        Channel.value(params.vep_cache_url),
-        Channel.value(tuple(params.ref_fasta_url, params.vep_fasta_path))
-    )
-    ch_vep_cachesubdir = VEP_UPDATECACHE.out.cachesubdir.first()
-    ch_versions = ch_versions.mix(VEP_UPDATECACHE.out.versions.first())
+    if (params.skip_preparation == false) {
+        VEP_UPDATECACHE (
+            ch_meta.first().combine(ch_vep_cachedir),
+            Channel.value(params.vep_updatecache_species),
+            Channel.value(params.vep_updatecache_options),
+            Channel.value(params.vep_cache_url),
+            Channel.value(tuple(params.ref_fasta_url, params.vep_fasta_path))
+        )
+        ch_vep_cachesubdir = VEP_UPDATECACHE.out.cachesubdir.first()
+        ch_versions = ch_versions.mix(VEP_UPDATECACHE.out.versions.first())
+    } else {
+        ch_vep_cachesubdir = Channel.empty()
+    }
 
 
-    //PREPARE (
-    //    ch_input_vcf,
-    //    ch_vep_cachesubdir,
-    //    ch_all_samples
-    //)
-    //ch_all_samples_vcf = PREPARE.out.all_samples_vcf
-    //ch_all_samples_vcf_tbi = PREPARE.out.all_samples_vcf_tbi
-    //ch_versions = ch_versions.mix(PREPARE.out.versions.first())
-    //ch_tracking = PREPARE.out.tracking
-
-    // using 'combo' processes to reduce the number of intermediate files, which was causing big disc space usage for large inputs
-    ch_py_script_fix_zero_pl = Channel.fromPath(params.pyscript_fix_zero_pl_path, checkIfExists: true)
     PREPARE (
-        ch_input_vcf
-            .join(ch_all_samples, by: 0)
-            .combine(ch_vep_cachesubdir)
-            .combine(ch_rename_chr)
-            .combine(ch_py_script_fix_zero_pl)
-            .map { meta, vcf, samples, cachesubdir, rename_chrs, pyscript -> tuple(meta, vcf, samples, cachesubdir, rename_chrs, pyscript, []) },
-        Channel.value(params.bcftools_replace_sample_names_sed_arg),
-        Channel.value(params.fix_zero_pl_min_gq),
-        Channel.value(params.vep_fasta_path),
-        Channel.value("prepare")
+        ch_input_vcf,
+        ch_vep_cachesubdir,
+        ch_all_samples
     )
-    ch_all_samples_vcf = PREPARE.out.vcf
-    ch_all_samples_vcf_tbi = PREPARE.out.tbi
+    ch_all_samples_vcf = PREPARE.out.all_samples_vcf
+    ch_all_samples_vcf_tbi = PREPARE.out.all_samples_vcf_tbi
     ch_versions = ch_versions.mix(PREPARE.out.versions.first())
-    ch_tracking = PREPARE.out.tracking_out
+    ch_tracking = PREPARE.out.tracking
+
+    // update: instead of combos we're using publish_intermediate param to control publishing and we're clearning work cache
+    // using 'combo' processes to reduce the number of intermediate files, which was causing big disc space usage for large inputs
+    //ch_py_script_fix_zero_pl = Channel.fromPath(params.pyscript_fix_zero_pl_path, checkIfExists: true)
+    //PREPARE (
+    //    ch_input_vcf
+    //        .join(ch_all_samples, by: 0)
+    //        .combine(ch_vep_cachesubdir)
+    //        .combine(ch_rename_chr)
+    //        .combine(ch_py_script_fix_zero_pl)
+    //        .map { meta, vcf, samples, cachesubdir, rename_chrs, pyscript -> tuple(meta, vcf, samples, cachesubdir, rename_chrs, pyscript, []) },
+    //    Channel.value(params.bcftools_replace_sample_names_sed_arg),
+    //    Channel.value(params.fix_zero_pl_min_gq),
+    //    Channel.value(params.vep_fasta_path),
+    //    Channel.value("prepare")
+    //)
+    //ch_all_samples_vcf = PREPARE.out.vcf
+    //ch_all_samples_vcf_tbi = PREPARE.out.tbi
+    //ch_versions = ch_versions.mix(PREPARE.out.versions.first())
+    //ch_tracking = PREPARE.out.tracking_out
 
 
     if (params.skip_reporting == 'false') {
@@ -143,66 +148,70 @@ workflow RARE_VAR_ASSOC {
         ch_versions = ch_versions.mix(EXPLORATORY_DATA_ANALYSIS.out.versions.first())
     }
 
-    //BCFTOOLS_FILTER_1 (
+    BCFTOOLS_FILTER_1 (
+        ch_all_samples_vcf.join(ch_all_samples_vcf_tbi, by: 0)
+            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
+            //.combine(PREPARE.out.tracking_out.last()),
+            .combine(PREPARE.out.tracking.last()),
+            //.combine(BCFTOOLS_VIEW_1.out.tracking_out.first()),
+        Channel.value(params.bcftools_filter_1_options),        // input args
+        Channel.value("filter1")
+    )
+    ch_filter_1_vcf  = BCFTOOLS_FILTER_1.out.vcf
+    ch_filter_1_vcf_tbi  = BCFTOOLS_FILTER_1.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_FILTER_1.out.versions.first())
+    ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_1.out.tracking_out.first())
+
+    BCFTOOLS_FILTER_2 (
+        ch_filter_1_vcf.join(ch_filter_1_vcf_tbi, by: 0)
+            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
+            .combine(BCFTOOLS_FILTER_1.out.tracking_out.first()),
+        Channel.value(params.bcftools_filter_2_options),        // input args
+        Channel.value("filter2"),
+    )
+    ch_filter_2_vcf  = BCFTOOLS_FILTER_2.out.vcf
+    ch_filter_2_vcf_tbi  = BCFTOOLS_FILTER_2.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_FILTER_2.out.versions.first())
+    ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_2.out.tracking_out.first())
+
+    // update: instead of combos we're using publish_intermediate param to control publishing and we're clearning work cache
+    // using 'combo' to reduce disc usage
+    //BCFTOOLS_FILTER_2_TIMES (
     //    ch_all_samples_vcf.join(ch_all_samples_vcf_tbi, by: 0)
     //        .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
     //        .combine(PREPARE.out.tracking_out.last()),
     //        //.combine(PREPARE.out.tracking.last()),
     //        //.combine(BCFTOOLS_VIEW_1.out.tracking_out.first()),
     //    Channel.value(params.bcftools_filter_1_options),        // input args
-    //    Channel.value("filter1")
-    //)
-    //ch_filter_1_vcf  = BCFTOOLS_FILTER_1.out.vcf
-    //ch_filter_1_vcf_tbi  = BCFTOOLS_FILTER_1.out.tbi
-    //ch_versions = ch_versions.mix(BCFTOOLS_FILTER_1.out.versions.first())
-    //ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_1.out.tracking_out.first())
-
-    //BCFTOOLS_FILTER_2 (
-    //    ch_filter_1_vcf.join(ch_filter_1_vcf_tbi, by: 0)
-    //        .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
-    //        .combine(BCFTOOLS_FILTER_1.out.tracking_out.first()),
     //    Channel.value(params.bcftools_filter_2_options),        // input args
-    //    Channel.value("filter2"),
+    //    Channel.value("filter_1_and_2")
     //)
-    //ch_filter_2_vcf  = BCFTOOLS_FILTER_2.out.vcf
-    //ch_filter_2_vcf_tbi  = BCFTOOLS_FILTER_2.out.tbi
-    //ch_versions = ch_versions.mix(BCFTOOLS_FILTER_2.out.versions.first())
-    //ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_2.out.tracking_out.first())
+    //ch_filter_2_vcf  = BCFTOOLS_FILTER_2_TIMES.out.vcf
+    //ch_filter_2_vcf_tbi  = BCFTOOLS_FILTER_2_TIMES.out.tbi
+    //ch_versions = ch_versions.mix(BCFTOOLS_FILTER_2_TIMES.out.versions.first())
+    //ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_2_TIMES.out.tracking_out.first())
 
-    // using 'combo' to reduce disc usage
-    BCFTOOLS_FILTER_2_TIMES (
-        ch_all_samples_vcf.join(ch_all_samples_vcf_tbi, by: 0)
-            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
-            .combine(PREPARE.out.tracking_out.last()),
-            //.combine(PREPARE.out.tracking.last()),
-            //.combine(BCFTOOLS_VIEW_1.out.tracking_out.first()),
-        Channel.value(params.bcftools_filter_1_options),        // input args
-        Channel.value(params.bcftools_filter_2_options),        // input args
-        Channel.value("filter_1_and_2")
-    )
-    ch_filter_2_vcf  = BCFTOOLS_FILTER_2_TIMES.out.vcf
-    ch_filter_2_vcf_tbi  = BCFTOOLS_FILTER_2_TIMES.out.tbi
-    ch_versions = ch_versions.mix(BCFTOOLS_FILTER_2_TIMES.out.versions.first())
-    ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_2_TIMES.out.tracking_out.first())
+    if (params.skip_preparation == false) {
+        VEP_ANNOTATE (
+            ch_filter_2_vcf.join(ch_filter_2_vcf_tbi, by: 0)
+                .combine(ch_vep_cachesubdir),
+            Channel.value(params.vep_annotate_species),
+            Channel.value(params.vep_fasta_path),
+            Channel.value(params.vep_annotate_options)
+        )
+        ch_vep_vcf  = VEP_ANNOTATE.out.vcf
+        ch_versions = ch_versions.mix(VEP_ANNOTATE.out.versions.first())
 
-    VEP_ANNOTATE (
-        ch_filter_2_vcf.join(ch_filter_2_vcf_tbi, by: 0)
-            .combine(ch_vep_cachesubdir),
-        Channel.value(params.vep_annotate_species),
-        Channel.value(params.vep_fasta_path),
-        Channel.value(params.vep_annotate_options)
-    )
-    ch_vep_vcf  = VEP_ANNOTATE.out.vcf
-    ch_versions = ch_versions.mix(VEP_ANNOTATE.out.versions.first())
+        BCFTOOLS_INDEX_3 (
+            ch_vep_vcf
+        )
+        ch_vep_vcf_tbi = BCFTOOLS_INDEX_3.out.tbi
+        ch_versions = ch_versions.mix(BCFTOOLS_INDEX_3.out.versions.first())
 
-
-    BCFTOOLS_INDEX_3 (
-        ch_vep_vcf
-    )
-    ch_vep_vcf_tbi = BCFTOOLS_INDEX_3.out.tbi
-    ch_versions = ch_versions.mix(BCFTOOLS_INDEX_3.out.versions.first())
-
-    ch_vep_vcf_with_index = ch_vep_vcf.join(ch_vep_vcf_tbi, by: 0)
+        ch_vep_vcf_with_index = ch_vep_vcf.join(ch_vep_vcf_tbi, by: 0)
+    } else {
+        ch_vep_vcf_with_index = ch_filter_2_vcf.join(ch_filter_2_vcf_tbi, by: 0)
+    }
 
 
     BCFTOOLS_VCF2FRQ (
@@ -235,8 +244,8 @@ workflow RARE_VAR_ASSOC {
         ch_vep_vcf_with_index
             .join(ch_unk_sex_psam, by: 0)
             .map { meta, vcf_file, tbi_file, unk_sex_psam_file -> tuple(meta, [], [], unk_sex_psam_file, vcf_file, tbi_file, [], [], []) }
-            //.combine(BCFTOOLS_FILTER_2.out.tracking_out.first()),
-            .combine(BCFTOOLS_FILTER_2_TIMES.out.tracking_out.first()),
+            .combine(BCFTOOLS_FILTER_2.out.tracking_out.first()),
+            //.combine(BCFTOOLS_FILTER_2_TIMES.out.tracking_out.first()),
         Channel.value(''),
         Channel.value(''),
         Channel.value(params.plink2_makepgen_1_vcf_input_options),

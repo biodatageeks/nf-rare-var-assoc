@@ -86,15 +86,19 @@ process PREPARE {
         vcf_norm.vcf.gz
     
 
-    echo "FIX_ZERO_PL"
-    date
-    echo ""
+    if [[ "${params.use_dosage}" = true\$ ]]; then
+        echo "FIX_ZERO_PL"
+        date
+        echo ""
 
-    python3 ${fix_zero_pl_script_path} \\
-        --input-vcf-path vcf_annotate.vcf.gz \\
-        --output-vcf-path vcf_fixed_zero_pl.vcf.gz \\
-        --min-gq ${min_gq} \\
-        --threads-num $task.cpus
+        python3 ${fix_zero_pl_script_path} \\
+            --input-vcf-path vcf_annotate.vcf.gz \\
+            --output-vcf-path vcf_fixed_zero_pl.vcf.gz \\
+            --min-gq ${min_gq} \\
+            --threads-num $task.cpus
+    else
+        cp vcf_annotate.vcf.gz vcf_fixed_zero_pl.vcf.gz
+    fi
     
 
     echo "BCFTOOLS_INDEX"
