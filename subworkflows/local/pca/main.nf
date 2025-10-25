@@ -100,12 +100,16 @@ workflow PCA {
     ch_versions = ch_versions.mix(PLINK2_PROJECTION_SCORE.out.versions.first())
     ch_tracking = ch_tracking.mix(PLINK2_PROJECTION_SCORE.out.tracking_out.first())
 
-    DRAW_PC_PLOT (
-        ch_sscore.join(ch_pheno, by: 0),
-        Channel.value('pc_plot')
-    )
-    ch_plot_file = DRAW_PC_PLOT.out.plot_file
-    ch_versions = ch_versions.mix(DRAW_PC_PLOT.out.versions.first())
+    if (params.skip_reporting == 'false') {
+        DRAW_PC_PLOT (
+            ch_sscore.join(ch_pheno, by: 0),
+            Channel.value('pc_plot')
+        )
+        ch_plot_file = DRAW_PC_PLOT.out.plot_file
+        ch_versions = ch_versions.mix(DRAW_PC_PLOT.out.versions.first())
+    } else {
+        ch_plot_file = Channel.empty()
+    }
 
     workflow.onError {
         log.error "Pipeline failed. Please refer to troubleshooting docs: https://nf-co.re/docs/usage/troubleshooting"

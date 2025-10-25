@@ -88,24 +88,18 @@ workflow RARE_VAR_ASSOC {
     ch_vep_cachedir = Channel.fromPath(vep_cachedir, checkIfExists: true)
     ch_masks = Channel.fromPath(params.input_masks, checkIfExists: true)
     ch_hild = Channel.fromPath(params.hild_path, checkIfExists: true)
-    ch_rename_chr = Channel.fromPath("${projectDir}/assets/rename_chr.txt", checkIfExists: true)
     ch_meta = ch_input_vcf.map { t -> t[0] }
 
 
-    if (params.skip_preparation == false) {
-        VEP_UPDATECACHE (
-            ch_meta.first().combine(ch_vep_cachedir),
-            Channel.value(params.vep_updatecache_species),
-            Channel.value(params.vep_updatecache_options),
-            Channel.value(params.vep_cache_url),
-            Channel.value(tuple(params.ref_fasta_url, params.vep_fasta_path))
-        )
-        ch_vep_cachesubdir = VEP_UPDATECACHE.out.cachesubdir.first()
-        ch_versions = ch_versions.mix(VEP_UPDATECACHE.out.versions.first())
-    } else {
-        ch_vep_cachesubdir = Channel.empty()
-    }
-
+    VEP_UPDATECACHE (
+        ch_meta.first().combine(ch_vep_cachedir),
+        Channel.value(params.vep_updatecache_species),
+        Channel.value(params.vep_updatecache_options),
+        Channel.value(params.vep_cache_url),
+        Channel.value(tuple(params.ref_fasta_url, params.vep_fasta_path))
+    )
+    ch_vep_cachesubdir = VEP_UPDATECACHE.out.cachesubdir.first()
+    ch_versions = ch_versions.mix(VEP_UPDATECACHE.out.versions.first())
 
     PREPARE (
         ch_input_vcf,
@@ -116,27 +110,6 @@ workflow RARE_VAR_ASSOC {
     ch_all_samples_vcf_tbi = PREPARE.out.all_samples_vcf_tbi
     ch_versions = ch_versions.mix(PREPARE.out.versions.first())
     ch_tracking = PREPARE.out.tracking
-
-    // update: instead of combos we're using publish_intermediate param to control publishing and we're clearning work cache
-    // using 'combo' processes to reduce the number of intermediate files, which was causing big disc space usage for large inputs
-    //ch_py_script_fix_zero_pl = Channel.fromPath(params.pyscript_fix_zero_pl_path, checkIfExists: true)
-    //PREPARE (
-    //    ch_input_vcf
-    //        .join(ch_all_samples, by: 0)
-    //        .combine(ch_vep_cachesubdir)
-    //        .combine(ch_rename_chr)
-    //        .combine(ch_py_script_fix_zero_pl)
-    //        .map { meta, vcf, samples, cachesubdir, rename_chrs, pyscript -> tuple(meta, vcf, samples, cachesubdir, rename_chrs, pyscript, []) },
-    //    Channel.value(params.bcftools_replace_sample_names_sed_arg),
-    //    Channel.value(params.fix_zero_pl_min_gq),
-    //    Channel.value(params.vep_fasta_path),
-    //    Channel.value("prepare")
-    //)
-    //ch_all_samples_vcf = PREPARE.out.vcf
-    //ch_all_samples_vcf_tbi = PREPARE.out.tbi
-    //ch_versions = ch_versions.mix(PREPARE.out.versions.first())
-    //ch_tracking = PREPARE.out.tracking_out
-
 
     if (params.skip_reporting == 'false') {
         EXPLORATORY_DATA_ANALYSIS (
@@ -149,12 +122,11 @@ workflow RARE_VAR_ASSOC {
     }
 
     BCFTOOLS_FILTER_1 (
-        ch_all_samples_vcf.join(ch_all_samples_vcf_tbi, by: 0)
+        ch_all_samples_vcf
+            .join(ch_all_samples_vcf_tbi, by: 0)
             .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
-            //.combine(PREPARE.out.tracking_out.last()),
             .combine(PREPARE.out.tracking.last()),
-            //.combine(BCFTOOLS_VIEW_1.out.tracking_out.first()),
-        Channel.value(params.bcftools_filter_1_options),        // input args
+        Channel.value(params.bcftools_filter_1_options),
         Channel.value("filter1")
     )
     ch_filter_1_vcf  = BCFTOOLS_FILTER_1.out.vcf
@@ -163,10 +135,11 @@ workflow RARE_VAR_ASSOC {
     ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_1.out.tracking_out.first())
 
     BCFTOOLS_FILTER_2 (
-        ch_filter_1_vcf.join(ch_filter_1_vcf_tbi, by: 0)
+        ch_filter_1_vcf
+            .join(ch_filter_1_vcf_tbi, by: 0)
             .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
             .combine(BCFTOOLS_FILTER_1.out.tracking_out.first()),
-        Channel.value(params.bcftools_filter_2_options),        // input args
+        Channel.value(params.bcftools_filter_2_options),
         Channel.value("filter2"),
     )
     ch_filter_2_vcf  = BCFTOOLS_FILTER_2.out.vcf
@@ -174,26 +147,10 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(BCFTOOLS_FILTER_2.out.versions.first())
     ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_2.out.tracking_out.first())
 
-    // update: instead of combos we're using publish_intermediate param to control publishing and we're clearning work cache
-    // using 'combo' to reduce disc usage
-    //BCFTOOLS_FILTER_2_TIMES (
-    //    ch_all_samples_vcf.join(ch_all_samples_vcf_tbi, by: 0)
-    //        .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
-    //        .combine(PREPARE.out.tracking_out.last()),
-    //        //.combine(PREPARE.out.tracking.last()),
-    //        //.combine(BCFTOOLS_VIEW_1.out.tracking_out.first()),
-    //    Channel.value(params.bcftools_filter_1_options),        // input args
-    //    Channel.value(params.bcftools_filter_2_options),        // input args
-    //    Channel.value("filter_1_and_2")
-    //)
-    //ch_filter_2_vcf  = BCFTOOLS_FILTER_2_TIMES.out.vcf
-    //ch_filter_2_vcf_tbi  = BCFTOOLS_FILTER_2_TIMES.out.tbi
-    //ch_versions = ch_versions.mix(BCFTOOLS_FILTER_2_TIMES.out.versions.first())
-    //ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_2_TIMES.out.tracking_out.first())
-
     if (params.skip_preparation == false) {
         VEP_ANNOTATE (
-            ch_filter_2_vcf.join(ch_filter_2_vcf_tbi, by: 0)
+            ch_filter_2_vcf
+                .join(ch_filter_2_vcf_tbi, by: 0)
                 .combine(ch_vep_cachesubdir),
             Channel.value(params.vep_annotate_species),
             Channel.value(params.vep_fasta_path),
@@ -220,20 +177,6 @@ workflow RARE_VAR_ASSOC {
     ch_frq = BCFTOOLS_VCF2FRQ.out.frq
     ch_versions = ch_versions.mix(BCFTOOLS_VCF2FRQ.out.versions.first())
 
-    // tag2tag plugin returns invalid results when run for PL -> GP. Acording to VCF v4.1 specification GP should be a Phred-scaled value, but tag2tag writes just bare float proabilities
-    //BCFTOOLS_TAG2TAG (
-    //    ch_vep_vcf_with_index,
-    //    Channel.value(params.bcftools_tag2tag_tag_from),
-    //    Channel.value(params.bcftools_tag2tag_tag_to)
-    //)
-    //ch_vcf_with_dosage_tag = BCFTOOLS_TAG2TAG.out.vcf
-    //ch_vcf_with_dosage_tag_tbi = BCFTOOLS_TAG2TAG.out.tbi
-    //ch_versions = ch_versions.mix(BCFTOOLS_TAG2TAG.out.versions.first())
-    //
-    //ch_vcf_with_dosage_tag_with_index = ch_vcf_with_dosage_tag
-    //    .join(ch_vcf_with_dosage_tag_tbi, by: 0)
-    //    .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file) }
-
     BCFTOOLS_VCF2PSAM (
         ch_vep_vcf_with_index
     )
@@ -245,7 +188,6 @@ workflow RARE_VAR_ASSOC {
             .join(ch_unk_sex_psam, by: 0)
             .map { meta, vcf_file, tbi_file, unk_sex_psam_file -> tuple(meta, [], [], unk_sex_psam_file, vcf_file, tbi_file, [], [], []) }
             .combine(BCFTOOLS_FILTER_2.out.tracking_out.first()),
-            //.combine(BCFTOOLS_FILTER_2_TIMES.out.tracking_out.first()),
         Channel.value(''),
         Channel.value(''),
         Channel.value(params.plink2_makepgen_1_vcf_input_options),

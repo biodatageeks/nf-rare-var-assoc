@@ -15,11 +15,11 @@ process BCFTOOLS_FILTER {
     val(out_name_part)
 
     output:
-    tuple val(meta), path("*.{vcf,vcf.gz,bcf,bcf.gz}"), emit: vcf
-    tuple val(meta), path("*.tbi")                    , emit: tbi, optional: true
-    tuple val(meta), path("*.csi")                    , emit: csi, optional: true
+    tuple val(meta), path("*_${out_name_part}.{vcf,vcf.gz,bcf,bcf.gz}"),     emit: vcf
+    tuple val(meta), path("*_${out_name_part}.{vcf,vcf.gz,bcf,bcf.gz}.tbi"), emit: tbi, optional: true
+    tuple val(meta), path("*_${out_name_part}.{vcf,vcf.gz,bcf,bcf.gz}.csi"), emit: csi, optional: true
     path "versions.yml"                               , emit: versions
-    path "*_${out_name_part}_tracking.json"                            , emit: tracking_out
+    path "*_${out_name_part}_tracking.json"           , emit: tracking_out
 
     when:
     task.ext.when == null || task.ext.when
