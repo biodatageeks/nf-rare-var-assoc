@@ -27,6 +27,8 @@ process REGENIE_STEP2 {
     def covar_file_corr_format = covar_file + "_correct_format.txt"
     def covar_file_input = covar_file ? "--covarFile " + covar_file_corr_format : ""
     """
+    echo 'task.cpus:${task.cpus}'
+    
     if [ -n "${covar_file}" ]; then
         sed '1s/^#//' ${covar_file} > ${covar_file_corr_format}
     fi
