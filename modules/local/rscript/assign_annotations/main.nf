@@ -1,6 +1,7 @@
 process RSCRIPT_ASSIGN_ANNOTATIONS {
     tag "$meta.id"
     label 'process_medium'
+    label 'low_res_high_mem'
 
     conda "${moduleDir}/environment.yml"
     container 'docker.io/psuszynski/r-ver:4.4.2.9'
@@ -24,6 +25,8 @@ process RSCRIPT_ASSIGN_ANNOTATIONS {
     //    --sample-path ${sample} \\
     //    --out-sample-path ${prefix}_r_out.sample \\
     """
+    echo 'task.cpus:${task.cpus}'
+    
     Rscript \\
         ${r_script_ch} \\
         --vcf-path ${vcf} \\
