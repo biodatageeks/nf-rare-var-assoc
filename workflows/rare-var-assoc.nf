@@ -115,7 +115,8 @@ workflow RARE_VAR_ASSOC {
         EXPLORATORY_DATA_ANALYSIS (
             ch_all_samples_vcf
                 .join(ch_all_samples_vcf_tbi, by: 0)
-                .join(ch_phenotype, by: 0)
+                .join(ch_phenotype, by: 0),
+            Channel.value(params.use_dosage)
         )
         ch_eda_plots = EXPLORATORY_DATA_ANALYSIS.out.plots
         ch_versions = ch_versions.mix(EXPLORATORY_DATA_ANALYSIS.out.versions.first())

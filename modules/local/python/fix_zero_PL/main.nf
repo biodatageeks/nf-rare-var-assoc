@@ -4,7 +4,7 @@ process FIX_ZERO_PL {
     label 'process_single'
 
     conda "${moduleDir}/environment.yml"
-    container 'docker.io/psuszynski/bioinf_combo:1.1.0'
+    container 'docker.io/psuszynski/bioinf_combo:1.1.1'
 
     input:
     tuple val(meta), path(vcf_file)

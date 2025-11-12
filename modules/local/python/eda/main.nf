@@ -8,6 +8,7 @@ process EXPLORATORY_DATA_ANALYSIS {
 
     input:
     tuple val(meta), path(vcf), path(tbi), path(phenotype_file)
+    val(use_dosage)
     
     output:
     tuple val(meta), path("plots/*.png"), emit: plots
@@ -477,8 +478,8 @@ def plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1, stat2):
             plt.close()
 
 # Main execution
-def main(vcf_file, phenotype_file, percentiles):
-    print(f"main()  ts = {current_milli_time()}", flush=True)
+def main(vcf_file, phenotype_file, percentiles, use_dosage):
+    print(f"main()  percentiles = {percentiles}  use_dosage = {use_dosage}  ts = {current_milli_time()}", flush=True)
 
     vcf_df, samples = load_vcf(vcf_file)
     pheno_df = load_phenotype(phenotype_file)
@@ -489,8 +490,9 @@ def main(vcf_file, phenotype_file, percentiles):
     plot_variant_stats(vcf_df, pheno_df, samples, 'GQ', percentiles=percentiles, stat_label='Genotype Quality')
     plot_sample_stats(vcf_df, pheno_df, samples, 'GQ', stat_label='Genotype Quality')
     
-    plot_variant_stats(vcf_df, pheno_df, samples, 'DS', percentiles=percentiles, stat_label='Genotype Dosage', include_log_scale=False)
-    plot_sample_stats(vcf_df, pheno_df, samples, 'DS', stat_label='Genotype Dosage')
+    if use_dosage:
+        plot_variant_stats(vcf_df, pheno_df, samples, 'DS', percentiles=percentiles, stat_label='Genotype Dosage', include_log_scale=False)
+        plot_sample_stats(vcf_df, pheno_df, samples, 'DS', stat_label='Genotype Dosage')
 
     plot_missingness(vcf_df, pheno_df, samples)
     
@@ -502,18 +504,20 @@ def main(vcf_file, phenotype_file, percentiles):
     
     plot_boxplots(vcf_df, pheno_df, samples, 'DP', 'Depth of Coverage')
     plot_boxplots(vcf_df, pheno_df, samples, 'GQ', 'Genotype Quality')
-    plot_boxplots(vcf_df, pheno_df, samples, 'DS', 'Genotype Dosage')
+    if use_dosage:
+        plot_boxplots(vcf_df, pheno_df, samples, 'DS', 'Genotype Dosage')
 
-    plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1='GQ', stat2='DS')
-    plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1='DP', stat2='DS')
-    plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1='GQ', stat2='DP')
-    plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1='GT', stat2='DS')
+        plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1='GQ', stat2='DS')
+        plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1='DP', stat2='DS')
+        plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1='GQ', stat2='DP')
+        plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1='GT', stat2='DS')
 
 # Run the analysis
 vcf_file = "${vcf}"
 phenotype_file = "${phenotype_file}"
 percentiles = [1, 50]
-main(vcf_file, phenotype_file, percentiles)
+use_dosage = "${use_dosage}" == "true"
+main(vcf_file, phenotype_file, percentiles, use_dosage)
 
 
 # Write versions.yml

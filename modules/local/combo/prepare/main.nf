@@ -3,7 +3,7 @@ process PREPARE {
     tag "$meta.id"
     label 'process_single'
 
-    container 'docker.io/psuszynski/bioinf_combo:1.0.0'
+    container 'docker.io/psuszynski/bioinf_combo:1.1.1'
 
     input:
     tuple val(meta), path(vcf_in), path(samples), path(cachesubdir), path(rename_chrs), path(fix_zero_pl_script_path), path(tracking_in)

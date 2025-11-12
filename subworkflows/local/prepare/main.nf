@@ -53,20 +53,11 @@ workflow PREPARE {
     ch_tracking = BCFTOOLS_VIEW_1.out.tracking_out
 
     if (params.skip_preparation == false) {
-        BCFTOOLS_ANNOTATE (
+        // NORM must be before ANNOTATE (where we assign variant ids) because we must first split multiallelic sites before assigning variant ids.
+        // Otherwise we'll end up with duplicated ids with a comma within them and this will cause subsequent plink write-snplist steps to fail
+        BCFTOOLS_NORM (
             ch_all_samples_vcf
                 .join(ch_all_samples_vcf_tbi, by: 0)
-                .combine(ch_rename_chr)
-                .map { meta, vcf_file, tbi_file, rename_chr -> tuple(meta, vcf_file, tbi_file, [], [], [], rename_chr) },
-            Channel.value("rename_chr")
-        )
-        ch_annotated_vcf = BCFTOOLS_ANNOTATE.out.vcf
-        ch_annotated_vcf_tbi = BCFTOOLS_ANNOTATE.out.tbi
-        ch_versions = ch_versions.mix(BCFTOOLS_ANNOTATE.out.versions.first())
-
-        BCFTOOLS_NORM (
-            ch_annotated_vcf
-                .join(ch_annotated_vcf_tbi, by: 0)
                 .combine(ch_vep_cachesubdir.map { t -> "${t}/${params.vep_fasta_path}" })
                 .combine(BCFTOOLS_VIEW_1.out.tracking_out.first()),
             Channel.value("norm")
@@ -75,14 +66,26 @@ workflow PREPARE {
         ch_normalized_vcf_tbi = BCFTOOLS_NORM.out.tbi
         ch_versions = ch_versions.mix(BCFTOOLS_NORM.out.versions.first())
         ch_tracking = ch_tracking.mix(BCFTOOLS_NORM.out.tracking_out.first())
+
+        BCFTOOLS_ANNOTATE (
+            ch_normalized_vcf
+                .join(ch_normalized_vcf_tbi, by: 0)
+                .combine(ch_rename_chr)
+                .map { meta, vcf_file, tbi_file, rename_chr -> tuple(meta, vcf_file, tbi_file, [], [], [], rename_chr) },
+            Channel.value("rename_chr")
+        )
+        ch_annotated_vcf = BCFTOOLS_ANNOTATE.out.vcf
+        ch_annotated_vcf_tbi = BCFTOOLS_ANNOTATE.out.tbi
+        ch_versions = ch_versions.mix(BCFTOOLS_ANNOTATE.out.versions.first())
+
     } else {
-        ch_normalized_vcf = ch_all_samples_vcf
-        ch_normalized_vcf_tbi = ch_all_samples_vcf_tbi
+        ch_annotated_vcf = ch_all_samples_vcf
+        ch_annotated_vcf_tbi = ch_all_samples_vcf_tbi
     }
 
     if (params.use_dosage == 'true') {
         FIX_ZERO_PL (
-            ch_normalized_vcf,
+            ch_annotated_vcf,
             Channel.value(params.fix_zero_pl_min_gq),
             Channel.value('calc_dosage')
         )
@@ -95,8 +98,8 @@ workflow PREPARE {
         ch_vcf_with_pl_corrected_tbi = BCFTOOLS_INDEX_2.out.tbi
         ch_versions = ch_versions.mix(BCFTOOLS_INDEX_2.out.versions.first())
     } else {
-        ch_vcf_with_pl_corrected = ch_normalized_vcf
-        ch_vcf_with_pl_corrected_tbi = ch_normalized_vcf_tbi
+        ch_vcf_with_pl_corrected = ch_annotated_vcf
+        ch_vcf_with_pl_corrected_tbi = ch_annotated_vcf_tbi
     }
 
 
