@@ -32,8 +32,8 @@ include { BCFTOOLS_VCF2PSAM      } from '../modules/local/bcftools/vcf2psam'
 include { BCFTOOLS_VCF2FRQ       } from '../modules/local/bcftools/vcf2frq'
 include { BCFTOOLS_TAG2TAG       } from '../modules/local/bcftools/tag2tag'
 include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_2   } from '../modules/local/bcftools/view'
-include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_1   } from '../modules/local/bcftools/filter'
-include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_2   } from '../modules/local/bcftools/filter'
+//include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_1   } from '../modules/local/bcftools/filter'
+//include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_2   } from '../modules/local/bcftools/filter'
 //include { BCFTOOLS_FILTER_2_TIMES } from '../modules/local/combo/filter2'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_3 } from '../modules/local/bcftools/index'
 include { MULTIQC                } from '../modules/nf-core/multiqc'
@@ -106,15 +106,15 @@ workflow RARE_VAR_ASSOC {
         ch_vep_cachesubdir,
         ch_all_samples
     )
-    ch_all_samples_vcf = PREPARE.out.all_samples_vcf
-    ch_all_samples_vcf_tbi = PREPARE.out.all_samples_vcf_tbi
+    ch_prepared_vcf = PREPARE.out.prepared_vcf
+    ch_prepared_vcf_tbi = PREPARE.out.prepared_vcf_tbi
     ch_versions = ch_versions.mix(PREPARE.out.versions.first())
     ch_tracking = PREPARE.out.tracking
 
     if (params.skip_reporting == 'false') {
         EXPLORATORY_DATA_ANALYSIS (
-            ch_all_samples_vcf
-                .join(ch_all_samples_vcf_tbi, by: 0)
+            ch_prepared_vcf
+                .join(ch_prepared_vcf_tbi, by: 0)
                 .join(ch_phenotype, by: 0),
             Channel.value(params.use_dosage)
         )
@@ -122,7 +122,7 @@ workflow RARE_VAR_ASSOC {
         ch_versions = ch_versions.mix(EXPLORATORY_DATA_ANALYSIS.out.versions.first())
     }
 
-    BCFTOOLS_FILTER_1 (
+    /*BCFTOOLS_FILTER_1 (
         ch_all_samples_vcf
             .join(ch_all_samples_vcf_tbi, by: 0)
             .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
@@ -146,12 +146,14 @@ workflow RARE_VAR_ASSOC {
     ch_filter_2_vcf  = BCFTOOLS_FILTER_2.out.vcf
     ch_filter_2_vcf_tbi  = BCFTOOLS_FILTER_2.out.tbi
     ch_versions = ch_versions.mix(BCFTOOLS_FILTER_2.out.versions.first())
-    ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_2.out.tracking_out.first())
+    ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_2.out.tracking_out.first())*/
 
     if (params.skip_preparation == false) {
         VEP_ANNOTATE (
-            ch_filter_2_vcf
-                .join(ch_filter_2_vcf_tbi, by: 0)
+            //ch_filter_2_vcf
+            //    .join(ch_filter_2_vcf_tbi, by: 0)
+            ch_prepared_vcf
+                .join(ch_prepared_vcf_tbi, by: 0)
                 .combine(ch_vep_cachesubdir),
             Channel.value(params.vep_annotate_species),
             Channel.value(params.vep_fasta_path),
@@ -168,7 +170,8 @@ workflow RARE_VAR_ASSOC {
 
         ch_vep_vcf_with_index = ch_vep_vcf.join(ch_vep_vcf_tbi, by: 0)
     } else {
-        ch_vep_vcf_with_index = ch_filter_2_vcf.join(ch_filter_2_vcf_tbi, by: 0)
+        //ch_vep_vcf_with_index = ch_filter_2_vcf.join(ch_filter_2_vcf_tbi, by: 0)
+        ch_vep_vcf_with_index = ch_prepared_vcf.join(ch_prepared_vcf_tbi, by: 0)
     }
 
 
@@ -187,8 +190,8 @@ workflow RARE_VAR_ASSOC {
     PLINK2_MAKEPGEN_1 (
         ch_vep_vcf_with_index
             .join(ch_unk_sex_psam, by: 0)
-            .map { meta, vcf_file, tbi_file, unk_sex_psam_file -> tuple(meta, [], [], unk_sex_psam_file, vcf_file, tbi_file, [], [], []) }
-            .combine(BCFTOOLS_FILTER_2.out.tracking_out.first()),
+            .map { meta, vcf_file, tbi_file, unk_sex_psam_file -> tuple(meta, [], [], unk_sex_psam_file, vcf_file, tbi_file, [], [], [],   []) },  // TODO add tracking generation to FILTER_AND_ENHANCE_VCF and use here the tracking out of PREPARE
+            //.combine(BCFTOOLS_FILTER_2.out.tracking_out.first()),
         Channel.value(''),
         Channel.value(''),
         Channel.value(params.plink2_makepgen_1_vcf_input_options),

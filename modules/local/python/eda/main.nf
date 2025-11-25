@@ -435,47 +435,49 @@ def plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1, stat2):
     stat1_values = vcf_df.select(stat1_cols).to_numpy().ravel()
     stat2_values = vcf_df.select(stat2_cols).to_numpy().ravel()
 
-    stat1_bins = np.arange(0, max(stat1_values) + 1, 1)
-    stat2_bins = np.linspace(0, 2, 201)
+    print(f"min(stat1_values) = {min(stat1_values)}  max(stat1_values) = {max(stat1_values)}")
+    if max(stat1_values) > 0:
+        stat1_bins = np.arange(0, max(stat1_values) + 1, 1)
+        stat2_bins = np.linspace(0, 2, 201)
 
-    # Create 2D histogram for heatmap
-    heatmap, xedges, yedges = np.histogram2d(stat1_values, stat2_values, bins=[stat1_bins, stat2_bins])
+        # Create 2D histogram for heatmap
+        heatmap, xedges, yedges = np.histogram2d(stat1_values, stat2_values, bins=[stat1_bins, stat2_bins])
 
-    plt.figure(figsize=(12, 10))
-    sns.heatmap(heatmap.T, cmap='viridis', norm='log', cbar_kws={'label': 'Count (log scale)'})
-    plt.xlabel(f'{stat1}')
-    plt.ylabel(f'{stat2}')
-    plt.title(f'Heatmap of {stat2} distribution per {stat1}')
-    plt.tight_layout()
-    plt.savefig(f'{output_dir}/17_{stat2}_vs_{stat1}.png')
-    plt.savefig(f'{output_dir}/17_{stat2}_vs_{stat1}.svg', format="svg")
-    plt.close()
+        plt.figure(figsize=(12, 10))
+        sns.heatmap(heatmap.T, cmap='viridis', norm='log', cbar_kws={'label': 'Count (log scale)'})
+        plt.xlabel(f'{stat1}')
+        plt.ylabel(f'{stat2}')
+        plt.title(f'Heatmap of {stat2} distribution per {stat1}')
+        plt.tight_layout()
+        plt.savefig(f'{output_dir}/17_{stat2}_vs_{stat1}.png')
+        plt.savefig(f'{output_dir}/17_{stat2}_vs_{stat1}.svg', format="svg")
+        plt.close()
 
-    if len(phenotypes) <= 5:
-        for pheno in phenotypes:
-            pheno_samples = pheno_df.filter(pl.col('Y1') == pheno)['IID'].to_list()
+        if len(phenotypes) <= 5:
+            for pheno in phenotypes:
+                pheno_samples = pheno_df.filter(pl.col('Y1') == pheno)['IID'].to_list()
 
-            stat1_cols = [f'{stat1}_{sample}' for sample in pheno_samples if f'{stat1}_{sample}' in vcf_df]
-            stat2_cols = [f'{stat2}_{sample}' for sample in pheno_samples if f'{stat2}_{sample}' in vcf_df]
-            stat1_values = vcf_df.select(stat1_cols).to_numpy().ravel()
-            stat2_values = vcf_df.select(stat2_cols).to_numpy().ravel()
+                stat1_cols = [f'{stat1}_{sample}' for sample in pheno_samples if f'{stat1}_{sample}' in vcf_df]
+                stat2_cols = [f'{stat2}_{sample}' for sample in pheno_samples if f'{stat2}_{sample}' in vcf_df]
+                stat1_values = vcf_df.select(stat1_cols).to_numpy().ravel()
+                stat2_values = vcf_df.select(stat2_cols).to_numpy().ravel()
 
-            print(f"max(stat1_values) = {np.nanmax(stat1_values)}  max(stat2_values) = {np.nanmax(stat2_values)}")
-            stat1_bins = np.arange(0, np.nanmax(stat1_values) + 1, 1)
-            stat2_bins = np.linspace(0, np.nanmax(stat2_values), 201)
+                print(f"max(stat1_values) = {np.nanmax(stat1_values)}  max(stat2_values) = {np.nanmax(stat2_values)}")
+                stat1_bins = np.arange(0, np.nanmax(stat1_values) + 1, 1)
+                stat2_bins = np.linspace(0, np.nanmax(stat2_values), 201)
 
-            # Create 2D histogram for heatmap
-            heatmap, xedges, yedges = np.histogram2d(stat1_values, stat2_values, bins=[stat1_bins, stat2_bins])
+                # Create 2D histogram for heatmap
+                heatmap, xedges, yedges = np.histogram2d(stat1_values, stat2_values, bins=[stat1_bins, stat2_bins])
 
-            plt.figure(figsize=(12, 10))
-            sns.heatmap(heatmap.T, cmap='viridis', norm='log', cbar_kws={'label': 'Count (log scale)'})
-            plt.xlabel(f'{stat1}')
-            plt.ylabel(f'{stat2}')
-            plt.title(f'Heatmap of {stat2} distribution per {stat1} by Phenotype {pheno}')
-            plt.tight_layout()
-            plt.savefig(f'{output_dir}/17_{stat2}_vs_{stat1}_by_phenotype_{pheno}.png')
-            plt.savefig(f'{output_dir}/17_{stat2}_vs_{stat1}_by_phenotype_{pheno}.svg', format="svg")
-            plt.close()
+                plt.figure(figsize=(12, 10))
+                sns.heatmap(heatmap.T, cmap='viridis', norm='log', cbar_kws={'label': 'Count (log scale)'})
+                plt.xlabel(f'{stat1}')
+                plt.ylabel(f'{stat2}')
+                plt.title(f'Heatmap of {stat2} distribution per {stat1} by Phenotype {pheno}')
+                plt.tight_layout()
+                plt.savefig(f'{output_dir}/17_{stat2}_vs_{stat1}_by_phenotype_{pheno}.png')
+                plt.savefig(f'{output_dir}/17_{stat2}_vs_{stat1}_by_phenotype_{pheno}.svg', format="svg")
+                plt.close()
 
 # Main execution
 def main(vcf_file, phenotype_file, percentiles, use_dosage):

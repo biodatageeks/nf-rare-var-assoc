@@ -8,7 +8,8 @@ include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_1 } from '../../../modules/local/bcft
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_2 } from '../../../modules/local/bcftools/index'
 include { BCFTOOLS_NORM          } from '../../../modules/local/bcftools/norm'
 include { BCFTOOLS_ANNOTATE      } from '../../../modules/local/bcftools/annotate'
-include { FIX_ZERO_PL            } from '../../../modules/local/python/fix_zero_PL'
+//include { FIX_ZERO_PL            } from '../../../modules/local/python/fix_zero_PL'
+include { FILTER_AND_ENHANCE_VCF } from '../../../modules/local/combo/filter_and_enhance_vcf'
 
 workflow PREPARE {
 
@@ -36,7 +37,6 @@ workflow PREPARE {
     ch_vcf_with_sample_names_corrected_tbi = BCFTOOLS_INDEX_1.out.tbi
     ch_versions = ch_versions.mix(BCFTOOLS_INDEX_1.out.versions.first())
 
-
     ch_view_1_input = ch_vcf_with_sample_names_corrected
         .join(ch_vcf_with_sample_names_corrected_tbi, by: 0)
         .join(ch_all_samples, by: 0)
@@ -59,6 +59,7 @@ workflow PREPARE {
             ch_all_samples_vcf
                 .join(ch_all_samples_vcf_tbi, by: 0)
                 .combine(ch_vep_cachesubdir.map { t -> "${t}/${params.vep_fasta_path}" })
+                //.map { meta, vcf_file, tbi_file, fasta_path -> tuple(meta, vcf_file, tbi_file, fasta_path, []) },
                 .combine(BCFTOOLS_VIEW_1.out.tracking_out.first()),
             Channel.value("norm")
         )
@@ -66,6 +67,7 @@ workflow PREPARE {
         ch_normalized_vcf_tbi = BCFTOOLS_NORM.out.tbi
         ch_versions = ch_versions.mix(BCFTOOLS_NORM.out.versions.first())
         ch_tracking = ch_tracking.mix(BCFTOOLS_NORM.out.tracking_out.first())
+        //ch_tracking = BCFTOOLS_NORM.out.tracking_out.first()
 
         BCFTOOLS_ANNOTATE (
             ch_normalized_vcf
@@ -75,15 +77,38 @@ workflow PREPARE {
             Channel.value("rename_chr")
         )
         ch_annotated_vcf = BCFTOOLS_ANNOTATE.out.vcf
-        ch_annotated_vcf_tbi = BCFTOOLS_ANNOTATE.out.tbi
+        //ch_annotated_vcf_tbi = BCFTOOLS_ANNOTATE.out.tbi
         ch_versions = ch_versions.mix(BCFTOOLS_ANNOTATE.out.versions.first())
 
     } else {
-        ch_annotated_vcf = ch_all_samples_vcf
-        ch_annotated_vcf_tbi = ch_all_samples_vcf_tbi
+        ch_annotated_vcf = ch_vcf_with_sample_names_corrected
+        //ch_annotated_vcf_tbi = ch_all_samples_vcf_tbi
+        //ch_tracking = Channel.empty()
     }
 
-    if (params.use_dosage == 'true') {
+    FILTER_AND_ENHANCE_VCF (
+        ch_annotated_vcf.map { meta, vcf_file -> tuple(meta, vcf_file, []) },
+        Channel.value(params.filter_and_enhance_vcf_qual_min),
+        Channel.value(params.filter_and_enhance_vcf_avg_gq_min),
+        Channel.value(params.filter_and_enhance_vcf_avg_dp_min),
+        Channel.value(params.filter_and_enhance_vcf_avg_dp_max),
+        Channel.value(params.filter_and_enhance_vcf_sample_gq_min),
+        Channel.value(params.filter_and_enhance_vcf_sample_dp_min),
+        Channel.value(params.filter_and_enhance_vcf_sample_dp_max),
+        Channel.value(params.filter_and_enhance_vcf_calc_ds_min_gq),
+        Channel.value("filterhance")
+    )
+    ch_filtered_and_enhanced_vcf = FILTER_AND_ENHANCE_VCF.out.vcf
+    ch_versions = ch_versions.mix(FILTER_AND_ENHANCE_VCF.out.versions.first())
+
+    BCFTOOLS_INDEX_2 (
+        ch_filtered_and_enhanced_vcf
+    )
+    ch_filtered_and_enhanced_vcf_tbi = BCFTOOLS_INDEX_2.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_INDEX_2.out.versions.first())
+    
+
+    /*if (params.use_dosage == 'true') {
         FIX_ZERO_PL (
             ch_annotated_vcf,
             Channel.value(params.fix_zero_pl_min_gq),
@@ -100,7 +125,7 @@ workflow PREPARE {
     } else {
         ch_vcf_with_pl_corrected = ch_annotated_vcf
         ch_vcf_with_pl_corrected_tbi = ch_annotated_vcf_tbi
-    }
+    }*/
 
 
     workflow.onError {
@@ -108,8 +133,8 @@ workflow PREPARE {
     }
 
     emit:
-    all_samples_vcf      = ch_vcf_with_pl_corrected
-    all_samples_vcf_tbi  = ch_vcf_with_pl_corrected_tbi
+    prepared_vcf      = ch_filtered_and_enhanced_vcf
+    prepared_vcf_tbi  = ch_filtered_and_enhanced_vcf_tbi
     versions   = ch_versions
     tracking   = ch_tracking
 }
