@@ -1,7 +1,6 @@
 
 process VEP_ANNOTATE {
     tag "$meta.id"
-    label 'process_medium'
     label 'process_long'
     label 'process_medium_memory'
 

@@ -77,55 +77,40 @@ workflow PREPARE {
             Channel.value("rename_chr")
         )
         ch_annotated_vcf = BCFTOOLS_ANNOTATE.out.vcf
-        //ch_annotated_vcf_tbi = BCFTOOLS_ANNOTATE.out.tbi
+        ch_annotated_vcf_tbi = BCFTOOLS_ANNOTATE.out.tbi
         ch_versions = ch_versions.mix(BCFTOOLS_ANNOTATE.out.versions.first())
 
     } else {
         ch_annotated_vcf = ch_vcf_with_sample_names_corrected
-        //ch_annotated_vcf_tbi = ch_all_samples_vcf_tbi
+        ch_annotated_vcf_tbi = ch_all_samples_vcf_tbi
         //ch_tracking = Channel.empty()
     }
 
-    FILTER_AND_ENHANCE_VCF (
-        ch_annotated_vcf.map { meta, vcf_file -> tuple(meta, vcf_file, []) },
-        Channel.value(params.filter_and_enhance_vcf_qual_min),
-        Channel.value(params.filter_and_enhance_vcf_avg_gq_min),
-        Channel.value(params.filter_and_enhance_vcf_avg_dp_min),
-        Channel.value(params.filter_and_enhance_vcf_avg_dp_max),
-        Channel.value(params.filter_and_enhance_vcf_sample_gq_min),
-        Channel.value(params.filter_and_enhance_vcf_sample_dp_min),
-        Channel.value(params.filter_and_enhance_vcf_sample_dp_max),
-        Channel.value(params.filter_and_enhance_vcf_calc_ds_min_gq),
-        Channel.value("filterhance")
-    )
-    ch_filtered_and_enhanced_vcf = FILTER_AND_ENHANCE_VCF.out.vcf
-    ch_versions = ch_versions.mix(FILTER_AND_ENHANCE_VCF.out.versions.first())
-
-    BCFTOOLS_INDEX_2 (
-        ch_filtered_and_enhanced_vcf
-    )
-    ch_filtered_and_enhanced_vcf_tbi = BCFTOOLS_INDEX_2.out.tbi
-    ch_versions = ch_versions.mix(BCFTOOLS_INDEX_2.out.versions.first())
-    
-
-    /*if (params.use_dosage == 'true') {
-        FIX_ZERO_PL (
-            ch_annotated_vcf,
-            Channel.value(params.fix_zero_pl_min_gq),
-            Channel.value('calc_dosage')
+    if (params.use_dosage == 'true') {
+        FILTER_AND_ENHANCE_VCF (
+            ch_annotated_vcf.map { meta, vcf_file -> tuple(meta, vcf_file, []) },
+            Channel.value(params.filter_and_enhance_vcf_qual_min),
+            Channel.value(params.filter_and_enhance_vcf_avg_gq_min),
+            Channel.value(params.filter_and_enhance_vcf_avg_dp_min),
+            Channel.value(params.filter_and_enhance_vcf_avg_dp_max),
+            Channel.value(params.filter_and_enhance_vcf_sample_gq_min),
+            Channel.value(params.filter_and_enhance_vcf_sample_dp_min),
+            Channel.value(params.filter_and_enhance_vcf_sample_dp_max),
+            Channel.value(params.filter_and_enhance_vcf_calc_ds_min_gq),
+            Channel.value("filterhance")
         )
-        ch_vcf_with_pl_corrected = FIX_ZERO_PL.out.vcf
-        ch_versions = ch_versions.mix(FIX_ZERO_PL.out.versions.first())
+        ch_filtered_and_enhanced_vcf = FILTER_AND_ENHANCE_VCF.out.vcf
+        ch_versions = ch_versions.mix(FILTER_AND_ENHANCE_VCF.out.versions.first())
 
         BCFTOOLS_INDEX_2 (
-            ch_vcf_with_pl_corrected
+            ch_filtered_and_enhanced_vcf
         )
-        ch_vcf_with_pl_corrected_tbi = BCFTOOLS_INDEX_2.out.tbi
+        ch_filtered_and_enhanced_vcf_tbi = BCFTOOLS_INDEX_2.out.tbi
         ch_versions = ch_versions.mix(BCFTOOLS_INDEX_2.out.versions.first())
     } else {
-        ch_vcf_with_pl_corrected = ch_annotated_vcf
-        ch_vcf_with_pl_corrected_tbi = ch_annotated_vcf_tbi
-    }*/
+        ch_filtered_and_enhanced_vcf = ch_annotated_vcf
+        ch_filtered_and_enhanced_vcf_tbi = ch_annotated_vcf_tbi
+    }
 
 
     workflow.onError {

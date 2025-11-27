@@ -9,6 +9,7 @@ include { RENAME as RENAME_1     } from '../modules/local/cmds/rename'
 include { RENAME as RENAME_2     } from '../modules/local/cmds/rename'
 include { GENERATE_TRACKING_REPORT           } from '../modules/local/python/generate_tracking_report'
 include { EXPLORATORY_DATA_ANALYSIS          } from '../modules/local/python/eda'
+include { FIX_ZERO_PL            } from '../modules/local/python/fix_zero_PL'
 include { RSCRIPT_BUILDREPORTS   } from '../modules/local/rscript/buildreports'
 include { REGENIE_STEP2          } from '../modules/local/regenie/step2'
 include { REGENIE_STEP1          } from '../modules/local/regenie/step1'
@@ -32,9 +33,10 @@ include { BCFTOOLS_VCF2PSAM      } from '../modules/local/bcftools/vcf2psam'
 include { BCFTOOLS_VCF2FRQ       } from '../modules/local/bcftools/vcf2frq'
 include { BCFTOOLS_TAG2TAG       } from '../modules/local/bcftools/tag2tag'
 include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_2   } from '../modules/local/bcftools/view'
-//include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_1   } from '../modules/local/bcftools/filter'
-//include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_2   } from '../modules/local/bcftools/filter'
+include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_1   } from '../modules/local/bcftools/filter'
+include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_2   } from '../modules/local/bcftools/filter'
 //include { BCFTOOLS_FILTER_2_TIMES } from '../modules/local/combo/filter2'
+include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_2 } from '../modules/local/bcftools/index'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_3 } from '../modules/local/bcftools/index'
 include { MULTIQC                } from '../modules/nf-core/multiqc'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
@@ -112,9 +114,29 @@ workflow RARE_VAR_ASSOC {
     ch_tracking = PREPARE.out.tracking
 
     if (params.skip_reporting == 'false') {
+        if (params.use_dosage != 'true') {
+            // do this only to be able to produce plots
+            FIX_ZERO_PL (
+                ch_prepared_vcf,
+                Channel.value(params.filter_and_enhance_vcf_calc_ds_min_gq),
+                Channel.value('calc_dosage')
+            )
+            ch_vcf_with_pl_corrected = FIX_ZERO_PL.out.vcf
+            ch_versions = ch_versions.mix(FIX_ZERO_PL.out.versions.first())
+
+            BCFTOOLS_INDEX_2 (
+                ch_vcf_with_pl_corrected
+            )
+            ch_vcf_with_pl_corrected_tbi = BCFTOOLS_INDEX_2.out.tbi
+            ch_versions = ch_versions.mix(BCFTOOLS_INDEX_2.out.versions.first())
+        } else {
+            ch_vcf_with_pl_corrected = ch_prepared_vcf
+            ch_vcf_with_pl_corrected_tbi = ch_prepared_vcf_tbi
+        }
+
         EXPLORATORY_DATA_ANALYSIS (
-            ch_prepared_vcf
-                .join(ch_prepared_vcf_tbi, by: 0)
+            ch_vcf_with_pl_corrected
+                .join(ch_vcf_with_pl_corrected_tbi, by: 0)
                 .join(ch_phenotype, by: 0),
             Channel.value(params.use_dosage)
         )
@@ -122,38 +144,46 @@ workflow RARE_VAR_ASSOC {
         ch_versions = ch_versions.mix(EXPLORATORY_DATA_ANALYSIS.out.versions.first())
     }
 
-    /*BCFTOOLS_FILTER_1 (
-        ch_all_samples_vcf
-            .join(ch_all_samples_vcf_tbi, by: 0)
-            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
-            .combine(PREPARE.out.tracking.last()),
-        Channel.value(params.bcftools_filter_1_options),
-        Channel.value("filter1")
-    )
-    ch_filter_1_vcf  = BCFTOOLS_FILTER_1.out.vcf
-    ch_filter_1_vcf_tbi  = BCFTOOLS_FILTER_1.out.tbi
-    ch_versions = ch_versions.mix(BCFTOOLS_FILTER_1.out.versions.first())
-    ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_1.out.tracking_out.first())
+    if (params.use_dosage != 'true') {
+        // turns out bcftools, even called two times, is faster than rust-htslib
 
-    BCFTOOLS_FILTER_2 (
-        ch_filter_1_vcf
-            .join(ch_filter_1_vcf_tbi, by: 0)
-            .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
-            .combine(BCFTOOLS_FILTER_1.out.tracking_out.first()),
-        Channel.value(params.bcftools_filter_2_options),
-        Channel.value("filter2"),
-    )
-    ch_filter_2_vcf  = BCFTOOLS_FILTER_2.out.vcf
-    ch_filter_2_vcf_tbi  = BCFTOOLS_FILTER_2.out.tbi
-    ch_versions = ch_versions.mix(BCFTOOLS_FILTER_2.out.versions.first())
-    ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_2.out.tracking_out.first())*/
+        bcftools_filter_1_options = "--exclude 'QUAL<${params.filter_and_enhance_vcf_qual_min} || AVG(FORMAT/GQ)<${params.filter_and_enhance_vcf_avg_gq_min} || AVG(FORMAT/DP)<${params.filter_and_enhance_vcf_avg_dp_min} || AVG(FORMAT/DP)>${params.filter_and_enhance_vcf_avg_dp_max}' --output-type z --write-index=tbi"
+        bcftools_filter_2_options = "--exclude 'FORMAT/GQ<${params.filter_and_enhance_vcf_sample_gq_min} | FORMAT/DP < ${params.filter_and_enhance_vcf_sample_dp_min} | FORMAT/DP > ${params.filter_and_enhance_vcf_sample_dp_max}' --set-GTs '.' --output-type z --write-index=tbi"
+    
+        BCFTOOLS_FILTER_1 (
+            ch_prepared_vcf
+                .join(ch_prepared_vcf_tbi, by: 0)
+                .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
+                .combine(PREPARE.out.tracking.last()),
+            Channel.value(bcftools_filter_1_options),
+            Channel.value("filter1")
+        )
+        ch_filter_1_vcf  = BCFTOOLS_FILTER_1.out.vcf
+        ch_filter_1_vcf_tbi  = BCFTOOLS_FILTER_1.out.tbi
+        ch_versions = ch_versions.mix(BCFTOOLS_FILTER_1.out.versions.first())
+        ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_1.out.tracking_out.first())
+
+        BCFTOOLS_FILTER_2 (
+            ch_filter_1_vcf
+                .join(ch_filter_1_vcf_tbi, by: 0)
+                .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
+                .combine(BCFTOOLS_FILTER_1.out.tracking_out.first()),
+            Channel.value(bcftools_filter_2_options),
+            Channel.value("filter2"),
+        )
+        ch_filtered_vcf  = BCFTOOLS_FILTER_2.out.vcf
+        ch_filtered_vcf_tbi  = BCFTOOLS_FILTER_2.out.tbi
+        ch_versions = ch_versions.mix(BCFTOOLS_FILTER_2.out.versions.first())
+        ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_2.out.tracking_out.first())
+    } else {
+        ch_filtered_vcf = ch_prepared_vcf
+        ch_filtered_vcf_tbi = ch_prepared_vcf_tbi
+    }
 
     if (params.skip_preparation == false) {
         VEP_ANNOTATE (
-            //ch_filter_2_vcf
-            //    .join(ch_filter_2_vcf_tbi, by: 0)
-            ch_prepared_vcf
-                .join(ch_prepared_vcf_tbi, by: 0)
+            ch_filtered_vcf
+                .join(ch_filtered_vcf_tbi, by: 0)
                 .combine(ch_vep_cachesubdir),
             Channel.value(params.vep_annotate_species),
             Channel.value(params.vep_fasta_path),
@@ -170,8 +200,7 @@ workflow RARE_VAR_ASSOC {
 
         ch_vep_vcf_with_index = ch_vep_vcf.join(ch_vep_vcf_tbi, by: 0)
     } else {
-        //ch_vep_vcf_with_index = ch_filter_2_vcf.join(ch_filter_2_vcf_tbi, by: 0)
-        ch_vep_vcf_with_index = ch_prepared_vcf.join(ch_prepared_vcf_tbi, by: 0)
+        ch_vep_vcf_with_index = ch_filtered_vcf.join(ch_filtered_vcf_tbi, by: 0)
     }
 
 
