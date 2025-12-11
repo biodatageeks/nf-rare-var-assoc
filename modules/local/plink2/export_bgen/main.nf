@@ -25,7 +25,7 @@ process PLINK2_EXPORT_BGEN {
     // TODO nf-core: See section in main README for further information regarding finding and adding container addresses to the section below.
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/plink2:2.00a5.10--h4ac6f70_0':
+        'https://depot.galaxyproject.org/singularity/plink2:2.0.0a.6.9--h9948957_0':
         params.cpu_support_avx2 ? 'docker.io/psuszynski/plink:2.0-alpha.6.9': 'docker.io/psuszynski/plink:2.0-alpha.6.9.noavx2' }"
 
     input:

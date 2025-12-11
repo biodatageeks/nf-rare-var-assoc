@@ -4,9 +4,7 @@ process GENERATE_TRACKING_REPORT {
     label 'process_single'
 
     conda "${moduleDir}/environment.yml"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/seaborn:0.13.2':
-        'docker.io/psuszynski/python_tools:1.0.0' }"
+    container 'docker.io/psuszynski/python_tools:1.0.0'
 
     input:
     tuple val(meta), path(tracking_files)
