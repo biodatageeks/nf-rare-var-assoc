@@ -7,6 +7,7 @@ include { DOWNLOAD_FILE          } from '../modules/local/cmds/download_file'
 include { MERGE_RESULTS          } from '../modules/local/cmds/merge_results'
 include { RENAME as RENAME_1     } from '../modules/local/cmds/rename'
 include { RENAME as RENAME_2     } from '../modules/local/cmds/rename'
+include { CHECK_X_CHROM_PRESENT  } from '../modules/local/cmds/check_x_chrom_present'
 include { GENERATE_TRACKING_REPORT           } from '../modules/local/python/generate_tracking_report'
 include { EXPLORATORY_DATA_ANALYSIS          } from '../modules/local/python/eda'
 include { FIX_ZERO_PL            } from '../modules/local/python/fix_zero_PL'
@@ -55,25 +56,6 @@ include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_rare
     RUN MAIN WORKFLOW
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
-
-process CHECK_X_CHROM_PRESENT {
-    input:
-    tuple val(meta), path(pgen), path(pvar), path(psam)
-
-    output:
-    tuple val(meta), env(has_x), path(pgen), path(pvar), path(psam), emit: has_x
-
-    script:
-    """
-    # Check if chromosome X or chrX exists in the .pvar file
-    if grep -E "^(X|chrX)\\s" ${pvar}; then
-        echo "true" > has_x.txt
-    else
-        echo "false" > has_x.txt
-    fi
-    has_x=\$(cat has_x.txt)
-    """
-}
 
 workflow RARE_VAR_ASSOC {
 
