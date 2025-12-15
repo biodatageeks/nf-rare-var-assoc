@@ -10,8 +10,8 @@ process GENERATE_TRACKING_REPORT {
     tuple val(meta), path(tracking_files)
     
     output:
-    tuple val(meta), path("sankey_report.html"), emit: report_html_file
-    tuple val(meta), path("pipeline_report.txt"), emit: report_txt_file
+    tuple val(meta), path("*_sankey_report.html"), emit: report_html_file
+    tuple val(meta), path("*_pipeline_report.txt"), emit: report_txt_file
     path "versions.yml", emit: versions
 
     script:
@@ -107,7 +107,7 @@ for file in tracking_files:
         ])
 
 # Write report
-with open("pipeline_report.txt", "w") as f:
+with open("${prefix}_pipeline_report.txt", "w") as f:
     f.write("\\n".join(report_lines))
 
 
@@ -293,7 +293,7 @@ def generate_html_report(branches, G, output_file):
 
 # Load data
 data = load_json_files()
-output_file = "sankey_report.html"
+output_file = "${prefix}_sankey_report.html"
 
 # Build DAG and identify branches
 G, branches = build_dag_and_branches(data)
@@ -315,8 +315,8 @@ with open('versions.yml', 'w') as f:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    touch sankey_report.html
-    touch pipeline_report.txt
+    touch ${prefix}_sankey_report.html
+    touch ${prefix}_pipeline_report.txt
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
