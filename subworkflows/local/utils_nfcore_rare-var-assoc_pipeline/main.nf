@@ -112,6 +112,8 @@ workflow PIPELINE_INITIALISATION {
     // Create channel from input file provided through params.input
     //
     if (input_phenotype != null) {
+        // input_phenotype may be a comma-separated list of files
+        input_phenotype = input_phenotype.tokenize(',')
         Channel.fromPath(input_phenotype, checkIfExists: true)
             .map { file ->
                 log.info("Processing phenotype file: ${file.name}")

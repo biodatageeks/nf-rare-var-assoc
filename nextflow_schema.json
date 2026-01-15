@@ -39,7 +39,6 @@
                 },
                 "input_phenotype": {
                     "type": "string",
-                    "exists": true,
                     "description": "Path to the phenotype file.",
                     "fa_icon": "fas fa-briefcase-medical"
                 },
