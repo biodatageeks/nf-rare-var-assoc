@@ -1,7 +1,7 @@
 process FIX_ZERO_PL {
 
     tag "$meta.id"
-    label 'process_single'
+    label 'process_low'
 
     conda "${moduleDir}/environment.yml"
     container 'docker.io/psuszynski/bioinf_combo:1.1.1'

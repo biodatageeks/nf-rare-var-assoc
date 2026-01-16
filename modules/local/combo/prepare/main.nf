@@ -1,7 +1,7 @@
 process PREPARE {
 
     tag "$meta.id"
-    label 'process_single'
+    label 'process_low'
 
     container 'docker.io/psuszynski/bioinf_combo:1.1.1'
 

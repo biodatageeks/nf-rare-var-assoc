@@ -1,6 +1,6 @@
 process CHECK_X_CHROM_PRESENT {
     tag "$meta.id"
-    label 'process_single'
+    label 'process_low'
 
     input:
     tuple val(meta), path(pgen), path(pvar), path(psam)

@@ -1,7 +1,7 @@
 process GENERATE_TRACKING_REPORT {
 
     tag "$meta.id"
-    label 'process_single'
+    label 'process_low'
 
     conda "${moduleDir}/environment.yml"
     container 'docker.io/psuszynski/python_tools:1.0.0'
