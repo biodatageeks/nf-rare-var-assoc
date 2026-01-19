@@ -1,6 +1,6 @@
 process RSCRIPT_BUILD_PHENOTYPES {
     tag "$meta.id"
-    label 'process_medium'
+    label 'process_low'
 
     conda "${moduleDir}/environment.yml"
     container 'docker.io/psuszynski/r-ver:4.4.2.9'

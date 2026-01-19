@@ -17,7 +17,6 @@
 
 process RSCRIPT_VCFTOAAF {
     tag "$meta.id"
-    label 'process_medium'
     label 'process_medium_memory'
 
     // TODO nf-core: List required Conda package(s).

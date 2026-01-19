@@ -1,6 +1,6 @@
 process REGENIE_STEP2 {
     tag "$meta.id"
-    label 'process_high'
+    label 'process_low'
     label 'process_long'
 
     conda "${moduleDir}/environment.yml"

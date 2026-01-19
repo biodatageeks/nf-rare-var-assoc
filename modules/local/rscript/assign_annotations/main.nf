@@ -1,6 +1,5 @@
 process RSCRIPT_ASSIGN_ANNOTATIONS {
     tag "$meta.id"
-    label 'process_medium'
     label 'process_medium_memory'
 
     conda "${moduleDir}/environment.yml"
