@@ -303,7 +303,14 @@ filter_annotations <- function(anno, masks_path, quantile_threshold, min_top_ann
     # Combine filters: keep if important OR above quantile OR in top 50
     keep <- keep_important | keep_quantile | keep_top_logical
 
-    # Replace consequences not meeting criteria with "NULL"
+    # BUG: This replaces filtered consequences with "NULL" instead of removing the rows.
+    # The downstream processing may incorrectly include these NULL rows in setlists.
+    # To fix, replace the line below with filtering that removes rows entirely:
+    #
+    # FIX (commented out to preserve original behavior):
+    # anno <- anno[keep[match(anno$Consequence, names(freq_table))], ]
+    #
+    # Current buggy behavior:
     anno$Consequence[!keep[match(anno$Consequence, names(freq_table))]] <- "NULL"
 
     # Report kept consequences

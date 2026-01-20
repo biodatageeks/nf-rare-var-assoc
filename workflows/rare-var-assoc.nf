@@ -14,8 +14,11 @@ include { FIX_ZERO_PL            } from '../modules/local/python/fix_zero_PL'
 include { RSCRIPT_BUILDREPORTS   } from '../modules/local/rscript/buildreports'
 include { REGENIE_STEP2          } from '../modules/local/regenie/step2'
 include { REGENIE_STEP1          } from '../modules/local/regenie/step1'
-include { RSCRIPT_VCFTOAAF       } from '../modules/local/rscript/vcf2aaf'
-include { RSCRIPT_ASSIGN_ANNOTATIONS         } from '../modules/local/rscript/assign_annotations'
+// R versions kept for reference but replaced by faster implementations:
+// include { RSCRIPT_VCFTOAAF       } from '../modules/local/rscript/vcf2aaf'
+// include { RSCRIPT_ASSIGN_ANNOTATIONS         } from '../modules/local/rscript/assign_annotations'
+include { PYTHON_VCFTOAAF        } from '../modules/local/python/vcf2aaf'
+include { BCFTOOLS_ASSIGN_ANNOTATIONS        } from '../modules/local/bcftools/assign_annotations'
 include { BGENIX                 } from '../modules/local/bgenix'
 include { QCTOOL                 } from '../modules/local/qctool'
 include { PLINK2_IMPORT_DOSAGE   } from '../modules/local/plink2/import_dosage'
@@ -392,25 +395,32 @@ workflow RARE_VAR_ASSOC {
     ch_tracking_step1 = ch_tracking_step1.mix(REGENIE_STEP1.out.tracking_out.first())
 
 
-    r_script_vcf2aaf_ch = Channel.fromPath(params.rscript_vcf2aaf_path, checkIfExists: true)
-    RSCRIPT_VCFTOAAF (
+    // Python vcf2aaf (replaces slower R version)
+    python_vcf2aaf_script_ch = Channel.fromPath("${projectDir}/modules/local/python/vcf2aaf/assets/vcf2aaf.py", checkIfExists: true)
+    // Split vcf2aaf options: if two parts use both, if one part use empty string + the value
+    def vcf2aaf_opts = params.rscript_vcf2aaf_options.split(' ')
+    def vcf2aaf_opt1 = vcf2aaf_opts.size() > 1 ? vcf2aaf_opts[0] : ''
+    def vcf2aaf_opt2 = vcf2aaf_opts.size() > 1 ? vcf2aaf_opts[1] : vcf2aaf_opts[0]
+    PYTHON_VCFTOAAF (
         ch_vep_vcf_with_index.map { meta, vcf, tbi -> tuple(meta, vcf) }
-            .combine(r_script_vcf2aaf_ch),
-        Channel.value(params.rscript_vcf2aaf_options)
+            .combine(python_vcf2aaf_script_ch),
+        Channel.value(vcf2aaf_opt1),
+        Channel.value(vcf2aaf_opt2)
     )
-    ch_aaf  = RSCRIPT_VCFTOAAF.out.aaf
-    ch_versions = ch_versions.mix(RSCRIPT_VCFTOAAF.out.versions.first())
+    ch_aaf  = PYTHON_VCFTOAAF.out.aaf
+    ch_versions = ch_versions.mix(PYTHON_VCFTOAAF.out.versions.first())
     
-    r_script_annotate_ch = Channel.fromPath(params.rscript_annotate_path, checkIfExists: true)
-    RSCRIPT_ASSIGN_ANNOTATIONS (
+    // bcftools/polars assign_annotations (replaces slower R version, also fixes NULL bug)
+    python_assign_annotations_script_ch = Channel.fromPath("${projectDir}/modules/local/bcftools/assign_annotations/assets/assign_annotations.py", checkIfExists: true)
+    BCFTOOLS_ASSIGN_ANNOTATIONS (
         ch_step2_vcf
             .combine(ch_masks)
-            .combine(r_script_annotate_ch),
-        Channel.value(params.rscript_annotate_options)
+            .combine(python_assign_annotations_script_ch),
+        Channel.value(params.rscript_annotate_options)  // Uses same params format
     )
-    ch_annotations  = RSCRIPT_ASSIGN_ANNOTATIONS.out.annotations
-    ch_setlist  = RSCRIPT_ASSIGN_ANNOTATIONS.out.setlist
-    ch_versions = ch_versions.mix(RSCRIPT_ASSIGN_ANNOTATIONS.out.versions.first())
+    ch_annotations  = BCFTOOLS_ASSIGN_ANNOTATIONS.out.annotations
+    ch_setlist  = BCFTOOLS_ASSIGN_ANNOTATIONS.out.setlist
+    ch_versions = ch_versions.mix(BCFTOOLS_ASSIGN_ANNOTATIONS.out.versions.first())
 
     if (params.use_dosage == 'true') {
         PLINK2_EXPORT_OTHER (

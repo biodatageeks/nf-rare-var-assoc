@@ -3,7 +3,7 @@ process FILTER_AND_ENHANCE_VCF {
     tag "$meta.id"
     label 'process_low'
 
-    container 'docker.io/psuszynski/bioinf_combo:1.2.0'
+    container 'docker.io/psuszynski/bioinf_combo:1.3.0'
 
     input:
     tuple val(meta), path(vcf_file), path(samples_file)
