@@ -1,7 +1,7 @@
 // Process to extract unique phenotypes and corresponding sample lists
 process EXTRACT_PHENOTYPES_AND_SAMPLES {
     tag "$meta.id"
-    label 'process_low'
+    label 'process_1'
 
     input:
     tuple val(meta), path(pheno_file)

@@ -2,7 +2,7 @@
 process VEP_ANNOTATE {
     tag "$meta.id"
     label 'process_long'
-    label 'process_high_memory'
+    label 'process_6'
 
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?

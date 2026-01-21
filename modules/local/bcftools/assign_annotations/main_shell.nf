@@ -1,6 +1,6 @@
 process BCFTOOLS_ASSIGN_ANNOTATIONS_SHELL {
     tag "$meta.id"
-    label 'process_low'
+    label 'process_1'
 
     conda "bioconda::bcftools=1.21"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?

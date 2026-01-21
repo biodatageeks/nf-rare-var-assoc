@@ -25,7 +25,7 @@ include { BCFTOOLS_INDEX                      } from '../modules/local/bcftools/
 
 process COMPARE_OUTPUTS {
     tag "$meta.id"
-    label 'process_low'
+    label 'process_1'
     
     publishDir "${params.outdir}/benchmark", mode: 'copy'
     

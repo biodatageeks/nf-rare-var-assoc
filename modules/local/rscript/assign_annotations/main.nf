@@ -1,6 +1,6 @@
 process RSCRIPT_ASSIGN_ANNOTATIONS {
     tag "$meta.id"
-    label 'process_medium_memory'
+    label 'process_5'
 
     conda "${moduleDir}/environment.yml"
     container 'docker.io/psuszynski/r-ver:4.4.2.9'

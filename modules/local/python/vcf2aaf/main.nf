@@ -1,6 +1,6 @@
 process PYTHON_VCFTOAAF {
     tag "$meta.id"
-    label 'process_low'
+    label 'process_1'
 
     conda "conda-forge::polars=1.0.0 bioconda::polars-bio=0.5.0"
     container 'docker.io/psuszynski/bioinf_combo:1.3.0'

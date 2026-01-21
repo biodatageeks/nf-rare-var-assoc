@@ -1,6 +1,6 @@
 process PLINK2_KING_CUTOFF {
     tag "$meta.id"
-    label 'process_low'
+    label 'process_1'
 
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?

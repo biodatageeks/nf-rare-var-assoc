@@ -1,7 +1,7 @@
 
 process PLINK2_WRITE_SNPLIST {
     tag "$meta.id"
-    label 'process_medium'
+    label 'process_2'
 
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?

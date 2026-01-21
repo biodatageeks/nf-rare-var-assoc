@@ -23,7 +23,7 @@ include { RSCRIPT_BUILD_PHENOTYPES  } from '../../../modules/local/rscript/build
 */
 
 process JOIN_CASES_AND_CONTROLS {
-    label 'process_low'
+    label 'process_1'
 
     input:
     tuple val(meta), path(cases), path(controls)
@@ -51,7 +51,7 @@ process JOIN_CASES_AND_CONTROLS {
 }
 
 process PHENOTYPE_SAMPLES {
-    label 'process_low'
+    label 'process_1'
 
     input:
     tuple val(meta), path(phenotype)

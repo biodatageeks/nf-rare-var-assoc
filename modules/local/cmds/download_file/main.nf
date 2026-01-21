@@ -1,6 +1,6 @@
 process DOWNLOAD_FILE {
     tag "$meta.id"
-    label 'process_low'
+    label 'process_1'
 
     input:
     tuple val(meta), path(url)

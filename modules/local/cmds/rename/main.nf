@@ -1,6 +1,6 @@
 process RENAME {
     tag "$meta.id"
-    label 'process_low'
+    label 'process_1'
 
     conda "${moduleDir}/environment.yml"
     container 'docker.io/psuszynski/r-ver:4.4.2.9'

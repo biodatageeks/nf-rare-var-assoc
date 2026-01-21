@@ -2,7 +2,7 @@
 // println "Container engine: ${workflow?.containerEngine}"
 process BCFTOOLS_FILTER_2_TIMES {
     tag "$meta.id"
-    label 'process_low'
+    label 'process_1'
 
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
