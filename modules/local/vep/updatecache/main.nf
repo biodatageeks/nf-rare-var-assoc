@@ -1,5 +1,6 @@
 process VEP_UPDATECACHE {
     tag "$meta.id"
+    label 'process_1'
     label 'process_long'
 
     conda "${moduleDir}/environment.yml"
