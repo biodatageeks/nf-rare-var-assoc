@@ -9,10 +9,11 @@ process REGENIE_STEP2 {
     input:
     tuple val(meta), path(pgen), path(pvar), path(psam), path(phenotype), path(annotations), path(setlist), path(aaf), path(step1_pred_list), path(covar_file), path(masks), path(tracking_in)
     val(input_args)
+    val(return_snplist)
 
     output:
-    tuple val(meta), path("*_masks.bed"), path("*_masks.bim"), path("*_masks.fam"), emit: masks_bed_bim_fam
-    tuple val(meta), path("*_masks.snplist"), emit: masks_snplist
+    // tuple val(meta), path("*_masks.bed"), path("*_masks.bim"), path("*_masks.fam"), emit: masks_bed_bim_fam
+    tuple val(meta), path("*_masks.snplist"), emit: masks_snplist, optional: true
     tuple val(meta), path("*.regenie"), emit: regenie_out
     tuple val(meta), path("*.log"), emit: log
     path "versions.yml"           , emit: versions
@@ -26,6 +27,7 @@ process REGENIE_STEP2 {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def covar_file_corr_format = covar_file + "_correct_format.txt"
     def covar_file_input = covar_file ? "--covarFile " + covar_file_corr_format : ""
+    def return_snplist_arg = return_snplist ? "--write-mask-snplist" : ""
     """
     echo 'task.cpus:${task.cpus}'
     
@@ -44,7 +46,7 @@ process REGENIE_STEP2 {
        --pred ${step1_pred_list} \\
        --aaf-file ${aaf} \\
        --out ${prefix}_step2 \\
-       $args $input_args
+       $args $input_args $return_snplist_arg
 
 
     # Extract counts from PLINK log

@@ -465,10 +465,9 @@ workflow RARE_VAR_ASSOC {
         ch_regenie_step_2_input
             .combine(ch_masks)
             .combine(BCFTOOLS_VIEW_2.out.tracking_out.first()),
-        Channel.value(params.regenie_step2_options)
+        Channel.value(params.regenie_step2_options),
+        Channel.value(params.skip_reporting == 'false')
     )
-    ch_regenie_step2_masks_bed_bim_fam  = REGENIE_STEP2.out.masks_bed_bim_fam
-    ch_regenie_step2_masks_snplist  = REGENIE_STEP2.out.masks_snplist
     ch_regenie_step2_regenie_out  = REGENIE_STEP2.out.regenie_out
     ch_versions = ch_versions.mix(REGENIE_STEP2.out.versions.first())
     ch_tracking_step2 = ch_tracking_step2.mix(REGENIE_STEP2.out.tracking_out.first())
@@ -476,7 +475,7 @@ workflow RARE_VAR_ASSOC {
     if (params.skip_reporting == 'false') {
         r_script_buildreports_ch = Channel.fromPath(params.rscript_buildreports_path, checkIfExists: true)
         RSCRIPT_BUILDREPORTS (
-            ch_regenie_step2_masks_snplist
+            REGENIE_STEP2.out.masks_snplist
                 .join(ch_regenie_step2_regenie_out, by: 0)
                 .join(ch_step2_vcf, by: 0)
                 .join(ch_phenotype, by: 0)
