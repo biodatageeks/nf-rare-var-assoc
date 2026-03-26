@@ -3,7 +3,7 @@ process BCFTOOLS_ASSIGN_ANNOTATIONS {
     label 'process_1'
 
     conda "bioconda::bcftools=1.21 conda-forge::polars=1.0.0"
-    container 'docker.io/psuszynski/bioinf_combo:1.3.0'
+    container 'docker.io/psuszynski/bioinf_combo:1.5.1'
 
     input:
     tuple val(meta), path(vcf), path(masks), path(python_script)

@@ -1,12 +1,12 @@
-process FILTER_AND_ENHANCE_VCF {
+process VIEW_AND_FILTER2_POLARSBIO {
 
     tag "$meta.id"
     label 'process_1'
 
-    container 'docker.io/psuszynski/bioinf_combo:1.5.1'
+    container 'docker.io/psuszynski/python_tools:1.0.10'
 
     input:
-    tuple val(meta), path(vcf_file), path(samples_file)
+    tuple val(meta), path(vcf_file), path(tbi_file), path(samples_file), path(python_script)
     val(qual_min)
     val(avg_gq_min)
     val(avg_dp_min)
@@ -14,7 +14,6 @@ process FILTER_AND_ENHANCE_VCF {
     val(sample_gq_min)
     val(sample_dp_min)
     val(sample_dp_max)
-    val(calc_ds_min_gq)
     val(out_name_part)
     
     output:
@@ -34,27 +33,7 @@ process FILTER_AND_ENHANCE_VCF {
         fi
     fi
 
-    # comp_ds_htslib is a Rust project that has been compiled and built into the bioinf_combo container
-    #
-    # Usage: comp_ds_htslib [OPTIONS] --input-vcf-path <INPUT_VCF_PATH> --output-vcf-path <OUTPUT_VCF_PATH>
-    #
-    # Options:
-    #     --input-vcf-path <INPUT_VCF_PATH>    
-    #     --output-vcf-path <OUTPUT_VCF_PATH>  
-    #     --samples-file <SAMPLES_FILE>        
-    #     --qual-min <QUAL_MIN>                [default: 25]
-    #     --avg-gq-min <AVG_GQ_MIN>            [default: 25]
-    #     --avg-dp-min <AVG_DP_MIN>            [default: 25]
-    #     --avg-dp-max <AVG_DP_MAX>            [default: 200]
-    #     --sample-gq-min <SAMPLE_GQ_MIN>      [default: 20]
-    #     --sample-dp-min <SAMPLE_DP_MIN>      [default: 20]
-    #     --sample-dp-max <SAMPLE_DP_MAX>      [default: 250]
-    #     --calc-ds-min-gq <CALC_DS_MIN_GQ>    [default: 1]
-    #     --threads-num <THREADS_NUM>          [default: 1]
-    # -h, --help                               Print help
-    # -V, --version                            Print version
-    
-    comp_ds_htslib \\
+    python3 ${python_script} \\
         --input-vcf-path ${vcf_file} \\
         --output-vcf-path ${prefix}_${out_name_part}.vcf.gz \\
         ${samples_arg} \\
@@ -64,13 +43,11 @@ process FILTER_AND_ENHANCE_VCF {
         --avg-dp-max ${avg_dp_max} \\
         --sample-gq-min ${sample_gq_min} \\
         --sample-dp-min ${sample_dp_min} \\
-        --sample-dp-max ${sample_dp_max} \\
-        --calc-ds-min-gq ${calc_ds_min_gq} \\
-        --threads-num $task.cpus
+        --sample-dp-max ${sample_dp_max}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        comp_ds_htslib: 1.2.0
+        polars-bio: 0.26.1
     END_VERSIONS
     """
 
@@ -82,7 +59,7 @@ process FILTER_AND_ENHANCE_VCF {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        comp_ds_htslib: 1.2.0
+        polars-bio: 0.26.1
     END_VERSIONS
     """
 }

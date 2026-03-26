@@ -100,7 +100,7 @@ workflow PCA {
     ch_versions = ch_versions.mix(PLINK2_PROJECTION_SCORE.out.versions.first())
     ch_tracking = ch_tracking.mix(PLINK2_PROJECTION_SCORE.out.tracking_out.first())
 
-    if (params.skip_reporting == 'false') {
+    if (!params.skip_reporting) {
         DRAW_PC_PLOT (
             ch_sscore.join(ch_pheno, by: 0),
             Channel.value('pc_plot')

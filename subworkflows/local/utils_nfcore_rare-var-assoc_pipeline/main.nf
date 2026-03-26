@@ -205,7 +205,6 @@ workflow PIPELINE_COMPLETION {
     // Completion email and summary
     //
     workflow.onComplete {
-
         completionSummary(monochrome_logs)
     }
 

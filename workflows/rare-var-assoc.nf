@@ -14,9 +14,6 @@ include { FIX_ZERO_PL            } from '../modules/local/python/fix_zero_PL'
 include { RSCRIPT_BUILDREPORTS   } from '../modules/local/rscript/buildreports'
 include { REGENIE_STEP2          } from '../modules/local/regenie/step2'
 include { REGENIE_STEP1          } from '../modules/local/regenie/step1'
-// R versions kept for reference but replaced by faster implementations:
-// include { RSCRIPT_VCFTOAAF       } from '../modules/local/rscript/vcf2aaf'
-// include { RSCRIPT_ASSIGN_ANNOTATIONS         } from '../modules/local/rscript/assign_annotations'
 include { PYTHON_VCFTOAAF        } from '../modules/local/python/vcf2aaf'
 include { BCFTOOLS_ASSIGN_ANNOTATIONS        } from '../modules/local/bcftools/assign_annotations'
 include { BGENIX                 } from '../modules/local/bgenix'
@@ -39,7 +36,6 @@ include { BCFTOOLS_TAG2TAG       } from '../modules/local/bcftools/tag2tag'
 include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_2   } from '../modules/local/bcftools/view'
 include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_1   } from '../modules/local/bcftools/filter'
 include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_2   } from '../modules/local/bcftools/filter'
-//include { BCFTOOLS_FILTER_2_TIMES } from '../modules/local/combo/filter2'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_2 } from '../modules/local/bcftools/index'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_3 } from '../modules/local/bcftools/index'
 include { MULTIQC                } from '../modules/nf-core/multiqc'
@@ -52,7 +48,6 @@ include { PREPARE                } from '../subworkflows/local/prepare'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_rare-var-assoc_pipeline'
-//include { PREPARE                } from '../modules/local/combo/prepare'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -98,8 +93,8 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(PREPARE.out.versions.first())
     ch_tracking = PREPARE.out.tracking
 
-    if (params.skip_reporting == 'false') {
-        if (params.use_dosage != 'true') {
+    if (!params.skip_reporting) {
+        if (!params.use_dosage) {
             // do this only to be able to produce plots
             FIX_ZERO_PL (
                 ch_prepared_vcf,
@@ -129,7 +124,7 @@ workflow RARE_VAR_ASSOC {
         ch_versions = ch_versions.mix(EXPLORATORY_DATA_ANALYSIS.out.versions.first())
     }
 
-    if (params.use_dosage != 'true') {
+    if ((!params.skip_preparation || !params.skip_reporting) && !params.use_dosage) {
         // turns out bcftools, even called two times, is faster than rust-htslib
 
         bcftools_filter_1_options = "--exclude 'QUAL<${params.filter_and_enhance_vcf_qual_min} || AVG(FORMAT/GQ)<${params.filter_and_enhance_vcf_avg_gq_min} || AVG(FORMAT/DP)<${params.filter_and_enhance_vcf_avg_dp_min} || AVG(FORMAT/DP)>${params.filter_and_enhance_vcf_avg_dp_max}' --output-type z --write-index=tbi"
@@ -422,7 +417,7 @@ workflow RARE_VAR_ASSOC {
     ch_setlist  = BCFTOOLS_ASSIGN_ANNOTATIONS.out.setlist
     ch_versions = ch_versions.mix(BCFTOOLS_ASSIGN_ANNOTATIONS.out.versions.first())
 
-    if (params.use_dosage == 'true') {
+    if (params.use_dosage) {
         PLINK2_EXPORT_OTHER (
             ch_vep_vcf_with_index
                 .join(ch_pgen_pvar_psam_6.map { meta, pgen, pvar, psam -> tuple(meta, psam) }, by: 0),
@@ -466,13 +461,13 @@ workflow RARE_VAR_ASSOC {
             .combine(ch_masks)
             .combine(BCFTOOLS_VIEW_2.out.tracking_out.first()),
         Channel.value(params.regenie_step2_options),
-        Channel.value(params.skip_reporting == 'false')
+        Channel.value(!params.skip_reporting)
     )
     ch_regenie_step2_regenie_out  = REGENIE_STEP2.out.regenie_out
     ch_versions = ch_versions.mix(REGENIE_STEP2.out.versions.first())
     ch_tracking_step2 = ch_tracking_step2.mix(REGENIE_STEP2.out.tracking_out.first())
 
-    if (params.skip_reporting == 'false') {
+    if (!params.skip_reporting) {
         r_script_buildreports_ch = Channel.fromPath(params.rscript_buildreports_path, checkIfExists: true)
         RSCRIPT_BUILDREPORTS (
             REGENIE_STEP2.out.masks_snplist

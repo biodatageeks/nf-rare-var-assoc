@@ -31,7 +31,7 @@ workflow FILTER_MISSING_PER_PHENO {
             .map { meta, pgen_file, pvar_file, psam_file, sample_file ->
                 tuple(meta + ['orig_id': meta.id, 'id': sample_file.getBaseName()], pgen_file, pvar_file, psam_file, sample_file)
             }
-            .combine(ch_tracking_in.collect()),
+            .combine(ch_tracking_in.last()),
         Channel.value('identify_acceptable_variants'),
         Channel.value(params.plink2_missing_per_pheno_options)
     )
