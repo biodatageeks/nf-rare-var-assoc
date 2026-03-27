@@ -67,13 +67,6 @@ workflow PREPARE {
                 )
                 ch_filtered_and_enhanced_vcf = FILTER_AND_ENHANCE_VCF_POLARSBIO.out.vcf
                 ch_versions = ch_versions.mix(FILTER_AND_ENHANCE_VCF_POLARSBIO.out.versions.first())
-
-                BCFTOOLS_INDEX_2 (
-                    ch_filtered_and_enhanced_vcf
-                )
-                ch_filtered_and_enhanced_vcf_tbi = BCFTOOLS_INDEX_2.out.tbi
-                ch_versions = ch_versions.mix(BCFTOOLS_INDEX_2.out.versions.first())
-                ch_tracking = Channel.empty()
             } else {
                 VIEW_AND_FILTER2_POLARSBIO (
                     ch_filter_polarsbio_input.combine(python_view_and_filter2_polarsbio_script_ch),
