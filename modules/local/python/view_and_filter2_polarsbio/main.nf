@@ -35,7 +35,7 @@ process VIEW_AND_FILTER2_POLARSBIO {
 
     python3 ${python_script} \\
         --input-vcf-path ${vcf_file} \\
-        --output-vcf-path ${prefix}_${out_name_part}.vcf.gz \\
+        --output-vcf-path ${prefix}_${out_name_part}.vcf.bgz \\
         ${samples_arg} \\
         --qual-min ${qual_min} \\
         --avg-gq-min ${avg_gq_min} \\
@@ -45,6 +45,8 @@ process VIEW_AND_FILTER2_POLARSBIO {
         --sample-dp-min ${sample_dp_min} \\
         --sample-dp-max ${sample_dp_max}
 
+    mv ${prefix}_${out_name_part}.vcf.bgz ${prefix}_${out_name_part}.vcf.gz
+    
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         polars-bio: 0.26.1

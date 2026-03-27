@@ -224,6 +224,29 @@ if not optim_used:
     print("Error: for some reason FusedArrayTransform optimization is not used. This optimization is mandatory for this query. Interrupting..")
     exit(1)
 
+
+source_lf = pb.scan_vcf(args.input_vcf_path, samples=samples)
+meta = pb.get_metadata(source_lf)
+header = meta["header"]
+
+# Keep only the FORMAT fields present in the output genotypes struct
+output_format_fields = {}
+for field_name in ["GT", "GQ", "DP", "PL"]:
+    if field_name in header["format_fields"]:
+        output_format_fields[field_name] = header["format_fields"][field_name]
+
+# Add DS as a new FORMAT field (computed by the query)
+output_format_fields["DS"] = {
+    "number": "1",
+    "type": "Float",
+    "description": "Genotype dosage from PL fields",
+}
+
+header["format_fields"] = output_format_fields
+
+
 lf = pb.sql(FILTER_SQL)
+pb.set_source_metadata(lf, format="vcf", path=args.input_vcf_path, header=header)
+
 pb.sink_vcf(lf, args.output_vcf_path)
 print(f"Wrote: {args.output_vcf_path}")
