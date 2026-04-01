@@ -3,7 +3,7 @@ process VIEW_AND_FILTER2_POLARSBIO {
     tag "$meta.id"
     label 'process_1'
 
-    container 'docker.io/psuszynski/python_tools:1.0.10'
+    container 'docker.io/psuszynski/python_tools:1.0.11'
 
     input:
     tuple val(meta), path(vcf_file), path(tbi_file), path(samples_file), path(python_script)

@@ -49,98 +49,20 @@ workflow PREPARE {
             .join(ch_vcf_with_sample_names_corrected_tbi, by: 0)
             .join(ch_all_samples, by: 0)
         
-        if (params.use_polarsbio_for_filtering) {
-            // TODO: when problems with polars-bio are resolved remove the alternative branch and this if
-
-            if (params.use_dosage) {
-                FILTER_AND_ENHANCE_VCF_POLARSBIO (
-                    ch_filter_polarsbio_input.combine(python_filter_and_enhance_vcf_polarsbio_script_ch),
-                    Channel.value(params.filter_and_enhance_vcf_qual_min),
-                    Channel.value(params.filter_and_enhance_vcf_avg_gq_min),
-                    Channel.value(params.filter_and_enhance_vcf_avg_dp_min),
-                    Channel.value(params.filter_and_enhance_vcf_avg_dp_max),
-                    Channel.value(params.filter_and_enhance_vcf_sample_gq_min),
-                    Channel.value(params.filter_and_enhance_vcf_sample_dp_min),
-                    Channel.value(params.filter_and_enhance_vcf_sample_dp_max),
-                    Channel.value(params.filter_and_enhance_vcf_calc_ds_min_gq),
-                    Channel.value("filterhance")
-                )
-                ch_filtered_and_enhanced_vcf = FILTER_AND_ENHANCE_VCF_POLARSBIO.out.vcf
-                ch_versions = ch_versions.mix(FILTER_AND_ENHANCE_VCF_POLARSBIO.out.versions.first())
-            } else {
-                VIEW_AND_FILTER2_POLARSBIO (
-                    ch_filter_polarsbio_input.combine(python_view_and_filter2_polarsbio_script_ch),
-                    Channel.value(params.filter_and_enhance_vcf_qual_min),
-                    Channel.value(params.filter_and_enhance_vcf_avg_gq_min),
-                    Channel.value(params.filter_and_enhance_vcf_avg_dp_min),
-                    Channel.value(params.filter_and_enhance_vcf_avg_dp_max),
-                    Channel.value(params.filter_and_enhance_vcf_sample_gq_min),
-                    Channel.value(params.filter_and_enhance_vcf_sample_dp_min),
-                    Channel.value(params.filter_and_enhance_vcf_sample_dp_max),
-                    Channel.value("viewfilter2")
-                )
-                ch_filtered_and_enhanced_vcf = VIEW_AND_FILTER2_POLARSBIO.out.vcf
-                ch_versions = ch_versions.mix(VIEW_AND_FILTER2_POLARSBIO.out.versions.first())
-            }
-
-            BCFTOOLS_INDEX_2 (
-                ch_filtered_and_enhanced_vcf
-            )
-            ch_filtered_and_enhanced_vcf_tbi = BCFTOOLS_INDEX_2.out.tbi
-            ch_versions = ch_versions.mix(BCFTOOLS_INDEX_2.out.versions.first())
-            ch_tracking = Channel.empty()
-        } else {
-            if (params.use_dosage) {
-                ch_view_1_input = ch_filter_polarsbio_input
-                    .map { meta, vcf_file, tbi_file, samples_file -> tuple(meta, vcf_file, tbi_file, [], [], samples_file, [], []) }
-
-                BCFTOOLS_VIEW_1 (
-                    ch_view_1_input,
-                    Channel.value(params.bcftools_view_1_options),
-                    Channel.value("view1")
-                )
-                ch_all_samples_vcf  = BCFTOOLS_VIEW_1.out.vcf
-                ch_all_samples_vcf_tbi  = BCFTOOLS_VIEW_1.out.tbi
-                ch_versions = ch_versions.mix(BCFTOOLS_VIEW_1.out.versions.first())
-                ch_tracking = BCFTOOLS_VIEW_1.out.tracking_out
-
-                FILTER_AND_ENHANCE_VCF (
-                    ch_all_samples_vcf.map { meta, vcf_file -> tuple(meta, vcf_file, []) },
-                    Channel.value(params.filter_and_enhance_vcf_qual_min),
-                    Channel.value(params.filter_and_enhance_vcf_avg_gq_min),
-                    Channel.value(params.filter_and_enhance_vcf_avg_dp_min),
-                    Channel.value(params.filter_and_enhance_vcf_avg_dp_max),
-                    Channel.value(params.filter_and_enhance_vcf_sample_gq_min),
-                    Channel.value(params.filter_and_enhance_vcf_sample_dp_min),
-                    Channel.value(params.filter_and_enhance_vcf_sample_dp_max),
-                    Channel.value(params.filter_and_enhance_vcf_calc_ds_min_gq),
-                    Channel.value("filterhance")
-                )
-                ch_filtered_and_enhanced_vcf = FILTER_AND_ENHANCE_VCF.out.vcf
-                ch_versions = ch_versions.mix(FILTER_AND_ENHANCE_VCF.out.versions.first())
-
-                BCFTOOLS_INDEX_2 (
-                    ch_filtered_and_enhanced_vcf
-                )
-                ch_filtered_and_enhanced_vcf_tbi = BCFTOOLS_INDEX_2.out.tbi
-                ch_versions = ch_versions.mix(BCFTOOLS_INDEX_2.out.versions.first())
-            } else {
-                bcftools_filter_1_options = "--exclude 'QUAL<${params.filter_and_enhance_vcf_qual_min} || AVG(FORMAT/GQ)<${params.filter_and_enhance_vcf_avg_gq_min} || AVG(FORMAT/DP)<${params.filter_and_enhance_vcf_avg_dp_min} || AVG(FORMAT/DP)>${params.filter_and_enhance_vcf_avg_dp_max}'"
-                bcftools_filter_2_options = "--exclude 'FORMAT/GQ<${params.filter_and_enhance_vcf_sample_gq_min} | FORMAT/DP < ${params.filter_and_enhance_vcf_sample_dp_min} | FORMAT/DP > ${params.filter_and_enhance_vcf_sample_dp_max}' --set-GTs '.'"
-                
-                BCFTOOLS_VIEW_AND_FILTER2 (
-                    ch_filter_polarsbio_input
-                        .map { meta, vcf_file, tbi_file, samples_file -> tuple(meta, vcf_file, tbi_file, [], [], samples_file, [], []) },
-                    Channel.value(bcftools_filter_1_options),
-                    Channel.value(bcftools_filter_2_options),
-                    Channel.value("viewfilter2")
-                )
-                ch_filtered_and_enhanced_vcf  = BCFTOOLS_VIEW_AND_FILTER2.out.vcf
-                ch_filtered_and_enhanced_vcf_tbi  = BCFTOOLS_VIEW_AND_FILTER2.out.tbi
-                ch_versions = ch_versions.mix(BCFTOOLS_VIEW_AND_FILTER2.out.versions.first())
-                ch_tracking = BCFTOOLS_VIEW_AND_FILTER2.out.tracking_out.first()
-            }
-        }
+        bcftools_filter_1_options = "--exclude 'QUAL<${params.filter_and_enhance_vcf_qual_min} || AVG(FORMAT/GQ)<${params.filter_and_enhance_vcf_avg_gq_min} || AVG(FORMAT/DP)<${params.filter_and_enhance_vcf_avg_dp_min} || AVG(FORMAT/DP)>${params.filter_and_enhance_vcf_avg_dp_max}'"
+        bcftools_filter_2_options = "--exclude 'FORMAT/GQ<${params.filter_and_enhance_vcf_sample_gq_min} | FORMAT/DP < ${params.filter_and_enhance_vcf_sample_dp_min} | FORMAT/DP > ${params.filter_and_enhance_vcf_sample_dp_max}' --set-GTs '.'"
+        
+        BCFTOOLS_VIEW_AND_FILTER2 (
+            ch_filter_polarsbio_input
+                .map { meta, vcf_file, tbi_file, samples_file -> tuple(meta, vcf_file, tbi_file, [], [], samples_file, [], []) },
+            Channel.value(bcftools_filter_1_options),
+            Channel.value(bcftools_filter_2_options),
+            Channel.value("viewfilter2")
+        )
+        ch_filtered_vcf  = BCFTOOLS_VIEW_AND_FILTER2.out.vcf
+        ch_filtered_vcf_tbi  = BCFTOOLS_VIEW_AND_FILTER2.out.tbi
+        ch_versions = ch_versions.mix(BCFTOOLS_VIEW_AND_FILTER2.out.versions.first())
+        ch_tracking = BCFTOOLS_VIEW_AND_FILTER2.out.tracking_out.first()
     } else {
         // when reporting is not skipped (and use_dosage is false) we do the filtering after generating EDA reports
 
@@ -206,17 +128,17 @@ workflow PREPARE {
                 Channel.value(params.filter_and_enhance_vcf_calc_ds_min_gq),
                 Channel.value("filterhance")
             )
-            ch_filtered_and_enhanced_vcf = FILTER_AND_ENHANCE_VCF.out.vcf
+            ch_filtered_vcf = FILTER_AND_ENHANCE_VCF.out.vcf
             ch_versions = ch_versions.mix(FILTER_AND_ENHANCE_VCF.out.versions.first())
 
             BCFTOOLS_INDEX_2 (
-                ch_filtered_and_enhanced_vcf
+                ch_filtered_vcf
             )
-            ch_filtered_and_enhanced_vcf_tbi = BCFTOOLS_INDEX_2.out.tbi
+            ch_filtered_vcf_tbi = BCFTOOLS_INDEX_2.out.tbi
             ch_versions = ch_versions.mix(BCFTOOLS_INDEX_2.out.versions.first())
         } else {
-            ch_filtered_and_enhanced_vcf = ch_annotated_vcf
-            ch_filtered_and_enhanced_vcf_tbi = ch_annotated_vcf_tbi
+            ch_filtered_vcf = ch_annotated_vcf
+            ch_filtered_vcf_tbi = ch_annotated_vcf_tbi
         }
     }
 
@@ -226,8 +148,8 @@ workflow PREPARE {
     }
 
     emit:
-    prepared_vcf      = ch_filtered_and_enhanced_vcf
-    prepared_vcf_tbi  = ch_filtered_and_enhanced_vcf_tbi
+    prepared_vcf      = ch_filtered_vcf
+    prepared_vcf_tbi  = ch_filtered_vcf_tbi
     versions   = ch_versions
     tracking   = ch_tracking
 }
