@@ -74,7 +74,7 @@ def extract_aaf(vcf_path: str, output_path: str, tag_name: str, default_tag_name
     info_fields = []
     if has_primary:
         info_fields.append(tag_name)
-    if has_default:
+    if has_default and default_tag_name != tag_name:
         info_fields.append(default_tag_name)
     
     if not info_fields:
@@ -96,7 +96,7 @@ def extract_aaf(vcf_path: str, output_path: str, tag_name: str, default_tag_name
     
     if has_primary:
         select_cols.append(pl.col(tag_name).alias("primary_af"))
-    if has_default:
+    if has_default and default_tag_name != tag_name:
         select_cols.append(pl.col(default_tag_name).alias("default_af"))
     
     df = lf.select(select_cols).collect()
@@ -119,7 +119,7 @@ def extract_aaf(vcf_path: str, output_path: str, tag_name: str, default_tag_name
     ])
     
     # Build AF expression based on available tags
-    if has_primary and has_default:
+    if has_primary and has_default and default_tag_name != tag_name:
         # Both tags available - use coalesce logic
         af_expr = (
             pl.when(

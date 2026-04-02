@@ -253,7 +253,7 @@ workflow RARE_VAR_ASSOC {
     FILTER_MISSING_PER_PHENO (
         ch_pgen_pvar_psam_before_quality_filtering,
         ch_phenotype,
-        PLINK2_MAKEPGEN_2.out.tracking_out.first().mix(PLINK2_MAKEPGEN_1.out.tracking_out.first()).collect()
+        PLINK2_MAKEPGEN_2.out.tracking_out.first()  // PLINK2_MAKEPGEN_2.out.tracking_out.first().mix(PLINK2_MAKEPGEN_1.out.tracking_out.first()).collect()
     )
     ch_pgen_pvar_psam_filtered_per_pheno  = FILTER_MISSING_PER_PHENO.out.pgen_pvar_psam_out
     ch_versions = ch_versions.mix(FILTER_MISSING_PER_PHENO.out.versions.first())
