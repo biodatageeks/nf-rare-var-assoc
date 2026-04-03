@@ -1,6 +1,6 @@
 process PLINK2_EXPORT_OTHER {
     tag "$meta.id"
-    label 'process_1'
+    label 'process_2'
 
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
