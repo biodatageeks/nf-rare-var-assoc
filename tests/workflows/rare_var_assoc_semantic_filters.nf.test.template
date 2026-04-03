@@ -1,0 +1,67 @@
+nextflow_workflow {
+
+    name "RARE_VAR_ASSOC semantic filters"
+    script "main.nf"
+    workflow "PSUSZYNS_RARE_VAR_ASSOC"
+
+    tag "workflows"
+    tag "semantic"
+    tag "filters"
+
+    // NOTE:
+    // This is a template. Convert to *.nf.test after final synthetic fixture files are prepared.
+    // Scenario coverage: S05, S06
+
+    test("S05 F-coefficient outlier filtering") {
+
+        // TODO:
+        // Assert expected removed and retained IDs from fixture contracts in:
+        // tests/fixtures/fcoef_truth_edges/expected/
+
+        when {
+            params {
+                // TODO replace with synthetic fixture paths
+                input_vcf = "${projectDir}/assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz"
+                input_cases = "${projectDir}/assets/medium_data/1kGP_cases_200.txt"
+                input_controls = "${projectDir}/assets/medium_data/1kGP_controls_400.txt"
+                skip_preparation = true
+                skip_reporting = true
+                use_dosage = true
+                outdir = "${projectDir}/tests/workflows/expected/s05_fcoef"
+                project_name = "semantic_s05_fcoef"
+            }
+        }
+
+        then {
+            assertAll(
+                { assert true }
+            )
+        }
+    }
+
+    test("S06 missingness per phenotype boundaries") {
+
+        // TODO:
+        // Assert expected IDs and counts in tests/fixtures/missingness_truth_edges/expected/
+
+        when {
+            params {
+                // TODO replace with synthetic fixture paths
+                input_vcf = "${projectDir}/assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz"
+                input_cases = "${projectDir}/assets/medium_data/1kGP_cases_200.txt"
+                input_controls = "${projectDir}/assets/medium_data/1kGP_controls_400.txt"
+                skip_preparation = true
+                skip_reporting = true
+                use_dosage = true
+                outdir = "${projectDir}/tests/workflows/expected/s06_missingness"
+                project_name = "semantic_s06_missingness"
+            }
+        }
+
+        then {
+            assertAll(
+                { assert true }
+            )
+        }
+    }
+}

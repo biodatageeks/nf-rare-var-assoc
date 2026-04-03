@@ -1,0 +1,68 @@
+nextflow_workflow {
+
+    name "RARE_VAR_ASSOC semantic PCA"
+    script "main.nf"
+    workflow "PSUSZYNS_RARE_VAR_ASSOC"
+
+    tag "workflows"
+    tag "semantic"
+    tag "pca"
+
+    // NOTE:
+    // This is a template. Convert to *.nf.test after final synthetic fixture files are prepared.
+    // Scenario coverage: S03, S04
+
+    test("S03 PCA numerical correctness") {
+
+        // TODO:
+        // Compare pipeline PCA output against independent reference
+        // tests/fixtures/pca_truth_basic/expected/pca_reference.tsv
+
+        when {
+            params {
+                // TODO replace with synthetic fixture paths
+                input_vcf = "${projectDir}/assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz"
+                input_cases = "${projectDir}/assets/medium_data/1kGP_cases_200.txt"
+                input_controls = "${projectDir}/assets/medium_data/1kGP_controls_400.txt"
+                skip_preparation = true
+                skip_reporting = true
+                use_dosage = true
+                outdir = "${projectDir}/tests/workflows/expected/s03_pca"
+                project_name = "semantic_s03_pca"
+            }
+        }
+
+        then {
+            assertAll(
+                { assert true }
+            )
+        }
+    }
+
+    test("S04 PC covariate influence") {
+
+        // TODO:
+        // Run two variants (with and without PC covariates) and assert non-zero deltas
+        // using tests/fixtures/pca_truth_influence/expected/pc_covariate_delta.tsv
+
+        when {
+            params {
+                // TODO replace with synthetic fixture paths
+                input_vcf = "${projectDir}/assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz"
+                input_cases = "${projectDir}/assets/medium_data/1kGP_cases_200.txt"
+                input_controls = "${projectDir}/assets/medium_data/1kGP_controls_400.txt"
+                skip_preparation = true
+                skip_reporting = true
+                use_dosage = true
+                outdir = "${projectDir}/tests/workflows/expected/s04_pca_influence"
+                project_name = "semantic_s04_pca_influence"
+            }
+        }
+
+        then {
+            assertAll(
+                { assert true }
+            )
+        }
+    }
+}

@@ -1,0 +1,41 @@
+nextflow_workflow {
+
+    name "RARE_VAR_ASSOC semantic masks"
+    script "main.nf"
+    workflow "PSUSZYNS_RARE_VAR_ASSOC"
+
+    tag "workflows"
+    tag "semantic"
+    tag "masks"
+
+    // NOTE:
+    // This is a template. Convert to *.nf.test after final synthetic fixture files are prepared.
+    // Scenario coverage: S09
+
+    test("S09 annotation mask constraints") {
+
+        // TODO:
+        // Assert disallowed annotations are removed and allowed annotations retained,
+        // based on tests/fixtures/mask_truth_basic/expected/
+
+        when {
+            params {
+                // TODO replace with synthetic fixture paths
+                input_vcf = "${projectDir}/assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz"
+                input_cases = "${projectDir}/assets/medium_data/1kGP_cases_200.txt"
+                input_controls = "${projectDir}/assets/medium_data/1kGP_controls_400.txt"
+                skip_preparation = true
+                skip_reporting = true
+                use_dosage = true
+                outdir = "${projectDir}/tests/workflows/expected/s09_masks"
+                project_name = "semantic_s09_masks"
+            }
+        }
+
+        then {
+            assertAll(
+                { assert true }
+            )
+        }
+    }
+}

@@ -3,6 +3,7 @@ work/
 data/
 results/
 results_sim_chr22/
+benchmark_results_large/
 .DS_Store
 testing/
 testing*

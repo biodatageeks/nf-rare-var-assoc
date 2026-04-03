@@ -1,0 +1,69 @@
+nextflow_workflow {
+
+    name "RARE_VAR_ASSOC semantic dosage"
+    script "main.nf"
+    workflow "PSUSZYNS_RARE_VAR_ASSOC"
+
+    tag "workflows"
+    tag "semantic"
+    tag "dosage"
+
+    // NOTE:
+    // This is a template. Convert to *.nf.test after final synthetic fixture files are prepared.
+    // Scenario coverage: S01, S02
+
+    test("S01 dosage influence true vs false") {
+
+        // TODO:
+        // 1) Run with use_dosage=true and persist normalized association output.
+        // 2) Run with use_dosage=false and persist normalized association output.
+        // 3) Assert at least one row delta > epsilon using fixture contract in:
+        //    tests/fixtures/dosage_truth_basic/expected/dosage_true_vs_false_delta.tsv
+
+        when {
+            params {
+                // TODO replace with synthetic fixture paths
+                input_vcf = "${projectDir}/assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz"
+                input_cases = "${projectDir}/assets/medium_data/1kGP_cases_200.txt"
+                input_controls = "${projectDir}/assets/medium_data/1kGP_controls_400.txt"
+                skip_preparation = true
+                skip_reporting = true
+                use_dosage = true
+                outdir = "${projectDir}/tests/workflows/expected/s01_dosage_true"
+                project_name = "semantic_s01_true"
+            }
+        }
+
+        then {
+            assertAll(
+                { assert true }
+            )
+        }
+    }
+
+    test("S02 hard GT fallback behavior") {
+
+        // TODO:
+        // Implement assertion contract from tests/fixtures/dosage_truth_basic/README.md
+
+        when {
+            params {
+                // TODO replace with synthetic fixture paths
+                input_vcf = "${projectDir}/assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz"
+                input_cases = "${projectDir}/assets/medium_data/1kGP_cases_200.txt"
+                input_controls = "${projectDir}/assets/medium_data/1kGP_controls_400.txt"
+                skip_preparation = true
+                skip_reporting = true
+                use_dosage = false
+                outdir = "${projectDir}/tests/workflows/expected/s02_dosage_false"
+                project_name = "semantic_s02_false"
+            }
+        }
+
+        then {
+            assertAll(
+                { assert true }
+            )
+        }
+    }
+}
