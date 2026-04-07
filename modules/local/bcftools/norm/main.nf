@@ -57,7 +57,7 @@ process BCFTOOLS_NORM {
     echo "tracking_in: ${tracking_in}"
     predecessor="none"
     if [ -s "${tracking_in}" ]; then
-        predecessor=\$(grep '"process_name"' ${tracking_in} | sed 's/.*"process_name": "\\([^"]*\\)".*/\\1/')
+        predecessor=\$(grep '"process_name"' ${tracking_in} | sed 's/.*"process_name": "\\([^"]*\\)".*/\\1/' || true)
     fi
     echo "predecessor: \$predecessor"
 

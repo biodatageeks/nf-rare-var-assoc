@@ -16,8 +16,12 @@ workflow PCA {
 
     main:
 
-    ch_hild = Channel.fromPath(params.hild_path, checkIfExists: true)
+    ch_hild = Channel.fromPath(params.hild_path, checkIfExists: true).first()
     ch_versions = Channel.empty()
+    empty_tracking_file = file("${projectDir}/assets/empty_tracking.json", checkIfExists: true)
+    trackingFirstOrEmpty = { ch -> ch.first().ifEmpty(empty_tracking_file) }
+    // Tracking is auxiliary: keep a single record and fallback when upstream optional branches produce none.
+    ch_tracking_single = trackingFirstOrEmpty(ch_tracking_in)
 
 
     PLINK2_MAKEBED (
@@ -25,7 +29,7 @@ workflow PCA {
             .map { meta, pgen_file, pvar_file, psam_file ->
                 tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], [])
             }
-            .combine(ch_tracking_in.first()),
+            .combine(ch_tracking_single),
         Channel.value(''),
         Channel.value(''),
         Channel.value('makebed'),
@@ -38,7 +42,7 @@ workflow PCA {
     PLINK19_MAKESET (
         ch_bed_bim_fam
             .combine(ch_hild)
-            .combine(PLINK2_MAKEBED.out.tracking_out.first())
+            .combine(trackingFirstOrEmpty(PLINK2_MAKEBED.out.tracking_out))
     )
     ch_hildset = PLINK19_MAKESET.out.out_set
     ch_versions = ch_versions.mix(PLINK19_MAKESET.out.versions.first())
@@ -47,7 +51,7 @@ workflow PCA {
     PLINK2_INDEP_PAIRWISE (
         ch_pgen_pvar_psam
             .join(ch_hildset, by: 0)
-            .combine(PLINK19_MAKESET.out.tracking_out.first()),
+            .combine(trackingFirstOrEmpty(PLINK19_MAKESET.out.tracking_out)),
         Channel.value(params.plink2_indep_pairwise_window_pca),
         Channel.value('indep_pairwise'),
         Channel.value(params.plink2_indep_pairwise_options)
@@ -60,7 +64,7 @@ workflow PCA {
     PLINK2_KING_CUTOFF (
         ch_pgen_pvar_psam
             .join(ch_indep_pairwise_prune_in, by: 0)
-            .combine(PLINK2_INDEP_PAIRWISE.out.tracking_out.first()),
+            .combine(trackingFirstOrEmpty(PLINK2_INDEP_PAIRWISE.out.tracking_out)),
         Channel.value(params.plink2_king_cutoff_threshold_pca),
         Channel.value('king_cutoff'),
         Channel.value(params.plink2_king_cutoff_options)
@@ -75,7 +79,7 @@ workflow PCA {
             .join(ch_indep_pairwise_prune_in, by: 0)
             .join(ch_king_cutoff_prune_in, by: 0)
             .join(ch_frq, by: 0)
-            .combine(PLINK2_KING_CUTOFF.out.tracking_out.first()),
+            .combine(trackingFirstOrEmpty(PLINK2_KING_CUTOFF.out.tracking_out)),
         Channel.value(params.plink2_pca_settings),
         Channel.value('pca'),
         Channel.value(params.plink2_pca_options)
@@ -91,7 +95,7 @@ workflow PCA {
         ch_pgen_pvar_psam
             .join(ch_frq, by: 0)
             .join(ch_eigenvec_allele, by: 0)
-            .combine(PLINK2_PCA.out.tracking_out.first()),
+            .combine(trackingFirstOrEmpty(PLINK2_PCA.out.tracking_out)),
         Channel.value(params.plink2_projection_score_settings),
         Channel.value('projection'),
         Channel.value(params.plink2_projection_score_options)
@@ -120,4 +124,12 @@ workflow PCA {
     plot_file  = ch_plot_file
     versions   = ch_versions
     tracking   = ch_tracking
+}
+
+def trackingFirstOrEmpty(ch) {
+    ch.first().ifEmpty(file("${projectDir}/assets/empty_tracking.json", checkIfExists: true))
+}
+
+def trackingLastOrEmpty(ch) {
+    ch.last().ifEmpty(file("${projectDir}/assets/empty_tracking.json", checkIfExists: true))
 }

@@ -69,8 +69,8 @@ workflow RARE_VAR_ASSOC {
     ch_versions = Channel.empty()
     ch_multiqc_files = Channel.empty()
     ch_vep_cachedir = Channel.fromPath(vep_cachedir, checkIfExists: true)
-    ch_masks = Channel.fromPath(params.input_masks, checkIfExists: true)
-    ch_hild = Channel.fromPath(params.hild_path, checkIfExists: true)
+    ch_masks = Channel.fromPath(params.input_masks, checkIfExists: true).first()
+    ch_hild = Channel.fromPath(params.hild_path, checkIfExists: true).first()
     ch_meta = ch_input_vcf.map { t -> t[0] }
 
 
@@ -86,7 +86,7 @@ workflow RARE_VAR_ASSOC {
 
 
     // call BCFTOOLS_ASSIGN_ANNOTATIONS with a dummy python script to pull the bioinf_combo image before HyperQueue provisions workers on PLGrid
-    dummy_python_script_ch = Channel.fromPath("${projectDir}/modules/local/bcftools/assign_annotations/assets/dummy.py", checkIfExists: true)
+    dummy_python_script_ch = Channel.fromPath("${projectDir}/modules/local/bcftools/assign_annotations/assets/dummy.py", checkIfExists: true).first()
     BCFTOOLS_ASSIGN_ANNOTATIONS_2 (
         ch_input_vcf
             .combine(ch_masks)
@@ -146,7 +146,7 @@ workflow RARE_VAR_ASSOC {
             ch_prepared_vcf
                 .join(ch_prepared_vcf_tbi, by: 0)
                 .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
-                .combine(PREPARE.out.tracking.last()),
+                .combine(trackingLastOrEmpty(PREPARE.out.tracking)),
             Channel.value(bcftools_filter_1_options),
             Channel.value("filter1")
         )
@@ -159,7 +159,7 @@ workflow RARE_VAR_ASSOC {
             ch_filter_1_vcf
                 .join(ch_filter_1_vcf_tbi, by: 0)
                 .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
-                .combine(BCFTOOLS_FILTER_1.out.tracking_out.first()),
+                .combine(trackingFirstOrEmpty(BCFTOOLS_FILTER_1.out.tracking_out)),
             Channel.value(bcftools_filter_2_options),
             Channel.value("filter2"),
         )
@@ -239,7 +239,7 @@ workflow RARE_VAR_ASSOC {
         split_data.with_x
             .join(ch_frq, by: 0)
             .map { meta, has_x, pgen, pvar, psam, frq -> tuple(meta, pgen, pvar, psam, [], [], frq, [], []) }
-            .combine(PLINK2_MAKEPGEN_1.out.tracking_out.first()),
+            .combine(trackingFirstOrEmpty(PLINK2_MAKEPGEN_1.out.tracking_out)),
         Channel.value('--remove'),
         Channel.value('--exclude'),
         Channel.value(''),
@@ -265,7 +265,7 @@ workflow RARE_VAR_ASSOC {
     FILTER_MISSING_PER_PHENO (
         ch_pgen_pvar_psam_before_quality_filtering,
         ch_phenotype,
-        PLINK2_MAKEPGEN_2.out.tracking_out.first()  // PLINK2_MAKEPGEN_2.out.tracking_out.first().mix(PLINK2_MAKEPGEN_1.out.tracking_out.first()).collect()
+        PLINK2_MAKEPGEN_2.out.tracking_out.first() // PLINK2_MAKEPGEN_2.out.tracking_out.first().mix(PLINK2_MAKEPGEN_1.out.tracking_out.first()).collect()
     )
     ch_pgen_pvar_psam_filtered_per_pheno  = FILTER_MISSING_PER_PHENO.out.pgen_pvar_psam_out
     ch_versions = ch_versions.mix(FILTER_MISSING_PER_PHENO.out.versions.first())
@@ -276,7 +276,7 @@ workflow RARE_VAR_ASSOC {
         ch_pgen_pvar_psam_filtered_per_pheno
             .combine(ch_hild)
             .map { meta, pgen_file, pvar_file, psam_file, hild_file -> tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], [], hild_file) }
-            .combine(FILTER_MISSING_PER_PHENO.out.tracking.last()),
+            .combine(trackingLastOrEmpty(FILTER_MISSING_PER_PHENO.out.tracking)),
         Channel.value('--remove'),
         Channel.value('--exclude'),
         Channel.value(''),
@@ -309,7 +309,7 @@ workflow RARE_VAR_ASSOC {
 
     PLINK2_WRITE_SNPLIST_1 (
         ch_pgen_pvar_psam_4.map { meta, pgen_file, pvar_file, psam_file -> tuple(meta, pgen_file, pvar_file, psam_file, []) }
-            .combine(PCA.out.tracking.last()),
+            .combine(trackingLastOrEmpty(PCA.out.tracking)),
         Channel.value('writesnp_pass'),
         Channel.value(params.plink2_write_snplist_qc_options)
     )
@@ -323,7 +323,7 @@ workflow RARE_VAR_ASSOC {
         ch_pgen_pvar_psam_filtered_per_pheno
             .combine(ch_hild)
             .map { meta, pgen_file, pvar_file, psam_file, hild_file -> tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], [], hild_file) }
-            .combine(FILTER_MISSING_PER_PHENO.out.tracking.last()),
+            .combine(trackingLastOrEmpty(FILTER_MISSING_PER_PHENO.out.tracking)),
         Channel.value('--remove'),
         Channel.value('--exclude'),
         Channel.value(''),
@@ -338,7 +338,7 @@ workflow RARE_VAR_ASSOC {
     PLINK2_MAKEPGEN_5 (
         ch_pgen_pvar_psam_5
             .map { meta, pgen_file, pvar_file, psam_file -> tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], [], []) }
-            .combine(PLINK2_MAKEPGEN_4.out.tracking_out.first()),
+            .combine(trackingFirstOrEmpty(PLINK2_MAKEPGEN_4.out.tracking_out)),
         Channel.value('--remove'),
         Channel.value('--exclude'),
         Channel.value(''),
@@ -352,7 +352,7 @@ workflow RARE_VAR_ASSOC {
     
     PLINK2_WRITE_SNPLIST_2 (
         ch_pgen_pvar_psam_6.map { meta, pgen_file, pvar_file, psam_file -> tuple(meta, pgen_file, pvar_file, psam_file, []) }
-            .combine(PLINK2_MAKEPGEN_5.out.tracking_out.first()),
+            .combine(trackingFirstOrEmpty(PLINK2_MAKEPGEN_5.out.tracking_out)),
         Channel.value('writesnp_step2'),
         Channel.value(params.plink2_write_snplist_step2_options),
     )
@@ -366,7 +366,7 @@ workflow RARE_VAR_ASSOC {
             .join(ch_step2_sample_ids, by: 0)            // Samples file
             .join(ch_step2_snplist, by: 0)               // SNPs file
             .map { meta, vcf_file, tbi_file, samples_file, snplist_file -> tuple(meta, vcf_file, tbi_file, [], [], samples_file, snplist_file) }
-            .combine(PLINK2_WRITE_SNPLIST_2.out.tracking_out.first()),
+            .combine(trackingFirstOrEmpty(PLINK2_WRITE_SNPLIST_2.out.tracking_out)),
         Channel.value("--output-type z --write-index=tbi"),         // input args
         Channel.value("view2")
     )
@@ -393,7 +393,7 @@ workflow RARE_VAR_ASSOC {
 
     REGENIE_STEP1 (
         ch_regenie_step_1_input
-            .combine(PLINK2_WRITE_SNPLIST_1.out.tracking_out.first()),
+            .combine(trackingFirstOrEmpty(PLINK2_WRITE_SNPLIST_1.out.tracking_out)),
         Channel.value(params.regenie_step1_options)
     )
     ch_regenie_step1_loco  = REGENIE_STEP1.out.loco
@@ -403,7 +403,7 @@ workflow RARE_VAR_ASSOC {
 
 
     // Python vcf2aaf (replaces slower R version)
-    python_vcf2aaf_script_ch = Channel.fromPath("${projectDir}/modules/local/python/vcf2aaf/assets/vcf2aaf.py", checkIfExists: true)
+    python_vcf2aaf_script_ch = Channel.fromPath("${projectDir}/modules/local/python/vcf2aaf/assets/vcf2aaf.py", checkIfExists: true).first()
     // Split vcf2aaf options: if two parts use both, if one part use empty string + the value
     def vcf2aaf_opts = params.rscript_vcf2aaf_options.split(' ')
     def vcf2aaf_opt1 = vcf2aaf_opts.size() > 1 ? vcf2aaf_opts[0] : ''
@@ -418,7 +418,7 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(PYTHON_VCFTOAAF.out.versions.first())
     
     // bcftools/polars assign_annotations (replaces slower R version, also fixes NULL bug)
-    python_assign_annotations_script_ch = Channel.fromPath("${projectDir}/modules/local/bcftools/assign_annotations/assets/assign_annotations.py", checkIfExists: true)
+    python_assign_annotations_script_ch = Channel.fromPath("${projectDir}/modules/local/bcftools/assign_annotations/assets/assign_annotations.py", checkIfExists: true).first()
     BCFTOOLS_ASSIGN_ANNOTATIONS (
         ch_step2_vcf
             .combine(ch_masks)
@@ -471,7 +471,7 @@ workflow RARE_VAR_ASSOC {
     REGENIE_STEP2 (
         ch_regenie_step_2_input
             .combine(ch_masks)
-            .combine(BCFTOOLS_VIEW_2.out.tracking_out.first()),
+            .combine(trackingFirstOrEmpty(BCFTOOLS_VIEW_2.out.tracking_out)),
         Channel.value(params.regenie_step2_options),
         Channel.value(!params.skip_reporting)
     )
@@ -480,7 +480,7 @@ workflow RARE_VAR_ASSOC {
     ch_tracking_step2 = ch_tracking_step2.mix(REGENIE_STEP2.out.tracking_out.first())
 
     if (!params.skip_reporting) {
-        r_script_buildreports_ch = Channel.fromPath(params.rscript_buildreports_path, checkIfExists: true)
+        r_script_buildreports_ch = Channel.fromPath(params.rscript_buildreports_path, checkIfExists: true).first()
         RSCRIPT_BUILDREPORTS (
             REGENIE_STEP2.out.masks_snplist
                 .join(ch_regenie_step2_regenie_out, by: 0)
@@ -500,7 +500,7 @@ workflow RARE_VAR_ASSOC {
             .groupTuple(by: [0, 1])
             .set { ch_regenie_step2_by_phenotype }
 
-        py_script_csv_concat_ch = Channel.fromPath(params.py_script_csv_concat_path, checkIfExists: true)
+        py_script_csv_concat_ch = Channel.fromPath(params.py_script_csv_concat_path, checkIfExists: true).first()
         MERGE_RESULTS (
             ch_regenie_step2_by_phenotype
                 .combine(py_script_csv_concat_ch)
@@ -575,6 +575,14 @@ workflow RARE_VAR_ASSOC {
     emit:multiqc_report = MULTIQC.out.report.toList() // channel: /path/to/multiqc_report.html
     versions       = ch_versions                 // channel: [ path(versions.yml) ]
 
+}
+
+def trackingFirstOrEmpty(ch) {
+    ch.first().ifEmpty(file("${projectDir}/assets/empty_tracking.json", checkIfExists: true))
+}
+
+def trackingLastOrEmpty(ch) {
+    ch.last().ifEmpty(file("${projectDir}/assets/empty_tracking.json", checkIfExists: true))
 }
 
 workflow.onComplete {

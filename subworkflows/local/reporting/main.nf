@@ -11,13 +11,13 @@ workflow REPORTING {
     setlist_file
 
     main:
-    gwas_report_template = Channel.fromPath("$baseDir/modules/local/rscript/manhattan_qq_plots/assets/gene_level_report_template.Rmd", checkIfExists: true)
-    r_functions_file = Channel.fromPath("$baseDir/modules/local/rscript/manhattan_qq_plots/assets/functions.R", checkIfExists: true)
+    gwas_report_template = Channel.fromPath("$baseDir/modules/local/rscript/manhattan_qq_plots/assets/gene_level_report_template.Rmd", checkIfExists: true).first()
+    r_functions_file = Channel.fromPath("$baseDir/modules/local/rscript/manhattan_qq_plots/assets/functions.R", checkIfExists: true).first()
 
     if(!params.phenotypes_apply_rint) {
-        rmd_pheno_stats_file = Channel.fromPath("$baseDir/modules/local/rscript/manhattan_qq_plots/assets/child_phenostatistics.Rmd", checkIfExists: true)
+        rmd_pheno_stats_file = Channel.fromPath("$baseDir/modules/local/rscript/manhattan_qq_plots/assets/child_phenostatistics.Rmd", checkIfExists: true).first()
     } else {
-        rmd_pheno_stats_file = Channel.fromPath("$baseDir/modules/local/rscript/manhattan_qq_plots/assets/child_phenostatistics_rint.Rmd", checkIfExists: true)
+        rmd_pheno_stats_file = Channel.fromPath("$baseDir/modules/local/rscript/manhattan_qq_plots/assets/child_phenostatistics_rint.Rmd", checkIfExists: true).first()
     }
 
     RSCRIPT_MANHATTAN_QQ_PLOTS (

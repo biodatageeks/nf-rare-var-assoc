@@ -13,9 +13,10 @@ workflow FILTER_MISSING_PER_PHENO {
     main:
 
     ch_versions = Channel.empty()
-    // Tracking is auxiliary: force a single predecessor record and fallback to an empty tracking file if none is available.
-    // This keeps the main data path running even when an upstream optional step (e.g. chrX-only branch) is skipped.
-    ch_tracking_single = ch_tracking_in.first().ifEmpty(file("${projectDir}/assets/empty_tracking.json", checkIfExists: true))
+    empty_tracking_file = file("${projectDir}/assets/empty_tracking.json", checkIfExists: true)
+    trackingFirstOrEmpty = { ch -> ch.first().ifEmpty(empty_tracking_file) }
+    // Tracking is auxiliary: force a single predecessor record and fallback when none is available.
+    ch_tracking_single = trackingFirstOrEmpty(ch_tracking_in)
 
 
     EXTRACT_PHENOTYPES_AND_SAMPLES(
@@ -55,7 +56,7 @@ workflow FILTER_MISSING_PER_PHENO {
             .map { meta, pgen_file, pvar_file, psam_file, snplist_files ->
                 tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], [], snplist_files)
             }
-            .combine(PLINK2_WRITE_SNPLIST.out.tracking_out.first()),
+            .combine(trackingFirstOrEmpty(PLINK2_WRITE_SNPLIST.out.tracking_out)),
         Channel.value(''),
         Channel.value('--extract-intersect'),
         Channel.value(''),
@@ -75,4 +76,12 @@ workflow FILTER_MISSING_PER_PHENO {
     pgen_pvar_psam_out = ch_pgen_pvar_psam_out
     versions        = ch_versions
     tracking        = ch_tracking
+}
+
+def trackingFirstOrEmpty(ch) {
+    ch.first().ifEmpty(file("${projectDir}/assets/empty_tracking.json", checkIfExists: true))
+}
+
+def trackingLastOrEmpty(ch) {
+    ch.last().ifEmpty(file("${projectDir}/assets/empty_tracking.json", checkIfExists: true))
 }

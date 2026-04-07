@@ -147,7 +147,7 @@ workflow PIPELINE_INITIALISATION {
                 }
                 .set { ch_input_cases }
             
-            r_script_build_phenotypes_ch = Channel.fromPath(params.rscript_build_phenotypes_path, checkIfExists: true)
+            r_script_build_phenotypes_ch = Channel.fromPath(params.rscript_build_phenotypes_path, checkIfExists: true).first()
             RSCRIPT_BUILD_PHENOTYPES (
                 ch_input_controls.join(ch_input_cases, by: 0)
                     .combine(r_script_build_phenotypes_ch),

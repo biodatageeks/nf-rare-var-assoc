@@ -22,10 +22,12 @@ workflow PREPARE {
     ch_all_samples
 
     main:
-    ch_rename_chr = Channel.fromPath("${projectDir}/assets/rename_chr.txt", checkIfExists: true)
+    ch_rename_chr = Channel.fromPath("${projectDir}/assets/rename_chr.txt", checkIfExists: true).first()
     python_view_and_filter2_polarsbio_script_ch = Channel.fromPath(params.view_and_filter2_polarsbio_script, checkIfExists: true)
     python_filter_and_enhance_vcf_polarsbio_script_ch = Channel.fromPath(params.filter_and_enhance_vcf_polarsbio_script, checkIfExists: true)
     ch_versions = Channel.empty()
+    empty_tracking_file = file("${projectDir}/assets/empty_tracking.json", checkIfExists: true)
+    trackingFirstOrEmpty = { ch -> ch.first().ifEmpty(empty_tracking_file) }
 
     
     BCFTOOLS_REPLACE_SAMPLE_NAMES (
@@ -89,7 +91,7 @@ workflow PREPARE {
                     .join(ch_all_samples_vcf_tbi, by: 0)
                     .combine(ch_vep_cachesubdir.map { t -> "${t}/${params.vep_fasta_path}" })
                     //.map { meta, vcf_file, tbi_file, fasta_path -> tuple(meta, vcf_file, tbi_file, fasta_path, []) },
-                    .combine(BCFTOOLS_VIEW_1.out.tracking_out.first()),
+                    .combine(trackingFirstOrEmpty(BCFTOOLS_VIEW_1.out.tracking_out)),
                 Channel.value("norm")
             )
             ch_normalized_vcf = BCFTOOLS_NORM.out.vcf
@@ -152,4 +154,12 @@ workflow PREPARE {
     prepared_vcf_tbi  = ch_filtered_vcf_tbi
     versions   = ch_versions
     tracking   = ch_tracking
+}
+
+def trackingFirstOrEmpty(ch) {
+    ch.first().ifEmpty(file("${projectDir}/assets/empty_tracking.json", checkIfExists: true))
+}
+
+def trackingLastOrEmpty(ch) {
+    ch.last().ifEmpty(file("${projectDir}/assets/empty_tracking.json", checkIfExists: true))
 }

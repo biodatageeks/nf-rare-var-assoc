@@ -12,10 +12,14 @@ workflow F_COEFFICIENT_FILTERING {
     main:
 
     ch_versions = Channel.empty()
+    empty_tracking_file = file("${projectDir}/assets/empty_tracking.json", checkIfExists: true)
+    trackingFirstOrEmpty = { ch -> ch.first().ifEmpty(empty_tracking_file) }
+    // Tracking is auxiliary: keep a single record and fallback when upstream optional branches produce none.
+    ch_tracking_single = trackingFirstOrEmpty(ch_tracking_in)
     
     PLINK2_INDEP_PAIRWISE (
         ch_pgen_pvar_psam.map { meta, pgen_file, pvar_file, psam_file -> tuple(meta, pgen_file, pvar_file, psam_file, []) }
-            .combine(ch_tracking_in.first()),
+            .combine(ch_tracking_single),
         Channel.value(params.plink2_indep_pairwise_window),
         Channel.value('indep_pairwise'),
         Channel.value(params.plink2_indep_pairwise_options)
@@ -29,7 +33,7 @@ workflow F_COEFFICIENT_FILTERING {
         ch_pgen_pvar_psam
             .join(ch_indep_pairwise_prune_in, by: 0)
             .map { meta, pgen_file, pvar_file, psam_file, het_file -> tuple(meta, pgen_file, pvar_file, psam_file, het_file) }
-            .combine(PLINK2_INDEP_PAIRWISE.out.tracking_out.first()),
+            .combine(trackingFirstOrEmpty(PLINK2_INDEP_PAIRWISE.out.tracking_out)),
         Channel.value('het'),
         Channel.value('')
     )
@@ -49,7 +53,7 @@ workflow F_COEFFICIENT_FILTERING {
         ch_pgen_pvar_psam
             .join(ch_inbreeding_outliers, by: 0)
             .map { meta, pgen_file, pvar_file, psam_file, outliers_file -> tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], outliers_file, []) }
-            .combine(PLINK2_HET.out.tracking_out.first()),
+            .combine(trackingFirstOrEmpty(PLINK2_HET.out.tracking_out)),
         Channel.value('--remove'),
         Channel.value('--exclude'),
         Channel.value(''),
@@ -69,4 +73,13 @@ workflow F_COEFFICIENT_FILTERING {
     pgen_pvar_psam_out = ch_pgen_pvar_psam_out
     versions        = ch_versions
     tracking        = ch_tracking
+}
+
+
+def trackingFirstOrEmpty(ch) {
+    ch.first().ifEmpty(file("${projectDir}/assets/empty_tracking.json", checkIfExists: true))
+}
+
+def trackingLastOrEmpty(ch) {
+    ch.last().ifEmpty(file("${projectDir}/assets/empty_tracking.json", checkIfExists: true))
 }
