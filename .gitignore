@@ -2,7 +2,9 @@
 work/
 data/
 results/
+results_test/
 results_sim_chr22/
+results_test_skip_preparation_and_reporting/
 benchmark_results_large/
 .DS_Store
 testing/
