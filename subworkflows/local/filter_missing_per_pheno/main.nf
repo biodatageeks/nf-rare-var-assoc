@@ -13,6 +13,9 @@ workflow FILTER_MISSING_PER_PHENO {
     main:
 
     ch_versions = Channel.empty()
+    // Tracking is auxiliary: force a single predecessor record and fallback to an empty tracking file if none is available.
+    // This keeps the main data path running even when an upstream optional step (e.g. chrX-only branch) is skipped.
+    ch_tracking_single = ch_tracking_in.first().ifEmpty(file("${projectDir}/assets/empty_tracking.json", checkIfExists: true))
 
 
     EXTRACT_PHENOTYPES_AND_SAMPLES(
@@ -24,6 +27,10 @@ workflow FILTER_MISSING_PER_PHENO {
 
     PLINK2_WRITE_SNPLIST (
         ch_pgen_pvar_psam
+            // Split each joined record into one tuple per phenotype-specific sample file.
+            // This runs SNP filtering separately per phenotype by swapping meta.id to sample_file base name,
+            // while preserving the original id in orig_id so outputs can be regrouped to the source cohort later.
+            // Attach one shared tracking file only for lineage metadata; this must not change processing cardinality.
             .join(ch_sample_files, by: 0)
             .flatMap { meta, pgen_file, pvar_file, psam_file, sample_files ->
                 sample_files.collect { v -> tuple(meta, pgen_file, pvar_file, psam_file, v) } 
@@ -31,7 +38,7 @@ workflow FILTER_MISSING_PER_PHENO {
             .map { meta, pgen_file, pvar_file, psam_file, sample_file ->
                 tuple(meta + ['orig_id': meta.id, 'id': sample_file.getBaseName()], pgen_file, pvar_file, psam_file, sample_file)
             }
-            .combine(ch_tracking_in),
+            .combine(ch_tracking_single),
         Channel.value('identify_acceptable_variants'),
         Channel.value(params.plink2_missing_per_pheno_options)
     )

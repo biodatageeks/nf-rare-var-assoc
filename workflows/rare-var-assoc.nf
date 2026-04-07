@@ -16,6 +16,7 @@ include { REGENIE_STEP2          } from '../modules/local/regenie/step2'
 include { REGENIE_STEP1          } from '../modules/local/regenie/step1'
 include { PYTHON_VCFTOAAF        } from '../modules/local/python/vcf2aaf'
 include { BCFTOOLS_ASSIGN_ANNOTATIONS        } from '../modules/local/bcftools/assign_annotations'
+include { BCFTOOLS_ASSIGN_ANNOTATIONS as BCFTOOLS_ASSIGN_ANNOTATIONS_2 } from '../modules/local/bcftools/assign_annotations'
 include { BGENIX                 } from '../modules/local/bgenix'
 include { QCTOOL                 } from '../modules/local/qctool'
 include { PLINK2_IMPORT_DOSAGE   } from '../modules/local/plink2/import_dosage'
@@ -82,6 +83,17 @@ workflow RARE_VAR_ASSOC {
     )
     ch_vep_cachesubdir = VEP_UPDATECACHE.out.cachesubdir.first()
     ch_versions = ch_versions.mix(VEP_UPDATECACHE.out.versions.first())
+
+
+    // call BCFTOOLS_ASSIGN_ANNOTATIONS with a dummy python script to pull the bioinf_combo image before HyperQueue provisions workers on PLGrid
+    dummy_python_script_ch = Channel.fromPath("${projectDir}/modules/local/bcftools/assign_annotations/assets/dummy.py", checkIfExists: true)
+    BCFTOOLS_ASSIGN_ANNOTATIONS_2 (
+        ch_input_vcf
+            .combine(ch_masks)
+            .combine(dummy_python_script_ch),
+        Channel.value(params.rscript_annotate_options)
+    )
+
 
     PREPARE (
         ch_input_vcf,

@@ -74,7 +74,7 @@ process PLINK2_MAKEPGEN {
         predecessor=""
         for file in ${tracking_in}; do
             if [ -s "\$file" ]; then
-                name=\$(grep '"process_name"' "\$file" | sed 's/.*"process_name": "\\([^"]*\\)".*/\\1/')
+                name=\$(grep '"process_name"' "\$file" | sed 's/.*"process_name": "\\([^"]*\\)".*/\\1/' || true)
                 if [ -n "\$name" ]; then
                     if [ -n "\$predecessor" ]; then
                         predecessor="\${predecessor} \${name}"
