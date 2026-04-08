@@ -23,12 +23,7 @@ workflow PREPARE {
 
     main:
     ch_rename_chr = Channel.fromPath("${projectDir}/assets/rename_chr.txt", checkIfExists: true).first()
-    python_view_and_filter2_polarsbio_script_ch = Channel.fromPath(params.view_and_filter2_polarsbio_script, checkIfExists: true)
-    python_filter_and_enhance_vcf_polarsbio_script_ch = Channel.fromPath(params.filter_and_enhance_vcf_polarsbio_script, checkIfExists: true)
     ch_versions = Channel.empty()
-    empty_tracking_file = file("${projectDir}/assets/empty_tracking.json", checkIfExists: true)
-    trackingFirstOrEmpty = { ch -> ch.first().ifEmpty(empty_tracking_file) }
-
     
     BCFTOOLS_REPLACE_SAMPLE_NAMES (
         ch_input_vcf,

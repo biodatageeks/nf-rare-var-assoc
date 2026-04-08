@@ -12,8 +12,6 @@ workflow F_COEFFICIENT_FILTERING {
     main:
 
     ch_versions = Channel.empty()
-    empty_tracking_file = file("${projectDir}/assets/empty_tracking.json", checkIfExists: true)
-    trackingFirstOrEmpty = { ch -> ch.first().ifEmpty(empty_tracking_file) }
     // Tracking is auxiliary: keep a single record and fallback when upstream optional branches produce none.
     ch_tracking_single = trackingFirstOrEmpty(ch_tracking_in)
     
@@ -32,7 +30,7 @@ workflow F_COEFFICIENT_FILTERING {
     PLINK2_HET (
         ch_pgen_pvar_psam
             .join(ch_indep_pairwise_prune_in, by: 0)
-            .map { meta, pgen_file, pvar_file, psam_file, het_file -> tuple(meta, pgen_file, pvar_file, psam_file, het_file) }
+            .map { meta, pgen_file, pvar_file, psam_file, extract_file -> tuple(meta, pgen_file, pvar_file, psam_file, extract_file) }
             .combine(trackingFirstOrEmpty(PLINK2_INDEP_PAIRWISE.out.tracking_out)),
         Channel.value('het'),
         Channel.value('')
@@ -40,7 +38,7 @@ workflow F_COEFFICIENT_FILTERING {
     ch_het  = PLINK2_HET.out.out_het
     ch_versions = ch_versions.mix(PLINK2_HET.out.versions.first())
     ch_tracking = ch_tracking.mix(PLINK2_HET.out.tracking_out.first())
-
+    
     CALCULATE_F_OUTLIERS (
         ch_het,
         Channel.value(params.inbreeding_outliers_range_stds),

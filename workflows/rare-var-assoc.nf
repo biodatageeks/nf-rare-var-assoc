@@ -70,7 +70,6 @@ workflow RARE_VAR_ASSOC {
     ch_multiqc_files = Channel.empty()
     ch_vep_cachedir = Channel.fromPath(vep_cachedir, checkIfExists: true)
     ch_masks = Channel.fromPath(params.input_masks, checkIfExists: true).first()
-    ch_hild = Channel.fromPath(params.hild_path, checkIfExists: true).first()
     ch_meta = ch_input_vcf.map { t -> t[0] }
 
 
@@ -274,8 +273,7 @@ workflow RARE_VAR_ASSOC {
 
     PLINK2_MAKEPGEN_3 (
         ch_pgen_pvar_psam_filtered_per_pheno
-            .combine(ch_hild)
-            .map { meta, pgen_file, pvar_file, psam_file, hild_file -> tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], [], hild_file) }
+            .map { meta, pgen_file, pvar_file, psam_file -> tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], [], []) }
             .combine(trackingLastOrEmpty(FILTER_MISSING_PER_PHENO.out.tracking)),
         Channel.value('--remove'),
         Channel.value('--exclude'),
@@ -321,8 +319,7 @@ workflow RARE_VAR_ASSOC {
 
     PLINK2_MAKEPGEN_4 (
         ch_pgen_pvar_psam_filtered_per_pheno
-            .combine(ch_hild)
-            .map { meta, pgen_file, pvar_file, psam_file, hild_file -> tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], [], hild_file) }
+            .map { meta, pgen_file, pvar_file, psam_file -> tuple(meta, pgen_file, pvar_file, psam_file, [], [], [], [], []) }
             .combine(trackingLastOrEmpty(FILTER_MISSING_PER_PHENO.out.tracking)),
         Channel.value('--remove'),
         Channel.value('--exclude'),

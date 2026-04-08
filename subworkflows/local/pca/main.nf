@@ -18,8 +18,6 @@ workflow PCA {
 
     ch_hild = Channel.fromPath(params.hild_path, checkIfExists: true).first()
     ch_versions = Channel.empty()
-    empty_tracking_file = file("${projectDir}/assets/empty_tracking.json", checkIfExists: true)
-    trackingFirstOrEmpty = { ch -> ch.first().ifEmpty(empty_tracking_file) }
     // Tracking is auxiliary: keep a single record and fallback when upstream optional branches produce none.
     ch_tracking_single = trackingFirstOrEmpty(ch_tracking_in)
 

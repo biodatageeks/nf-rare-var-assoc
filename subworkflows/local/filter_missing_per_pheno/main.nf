@@ -13,8 +13,6 @@ workflow FILTER_MISSING_PER_PHENO {
     main:
 
     ch_versions = Channel.empty()
-    empty_tracking_file = file("${projectDir}/assets/empty_tracking.json", checkIfExists: true)
-    trackingFirstOrEmpty = { ch -> ch.first().ifEmpty(empty_tracking_file) }
     // Tracking is auxiliary: force a single predecessor record and fallback when none is available.
     ch_tracking_single = trackingFirstOrEmpty(ch_tracking_in)
 
