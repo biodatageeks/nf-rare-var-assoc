@@ -302,12 +302,21 @@ workflow RARE_VAR_ASSOC {
     )
     ch_sscore = PCA.out.sscore
     ch_pca_plot_file = PCA.out.plot_file
+    ch_king_cutoff_prune_in = PCA.out.king_cutoff_prune_in
     ch_versions = ch_versions.mix(PCA.out.versions.first())
     ch_tracking_step1 = ch_tracking_step1.mix(PCA.out.tracking)
 
+    if (params.regenie_step1_kinship_filtering) {
+        plink2_write_snplist_1_input = ch_pgen_pvar_psam_4
+            .join(ch_king_cutoff_prune_in, by: 0)
+            .map { meta, pgen_file, pvar_file, psam_file, king_cutoff_prune_in -> tuple(meta, pgen_file, pvar_file, psam_file, king_cutoff_prune_in) }
+    } else {
+        plink2_write_snplist_1_input = ch_pgen_pvar_psam_4
+            .map { meta, pgen_file, pvar_file, psam_file -> tuple(meta, pgen_file, pvar_file, psam_file, []) }
+    }
+
     PLINK2_WRITE_SNPLIST_1 (
-        ch_pgen_pvar_psam_4.map { meta, pgen_file, pvar_file, psam_file -> tuple(meta, pgen_file, pvar_file, psam_file, []) }
-            .combine(trackingLastOrEmpty(PCA.out.tracking)),
+        plink2_write_snplist_1_input.combine(trackingLastOrEmpty(PCA.out.tracking)),
         Channel.value('writesnp_pass'),
         Channel.value(params.plink2_write_snplist_qc_options)
     )

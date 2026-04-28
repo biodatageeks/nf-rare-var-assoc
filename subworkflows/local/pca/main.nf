@@ -120,6 +120,7 @@ workflow PCA {
     emit:
     sscore     = ch_sscore
     plot_file  = ch_plot_file
+    king_cutoff_prune_in = ch_king_cutoff_prune_in
     versions   = ch_versions
     tracking   = ch_tracking
 }
