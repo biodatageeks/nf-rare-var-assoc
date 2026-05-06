@@ -1,0 +1,41 @@
+nextflow_process {
+
+    name "Test Process MERGE_SEX_COVAR"
+    script "../main.nf"
+    process "MERGE_SEX_COVAR"
+
+    tag "modules"
+    tag "modules_"
+    tag "mergesexcovar"
+
+    test("merging PCA sscore file with SEX from psam file to form a single covariates file") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test', single_end:false ], // meta map
+                    file('${projectDir}/modules/local/python/merge_sex_covar/tests/assets/test_projection.sscore', checkIfExists: true),
+                    file('${projectDir}/modules/local/python/merge_sex_covar/tests/assets/test_makepgen4.psam', checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert process.out.covar_file.size() == 1 },
+                { assert process.out.versions.size() == 1 },
+                { assert file(process.out.covar_file[0][1]).name.endsWith('_sex_covar.txt') },
+                { assert path(process.out.covar_file[0][1]).readLines().equals([
+                    '#FID\tIID\tPHENO1\tALLELE_CT\tNAMED_ALLELE_DOSAGE_SUM\tPC1_AVG\tPC2_AVG\tPC3_AVG\tPC4_AVG\tPC5_AVG\tPC6_AVG\tPC7_AVG\tPC8_AVG\tPC9_AVG\tPC10_AVG\tSEX',
+                    'HG03781\tHG03781\t1\t630\t630\t-0.0234962\t0.131451\t-0.0847061\t0.0388767\t0.00920127\t0.0253016\t-0.0148846\t-0.022419\t0.0237606\t-0.0123937\tNA',
+                    'HG03782\tHG03782\t1\t604\t604\t-0.0181115\t0.0285475\t-0.0619145\t-0.00404428\t0.0201962\t0.0560765\t0.0339468\t0.015368\t-0.0202399\t0.0701463\tM',
+                    'HG03784\tHG03784\t0\t626\t626\t-0.0315753\t0.152715\t-0.0637191\t-0.0192868\t0.0156481\t-0.0126355\t5.2861e-05\t0.11484\t-0.0310568\t-0.0569127\tF'
+                ]) }
+            )
+        }
+
+    }
+
+}

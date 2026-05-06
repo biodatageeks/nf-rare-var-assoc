@@ -11,6 +11,7 @@ include { CHECK_X_CHROM_PRESENT  } from '../modules/local/cmds/check_x_chrom_pre
 include { GENERATE_TRACKING_REPORT           } from '../modules/local/python/generate_tracking_report'
 include { EXPLORATORY_DATA_ANALYSIS          } from '../modules/local/python/eda'
 include { FIX_ZERO_PL            } from '../modules/local/python/fix_zero_PL'
+include { MERGE_SEX_COVAR        } from '../modules/local/python/merge_sex_covar'
 include { RSCRIPT_BUILDREPORTS   } from '../modules/local/rscript/buildreports'
 include { REGENIE_STEP2          } from '../modules/local/regenie/step2'
 include { REGENIE_STEP1          } from '../modules/local/regenie/step1'
@@ -306,6 +307,15 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(PCA.out.versions.first())
     ch_tracking_step1 = ch_tracking_step1.mix(PCA.out.tracking)
 
+    MERGE_SEX_COVAR (
+        ch_sscore.join(
+            ch_pgen_pvar_psam_4.map { meta, pgen_file, pvar_file, psam_file -> tuple(meta, psam_file) },
+            by: 0
+        )
+    )
+    ch_regenie_covar_file = MERGE_SEX_COVAR.out.covar_file
+    ch_versions = ch_versions.mix(MERGE_SEX_COVAR.out.versions.first())
+
     if (params.regenie_step1_kinship_filtering) {
         plink2_write_snplist_1_input = ch_pgen_pvar_psam_4
             .join(ch_king_cutoff_prune_in, by: 0)
@@ -389,7 +399,7 @@ workflow RARE_VAR_ASSOC {
     
     if (params.regenie_step1_options.contains("covarColList")) {
         ch_regenie_step_1_input = ch_regenie_step_1_input_part
-            .join(ch_sscore, by: 0)
+            .join(ch_regenie_covar_file, by: 0)
     } else {
         ch_regenie_step_1_input = ch_regenie_step_1_input_part
             .map { meta, pgen_file, pvar_file, psam_file, id_file, snplist_file, phenotype_file ->
@@ -466,7 +476,7 @@ workflow RARE_VAR_ASSOC {
             .join(ch_regenie_step1_pred_list, by: 0)
     if (params.regenie_step1_options.contains("covarColList")) {
         ch_regenie_step_2_input = ch_regenie_step_2_input_part
-            .join(ch_sscore, by: 0)
+            .join(ch_regenie_covar_file, by: 0)
     } else {
         ch_regenie_step_2_input = ch_regenie_step_2_input_part
             .map { meta, pgen, pvar, psam, pheno, anno, setlist, aaf, pred_list ->
