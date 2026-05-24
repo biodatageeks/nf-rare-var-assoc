@@ -1,3 +1,6 @@
+Update: this is an old file which should be considered obsolete. These changes were abandoned and since then some changes were applied to the code.
+
+
 # Design Doc: Business-Logic Testing for `RARE_VAR_ASSOC`
 
 ## 1. Context and Priority

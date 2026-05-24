@@ -1,8 +1,5 @@
 
 include { BCFTOOLS_REPLACE_SAMPLE_NAMES      } from '../../../modules/local/bcftools/replace_sample_names'
-include { BCFTOOLS_VCF2PSAM      } from '../../../modules/local/bcftools/vcf2psam'
-include { BCFTOOLS_VCF2FRQ       } from '../../../modules/local/bcftools/vcf2frq'
-include { BCFTOOLS_TAG2TAG       } from '../../../modules/local/bcftools/tag2tag'
 include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_1   } from '../../../modules/local/bcftools/view'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_1 } from '../../../modules/local/bcftools/index'
 include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_2 } from '../../../modules/local/bcftools/index'
@@ -10,8 +7,6 @@ include { BCFTOOLS_NORM          } from '../../../modules/local/bcftools/norm'
 include { BCFTOOLS_ANNOTATE      } from '../../../modules/local/bcftools/annotate'
 //include { FIX_ZERO_PL            } from '../../../modules/local/python/fix_zero_PL'
 include { FILTER_AND_ENHANCE_VCF } from '../../../modules/local/combo/filter_and_enhance_vcf'
-include { VIEW_AND_FILTER2_POLARSBIO         } from '../../../modules/local/python/view_and_filter2_polarsbio'
-include { FILTER_AND_ENHANCE_VCF_POLARSBIO   } from '../../../modules/local/python/filter_and_enhance_vcf_polarsbio'
 include { BCFTOOLS_VIEW_AND_FILTER2          } from '../../../modules/local/bcftools/view_and_filter2'
 
 workflow PREPARE {
