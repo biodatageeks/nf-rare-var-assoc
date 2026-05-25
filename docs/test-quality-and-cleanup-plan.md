@@ -1,10 +1,21 @@
 # Test Quality and Cleanup Plan (Design)
 
-Date: 2026-05-21 (updated 2026-05-24)
+Date: 2026-05-21 (updated 2026-05-25)
 
 This is the index. Detailed plans for each work area live in
 [test-quality-and-cleanup/](test-quality-and-cleanup/). When working on a task, read this
 file plus the sub-doc the task points to — you don't need to load the others.
+
+## Working agreement
+
+- One task at a time. Finish it, update status here and in the sub-doc, then stop for
+  user review. Don't chain tasks.
+- If a task is too large, propose a split into the sub-doc and hand back before doing
+  the work.
+- Keep design docs terse: they are loaded into AI context every session. State each rule,
+  status, and decision once. Delete superseded resume notes and obsolete detail as soon
+  as the task lands. Cite source-of-truth files (paths/line numbers) instead of duplicating
+  them.
 
 ## Goals
 
@@ -151,8 +162,13 @@ command, done-when). Conventions in §0 are assumed throughout.
 |---|---|---|
 | T1 — Confirm dead-code list | ✅ Done 2026-05-24 | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
 | T2 — Phase 1 dead-code removal | ✅ Done 2026-05-24 | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
-| T2.5 — Delete abandoned `tests/` scaffold | pending | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
-| T3 — Fix Cat-B failures (wrong process name / path) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| T2.5 — Delete abandoned `tests/` scaffold | ✅ Done 2026-05-25 (partial revert — see T2.6) | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
+| T2.6 — Prune `tests/nextflow.config` contents | ✅ Done 2026-05-25 | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
+| T3 — Fix Cat-B failures (wrong process name / path) — split into T3a–T3d on 2026-05-25 | in progress | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| &nbsp;&nbsp;T3a — `bcftools/filter` (process rename + tuple reshape) | ✅ Done 2026-05-25 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| &nbsp;&nbsp;T3b — `rscript/buildreports` (strip dead setup, use fixtures) | ✅ Done 2026-05-25 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| &nbsp;&nbsp;T3c — `regenie/step1` (rewrite against current production shape) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| &nbsp;&nbsp;T3d — `regenie/step2` (rewrite against current production shape) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T4 — Fix Cat-A failures (signature mismatches) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T5 — Fix Cat-D transitive failure (`plink2/write_snplist`) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T6 — Re-record Cat-E snapshot (`bcftools/vcf2frq`) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |

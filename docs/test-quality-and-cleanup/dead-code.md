@@ -108,13 +108,22 @@ Removed 5 includes from `workflows/rare-var-assoc.nf` and 5 from
 `subworkflows/local/prepare/main.nf`; renamed 15 module dirs/files to `__to_delete`; deleted
 6 obsolete test files; 3 471 lines removed.
 
-### T2.5 — Delete abandoned `tests/` scaffold
+### T2.5 — Delete abandoned `tests/` scaffold (✅ Done 2026-05-25, partial revert)
 
-- **Action**: `git rm -r tests/`.
-- **Verify before running**: `git status tests/` shows no in-progress local changes —
-  directory should match its committed state.
-- **Done-when**: top-level `tests/` no longer exists; `git status` shows it staged for
-  deletion; no other test file references a `tests/...` path.
+`git rm` of 24 files + `rm -r` of untracked `tests/results/`. `tests/nextflow.config`
+restored: it is nf-test's default `configFile` (set in repo-root `nf-test.config`) and
+removing it aborts the harness. Contents are stale — see T2.6.
+
+### T2.6 — Prune `tests/nextflow.config` contents (✅ Done 2026-05-25)
+
+Reduced to the `process { resourceLimits = [...] }` block; all the workflow-level params
+it carried (`filter_and_enhance_vcf_*`, `use_dosage / skip_preparation / skip_reporting`,
+`medium_data` `input_vcf / input_controls / input_cases`, `project_name`, `outdir`,
+`rscript_vcf2aaf_options`) were only consumed by the deleted `tests/workflows/*.template`
+scaffolds. Workflow ITs (T8+) will set their own params via a sibling `nextflow.config`
+next to each `.nf.test`, pointing at the canonical `assets/three_chr_unprepared/` fixtures
+(§0.4). Verified: `nf-test test --profile podman modules/local/bcftools/filter/tests/main.nf.test`
+— 3/3 pass.
 
 ### T14 — Phase 2 dead-code removal
 

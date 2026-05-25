@@ -74,18 +74,167 @@ all 18 nf-core utility subworkflow tests.
 
 ### T3 — Fix Cat-B failures (wrong process name / path)
 
-- **Files to edit**:
-  - `modules/local/bcftools/filter/tests/main.nf.test` — change `BCFTOOLS_VIEW` to
-    `BCFTOOLS_FILTER`; update include path to filter's `main.nf`
-  - `modules/local/rscript/buildreports/tests/main.nf.test` — remove the include pointing at
-    `rscript/assign_annotations`; exercise only `RSCRIPT_BUILDREPORTS`
-  - `modules/local/regenie/step1/tests/main.nf.test` — change `rscript/annotate/main.nf` to
-    `bcftools/assign_annotations/main.nf`; update process name to `BCFTOOLS_ASSIGN_ANNOTATIONS`
-  - `modules/local/regenie/step2/tests/main.nf.test` — same as step1
-- **Already removed by T2**: `modules/local/rscript/assign_annotations__to_delete/tests/main.nf.test`.
-- **After fix compiles**, audit existing assertions against the quality bar in the main plan.
-- **Verify**: `nf-test test --profile podman <each file>`.
-- **Done-when**: all four named tests pass with at least one meaningful assertion each.
+Originally a single task; on 2026-05-25 it was split into four sub-tasks because the
+"rename the include" fix described in the original write-up was insufficient. In every case
+the test's `setup` chain or input shapes also drift from what the current production
+workflow uses (signatures were consolidated; several upstream modules in the chain are now
+`__to_delete`). Each sub-task is sized to a single test file and is independent of the
+others, so they can be parallelised.
+
+The current production callers — `workflows/rare-var-assoc.nf` and the prepare/PCA/etc.
+subworkflows — are the source of truth for how each module is invoked now (input tuple
+shape, what feeds it). Match the test setup to those callers rather than recreating the old
+chain.
+
+#### T3a — Fix `bcftools/filter` test (process rename + signature reshape)
+
+- **File**: `modules/local/bcftools/filter/tests/main.nf.test`.
+- **Why it fails today**:
+  1. References `BCFTOOLS_VIEW` but the module process is `BCFTOOLS_FILTER`.
+  2. Uses the old 6-input shape (`tuple(meta, vcf, tbi)` + 5 separate vals for
+     regions/targets/samples/snplist/out_name_part). The current signature is one
+     consolidated tuple `(meta, vcf, index, regions, targets, samples, snplist, tracking_in)`
+     + `val(input_args)` + `val(out_name_part)` — i.e. only 3 inputs.
+- **Fix**:
+  - Rename process and `name` string to `BCFTOOLS_FILTER`.
+  - Reshape every test's `when { process { ... } }` block to the new 3-input form. Use the
+    production call in `workflows/rare-var-assoc.nf` (lines 140–160) as the template — empty
+    lists `[]` for unused path slots, `[]` for `tracking_in` when not chaining.
+  - Delete the four `- stub` test variants entirely. Stub tests violate §0.2 of the main
+    plan ("never write stub tests — they verify nothing meaningful").
+  - The four non-stub tests that exercise different `--write-index` configs (default, csi,
+    tbi) and the regions/targets variant are worth keeping; consolidate to ≤2 tests if their
+    only difference is the resulting index extension.
+- **Assertions** (every test must meet the quality bar):
+  - The `*_tracking.json` file's `outputs.variants` value matches the number of records in
+    the output VCF (parse with `bcftools view -H | wc -l` in a `path.text` check or
+    `path(...).readLines().size()`), OR assert that `variants_out ≤ variants_in` when a
+    filter argument is exercised. `versions.yml` snapshot is fine for the YAML metadata.
+- **Verify**: `nf-test test --profile podman modules/local/bcftools/filter/tests/main.nf.test`.
+- **Done-when**: test passes; each remaining test case carries at least one assertion that
+  names a concrete invariant (per §"Quality bar for assertions" in the main plan).
+
+#### T3b — Fix `rscript/buildreports` test (strip dead-code setup chain)
+
+- **File**: `modules/local/rscript/buildreports/tests/main.nf.test`.
+- **Why it fails today**: the `setup` block runs PLINK2_EXPORT_BGEN, BGENIX,
+  RSCRIPT_ANNOTATE (`rscript/assign_annotations` — now dead), RSCRIPT_VCFTOAAF
+  (`rscript/vcf2aaf` — now dead), and the old-signature REGENIE_STEP1/STEP2. The first
+  compile error is "Cannot find RSCRIPT_ANNOTATE in assign_annotations/main.nf"; even after
+  fixing that, the chain is unrecoverable because three upstream modules in it are
+  `__to_delete`.
+- **Fix**:
+  - Delete the entire `setup` block.
+  - Feed `RSCRIPT_BUILDREPORTS` directly from canonical fixtures. The module's six inputs
+    (`regenie_step2_masks_snplist`, `regenie_step2_Y1_regenie`, `vcf`, `phenotype`,
+    `annotations`, `r_script_ch`) are all small text/CSV files; commit a minimal hand-rolled
+    fixture set under `modules/local/rscript/buildreports/tests/fixtures/`. Use values
+    consistent with the medium_data 1kGP chr22 dataset (a regenie output stub with
+    ~10 rows, an annotations file with the same gene IDs, a phenotype file matching the
+    sample IDs in `1kGP_cases.txt` + `1kGP_controls.txt`).
+  - The R script itself lives at
+    `modules/local/rscript/buildreports/assets/build_reports.R` — keep that reference.
+- **Assertions** (reporting carve-out applies — smoke level OK per main plan):
+  - Assert all three output CSVs exist and are non-empty (≥1 data row past header).
+  - Assert the column header of `*_res_log10p_1_annotated.csv` includes the columns the
+    downstream reporting templates rely on (look at `assets/build_reports.R` or grep the
+    HTML/Rmd templates for which columns are read). One named column is enough.
+  - Snapshot `versions.yml`.
+- **Verify**: `nf-test test --profile podman modules/local/rscript/buildreports/tests/main.nf.test`.
+- **Done-when**: test passes; smoke-level assertions in place.
+
+#### T3c — Rewrite `regenie/step1` test against the current production shape
+
+- **File**: `modules/local/regenie/step1/tests/main.nf.test`.
+- **Why it fails today**:
+  1. `setup` chain includes PLINK2_EXPORT_BGEN, BGENIX, RSCRIPT_VCFTOAAF — all dead code —
+     and `RSCRIPT_ANNOTATE` (imported from `rscript/annotate/main.nf`, a path that does not
+     exist). `RSCRIPT_ANNOTATE`'s job was to build the regenie mask files and filter
+     variant annotations — that responsibility now belongs to `BCFTOOLS_ASSIGN_ANNOTATIONS`
+     in production. (Phenotype generation is a separate concern handled by
+     `RSCRIPT_BUILD_PHENOTYPES` in `subworkflows/local/utils_nfcore_rare-var-assoc_pipeline`,
+     not by `RSCRIPT_ANNOTATE`.)
+  2. The setup also uses `PLINK2_MAKEBED`, which is no longer the production code path —
+     genotype-data conversion has moved to `PLINK2_MAKEPGEN` everywhere in
+     `workflows/rare-var-assoc.nf`.
+  3. Current `REGENIE_STEP1` signature is a single consolidated 9-element tuple
+     `(meta, pgen, pvar, psam, qc_pass_id, qc_pass_snplist, phenotype, covar_file, tracking_in)`
+     + `val(input_args)`. The test passes 5 separate inputs.
+- **Fix** (use `workflows/rare-var-assoc.nf` lines 323–409 as the template):
+  - Rebuild `setup` using only live modules:
+    - `PLINK2_MAKEPGEN` on the medium_data 1kGP chr22 VCF. Signature is in
+      `modules/local/plink2/makepgen/main.nf` — input[0] is a 10-element tuple, then 5
+      `val()` args (samples-filter-type, variants-filter-type, vcf-input-options,
+      out-name-part, input-args). Mirror the production call at lines 334–343 (use empty
+      `[]` for filter files when not exercised).
+    - `PLINK2_WRITE_SNPLIST` on PLINK2_MAKEPGEN's `out_pgen_pvar_psam`. Mirror the
+      production call at lines 323–327. Use `Channel.value('writesnp_pass')` for
+      `out_name_part` and a minimal QC option string.
+  - Phenotype: commit a minimal phenotype TSV under
+    `modules/local/regenie/step1/tests/fixtures/phenotype.tsv` matching the 1kGP chr22
+    sample IDs and one binary trait column (header `FID IID Y1`). Do not regenerate
+    phenotypes via any module in the test — keep this as a static fixture.
+  - Build the consolidated tuple input as the production workflow does (lines 390–403):
+    `tuple(meta, pgen, pvar, psam, qc_pass_id, qc_pass_snplist, phenotype, [], [])` —
+    empty `covar_file` and `tracking_in` when not exercising those paths.
+- **Assertions**:
+  - `*_pred.list` is non-empty and references the `.loco` file by name.
+  - `*.loco` is non-empty.
+  - Parse the tracking JSON: `inputs.samples` ≥ 1, `inputs.variants` ≥ 1.
+  - Snapshot `versions.yml`.
+- **Verify**: `nf-test test --profile podman modules/local/regenie/step1/tests/main.nf.test`.
+- **Done-when**: test passes; assertions in place.
+- **No test-level dependency**: `PLINK2_MAKEPGEN` has no test directory and the
+  `PLINK2_WRITE_SNPLIST` module itself works (its own test failure in §3 Cat-D is a
+  pre-existing harness issue, not a code defect). T3c can be implemented independently of
+  T4 and T5.
+
+#### T3d — Rewrite `regenie/step2` test against the current production shape
+
+- **File**: `modules/local/regenie/step2/tests/main.nf.test`.
+- **Why it fails today**: same root causes as T3c plus dependencies on `qctool` and
+  `bgenix` (both dead). Current `REGENIE_STEP2` signature is a single 12-element tuple
+  + `val(input_args)` + `val(return_snplist)`.
+- **Fix** (use `workflows/rare-var-assoc.nf` lines 405–488 as the template):
+  - Reuse T3c's setup up to and including REGENIE_STEP1.
+  - Add `BCFTOOLS_ASSIGN_ANNOTATIONS` and `PYTHON_VCFTOAAF` to the chain. These are the
+    current production replacements for the dead `RSCRIPT_ANNOTATE` /  `RSCRIPT_VCFTOAAF`
+    R-based modules: `BCFTOOLS_ASSIGN_ANNOTATIONS` builds the mask annotations + setlist;
+    `PYTHON_VCFTOAAF` produces the alt-allele-frequency file. Both take small tuple
+    inputs; signatures in their respective `main.nf`. For `BCFTOOLS_ASSIGN_ANNOTATIONS`,
+    the python script asset lives at
+    `modules/local/bcftools/assign_annotations/assets/assign_annotations.py`. For
+    `PYTHON_VCFTOAAF`, the python script asset lives at
+    `modules/local/python/vcf2aaf/assets/vcf2aaf.py`.
+  - Build the consolidated 12-element tuple as in lines 466–479:
+    `tuple(meta, pgen, pvar, psam, phenotype, annotations, setlist, aaf, step1_pred_list,
+    [], masks, [])` — empty `covar_file` and `tracking_in`, masks from
+    `assets/default.masks`.
+  - Pass `Channel.value('--bt --ref-first --firth --approx --bsize 200 --lowmem --aaf-bins 0.01,0.05,0.1,1 --write-mask --vc-tests skato')`
+    and `Channel.value(true)` for `return_snplist` so `masks_snplist` is emitted.
+- **Assertions**:
+  - `*_step2.regenie` exists and contains a header row with the expected regenie columns
+    (`CHROM POS ID ALLELE0 ALLELE1 ... TEST BETA SE CHISQ LOG10P` or whatever current
+    regenie emits — read the file head with `path(...).readLines()[0]`).
+  - `*_step2.regenie` has at least one data row.
+  - `*_masks.snplist` is non-empty.
+  - Snapshot `versions.yml`.
+- **Verify**: `nf-test test --profile podman modules/local/regenie/step2/tests/main.nf.test`.
+- **Done-when**: test passes; assertions in place.
+- **Heads-up**: depends on T3c (reuse its setup). Plan for ~10–15 min wall clock per test
+  run.
+
+#### T3 sub-task status
+
+| Sub-task | Status | Depends on |
+|---|---|---|
+| T3a — `bcftools/filter` | ✅ Done 2026-05-25 — 3 tests pass | none |
+| T3b — `rscript/buildreports` | ✅ Done 2026-05-25 — 1 test passes; fixtures under `tests/fixtures/` | none |
+| T3c — `regenie/step1` | pending | none (modules `PLINK2_MAKEPGEN` and `PLINK2_WRITE_SNPLIST` are live; their tests are unrelated) |
+| T3d — `regenie/step2` | pending | T3c (reuses its setup chain) |
+
+- **Combined done-when**: all four sub-tasks done; `nf-test test --profile podman --tag ci`
+  shows zero Cat-B failures.
 
 ### T4 — Fix Cat-A failures (signature mismatches)
 
