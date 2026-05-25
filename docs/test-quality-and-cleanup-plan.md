@@ -167,7 +167,7 @@ command, done-when). Conventions in §0 are assumed throughout.
 | T3 — Fix Cat-B failures (wrong process name / path) — split into T3a–T3d on 2026-05-25 | in progress | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T3a — `bcftools/filter` (process rename + tuple reshape) | ✅ Done 2026-05-25 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T3b — `rscript/buildreports` (strip dead setup, use fixtures) | ✅ Done 2026-05-25 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
-| &nbsp;&nbsp;T3c — `regenie/step1` (rewrite against current production shape) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| &nbsp;&nbsp;T3c — `regenie/step1` (rewrite against current production shape) | ✅ Done 2026-05-25 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T3d — `regenie/step2` (rewrite against current production shape) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T4 — Fix Cat-A failures (signature mismatches) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T5 — Fix Cat-D transitive failure (`plink2/write_snplist`) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
