@@ -164,12 +164,19 @@ command, done-when). Conventions in §0 are assumed throughout.
 | T2 — Phase 1 dead-code removal | ✅ Done 2026-05-24 | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
 | T2.5 — Delete abandoned `tests/` scaffold | ✅ Done 2026-05-25 (partial revert — see T2.6) | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
 | T2.6 — Prune `tests/nextflow.config` contents | ✅ Done 2026-05-25 | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
-| T3 — Fix Cat-B failures (wrong process name / path) — split into T3a–T3d on 2026-05-25 | in progress | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| T3 — Fix Cat-B failures (wrong process name / path) — split into T3a–T3d on 2026-05-25 | ✅ Done 2026-05-25 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T3a — `bcftools/filter` (process rename + tuple reshape) | ✅ Done 2026-05-25 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T3b — `rscript/buildreports` (strip dead setup, use fixtures) | ✅ Done 2026-05-25 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T3c — `regenie/step1` (rewrite against current production shape) | ✅ Done 2026-05-25 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T3d — `regenie/step2` (rewrite against current production shape) | ✅ Done 2026-05-25 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
-| T4 — Fix Cat-A failures (signature mismatches) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| T4 — Fix Cat-A failures (signature mismatches) — split into T4a–T4g on 2026-05-25 | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| &nbsp;&nbsp;T4a — `cmds/merge_results` (tuple consolidation; assertions already meet bar) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| &nbsp;&nbsp;T4b — `bcftools/annotate` (collapse 5 paths into tuple; many test variants) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| &nbsp;&nbsp;T4c — `bcftools/norm` (collapse 4 paths into tuple; large test file) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| &nbsp;&nbsp;T4d — `bcftools/view` (collapse 7 paths into tuple) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| &nbsp;&nbsp;T4e — `plink2/makebed` (8-path tuple + 4 vals; **unblocks T5**) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| &nbsp;&nbsp;T4f — `vep/annotate` (4-path tuple; needs `../vep_cachedir` reference) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| &nbsp;&nbsp;T4g — `rscript/manhattan_qq_plots` (11-element tuple; **deferred — needs IT-5 fixtures from T11**) | deferred | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T5 — Fix Cat-D transitive failure (`plink2/write_snplist`) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T6 — Re-record Cat-E snapshot (`bcftools/vcf2frq`) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T7 — Write high-priority unit tests (§5a) | pending | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
@@ -203,3 +210,7 @@ T1 ──► T2 ──► T2.5
 T3/T4/T5/T6/T7/T8 are independent of each other and may be parallelised. T9..T12 all depend
 on T8 (they need `prepared_500/`). T14 is the only task that strictly requires every
 preceding test task to be green.
+
+T4 sub-tasks T4a..T4f are independent of each other. T4e (`plink2/makebed`) is a strict
+prerequisite for T5. T4g (`rscript/manhattan_qq_plots`) is deferred until T11 produces the
+IT-5 reporting fixtures.

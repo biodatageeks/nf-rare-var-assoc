@@ -231,37 +231,191 @@ chain.
 | T3a — `bcftools/filter` | ✅ Done 2026-05-25 — 3 tests pass | none |
 | T3b — `rscript/buildreports` | ✅ Done 2026-05-25 — 1 test passes; fixtures under `tests/fixtures/` | none |
 | T3c — `regenie/step1` | ✅ Done 2026-05-25 — 1 test passes; uses `prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz` for genuine LOCO; Welch t-test (p<0.01) confirms model captures YRI vs CHB population structure | none |
-| T3d — `regenie/step2` | ✅ Done 2026-05-25 — 1 test passes; regenieLines comment-stripping needed (##MASKS prefix); ~60 s wall clock; tagged `"full"` | T3c (reuses its setup chain) |
+| T3d — `regenie/step2` | ✅ Done 2026-05-25 — 1 test passes; ##MASKS comment-stripping needed; WWC3 highest LOG10P assertion (p<0.01); ~30 s wall clock; tagged `"full"` | T3c (reuses its setup chain) |
 
 - **Combined done-when**: all four sub-tasks done; `nf-test test --profile podman --tag ci`
   shows zero Cat-B failures.
 
 ### T4 — Fix Cat-A failures (signature mismatches)
 
-For each Cat-A test (excluding the dead `qctool` row), rewrite the workflow call to match the
-current module signature. **The signature in `modules/local/<group>/<name>/main.nf` is the
-source of truth, not the table above.**
+Originally a single task; on 2026-05-25 it was split into seven sub-tasks. The seven test
+files vary widely in size and required setup: some just need the call tuple reshaped
+(`cmds/merge_results`), others need fresh fixtures (`plink2/makebed`, `vep/annotate`), and
+one (`rscript/manhattan_qq_plots`) is blocked on the IT-5 reporting fixture from T11 and is
+deferred. Sub-tasks T4a..T4f are independent and can be parallelised.
 
-- **Files to edit**:
-  - `modules/local/bcftools/annotate/tests/main.nf.test`
-  - `modules/local/bcftools/norm/tests/main.nf.test`
-  - `modules/local/bcftools/view/tests/main.nf.test`
-  - `modules/local/cmds/merge_results/tests/main.nf.test`
-  - `modules/local/plink2/makebed/tests/main.nf.test`
-  - `modules/local/rscript/manhattan_qq_plots/tests/main.nf.test`
-  - `modules/local/vep/annotate/tests/main.nf.test`
-- **Heads-up**: several of these (e.g. `manhattan_qq_plots`, `plink2/makebed`) take many
-  input files. Just changing the call shape without providing realistic inputs will not work
-  — you will need to author or borrow fixtures. For `manhattan_qq_plots`, lean on the IT-5
-  reporting fixture (see [integration-tests.md](integration-tests.md)).
-- **After each fix runs**, audit existing assertions against the quality bar. For modules
-  with real custom logic (e.g. `cmds/merge_results` concatenates per-chromosome regenie
-  outputs and re-sorts), add a row-count or column-presence assertion; for pure wrappers
-  (e.g. `bcftools/annotate` with rename_chrs), one assertion checking that the rename
-  actually took effect is enough.
-- **Verify** (per file): `nf-test test --profile podman <file>`.
-- **Done-when**: all seven tests pass individually and
-  `nf-test test --profile podman --tag ci` shows zero Cat-A failures.
+**For every sub-task**: the signature in `modules/local/<group>/<name>/main.nf` is the
+source of truth (not the table in §3 Cat-A). The production caller — the subworkflow that
+already uses the module — is the template for how to shape inputs. After the test compiles
+and runs, audit existing assertions against the **quality bar for assertions** in the main
+plan before declaring done.
+
+| Module | Production caller (template) |
+|---|---|
+| `bcftools/annotate` | [subworkflows/local/prepare/main.nf:93](../../subworkflows/local/prepare/main.nf#L93) |
+| `bcftools/norm` | [subworkflows/local/prepare/main.nf:79](../../subworkflows/local/prepare/main.nf#L79) |
+| `bcftools/view` | [subworkflows/local/prepare/main.nf:66](../../subworkflows/local/prepare/main.nf#L66), [workflows/rare-var-assoc.nf:375](../../workflows/rare-var-assoc.nf#L375) |
+| `cmds/merge_results` | [workflows/rare-var-assoc.nf:515](../../workflows/rare-var-assoc.nf#L515) |
+| `plink2/makebed` | [subworkflows/local/pca/main.nf:25](../../subworkflows/local/pca/main.nf#L25) |
+| `rscript/manhattan_qq_plots` | [subworkflows/local/reporting/main.nf:23](../../subworkflows/local/reporting/main.nf#L23) |
+| `vep/annotate` | [workflows/rare-var-assoc.nf:171](../../workflows/rare-var-assoc.nf#L171) |
+
+#### T4a — Fix `cmds/merge_results` test (smallest)
+
+- **File**: `modules/local/cmds/merge_results/tests/main.nf.test`.
+- **Why it fails today**: current signature is one tuple
+  `(meta, phenotype, regenie_chromosomes, csv_concat_py_script)` — the test passes the
+  python script as a separate `input[0]` and the regenie channel as `input[1]`.
+- **Fix**: collapse both arguments into a single tuple per the production call. Reuse the
+  two existing test cases ("merging 4 regenie files", "merging fileA and fileB") — assertions
+  there already meet the quality bar (column header + row count). Drop the `// TODO nf-core:`
+  comment block at the top.
+- **Verify**: `nf-test test --profile podman modules/local/cmds/merge_results/tests/main.nf.test`.
+- **Done-when**: both tests pass; existing assertions retained.
+
+#### T4b — Fix `bcftools/annotate` test
+
+- **File**: `modules/local/bcftools/annotate/tests/main.nf.test` (373 lines, many variants).
+- **Why it fails today**: signature is now one consolidated 7-element tuple
+  `(meta, input, index, annotations, annotations_index, header_lines, rename_chrs)` +
+  `val(out_name_part)`. Tests pass 3 separate inputs in the old shape.
+- **Fix**:
+  - Reshape every test's input block to the consolidated tuple form. Use empty `[]` for the
+    path slots a given test does not exercise (e.g. `header_lines`, `rename_chrs`).
+  - Audit the per-test `.config` files (`vcf.config`, `vcf_gz_index.config`, etc.) — they
+    should still drive `task.ext.args` and `task.ext.prefix`. No changes there expected.
+  - Consolidate near-duplicate test variants if the only difference is the index extension.
+- **Assertions** (every test must meet the quality bar):
+  - For tests exercising `--rename-chrs`: assert that a known chromosome name in the input
+    VCF appears renamed in the output (`bcftools view -H | head -1 | cut -f1`).
+  - For tests exercising `--annotations`: assert that an INFO field added by the annotation
+    file appears in `bcftools view -h` output.
+  - `versions.yml` snapshot is fine for the YAML metadata.
+- **Verify**: `nf-test test --profile podman modules/local/bcftools/annotate/tests/main.nf.test`.
+- **Done-when**: every retained test passes with at least one business-meaningful assertion.
+
+#### T4c — Fix `bcftools/norm` test
+
+- **File**: `modules/local/bcftools/norm/tests/main.nf.test` (580 lines, largest in T4).
+- **Why it fails today**: signature is one 5-element tuple
+  `(meta, vcf, tbi, fasta, tracking_in)` + `val(out_name_part)`. Tests pass 3 separate
+  inputs.
+- **Fix**:
+  - Reshape to the consolidated tuple form per the production call. Pass `[]` for
+    `tracking_in` when not chaining.
+  - Consolidate near-duplicate test variants — at most 3 retained (split-multiallelic, join,
+    and a no-op/`--check-ref` variant) if the existing 580-line file repeats the same shape
+    many times.
+- **Assertions**:
+  - Splitting tests: variant count in output > variant count in input when a multiallelic
+    test input is used; tracking JSON `outputs.variants > inputs.variants`.
+  - Joining tests: opposite inequality.
+- **Verify**: `nf-test test --profile podman modules/local/bcftools/norm/tests/main.nf.test`.
+- **Done-when**: retained tests pass; assertions in place.
+
+#### T4d — Fix `bcftools/view` test
+
+- **File**: `modules/local/bcftools/view/tests/main.nf.test` (315 lines).
+- **Why it fails today**: signature is one 8-element tuple
+  `(meta, vcf, index, regions, targets, samples, snplist, tracking_in)` + `val(input_args)`
+  + `val(out_name_part)`. Tests pass 6 separate inputs.
+- **Fix**:
+  - Reshape to the consolidated tuple form. The production call at
+    `workflows/rare-var-assoc.nf:375` (BCFTOOLS_VIEW_2 — sample subsetting) and
+    `subworkflows/local/prepare/main.nf:66` (BCFTOOLS_VIEW_1 — region/target filtering)
+    cover the two main shapes.
+  - Keep two regions/targets/samples variants — one that exercises `regions`, one that
+    exercises `samples`. Drop stub variants if present.
+- **Assertions**:
+  - Region test: assert output VCF contains only records on the requested chromosome
+    (`bcftools view -H | awk '{print $1}' | sort -u`).
+  - Sample test: assert the output VCF header lists exactly the requested sample(s)
+    (`bcftools view -h | tail -1`).
+  - Tracking JSON consistency: `outputs.variants ≤ inputs.variants` when a filter is applied.
+- **Verify**: `nf-test test --profile podman modules/local/bcftools/view/tests/main.nf.test`.
+- **Done-when**: retained tests pass; assertions in place.
+
+#### T4e — Fix `plink2/makebed` test (**unblocks T5**)
+
+- **File**: `modules/local/plink2/makebed/tests/main.nf.test`.
+- **Why it fails today**: signature is one 9-element tuple
+  `(meta, pgen, pvar, psam, vcf, frq, samples_filtering_file, variants_filtering_file, tracking_in)`
+  + 4× `val(samples_filtering_type, variants_filtering_type, out_name_part, input_args)`.
+  The current test passes 3 inputs (old shape: 5-path tuple + 2 vals).
+- **Fix**:
+  - Reshape the single active test ("small vcf - bed,bim,fam") to the new 5-input form.
+    Use the production call at [subworkflows/local/pca/main.nf:25](../../subworkflows/local/pca/main.nf#L25) as the template.
+  - For the VCF input path, use the canonical fixture
+    `assets/three_chr_unprepared/unprepared_rand_500.vcf.gz` (§0.4) — the existing
+    `genomics/homo_sapiens/illumina/plink/test.rnaseq.{bed,bim,fam}` data path can be kept
+    if the test exercises the bed/bim/fam input branch; otherwise switch to VCF input via
+    `vcf` slot with empty `pgen/pvar/psam`.
+  - Delete the two commented-out block tests at the bottom (`split-par`, `impute-sex`) —
+    they reference the dead PLINK19_MAKEBED and a since-removed signature.
+- **Assertions**:
+  - The emitted `.bed`/`.bim`/`.fam` trio is non-empty.
+  - The `.fam` row count equals the sample count expected for the input VCF (3202 for the
+    full fixture; document the expected count if a smaller subset is used).
+  - The tracking JSON's `outputs.variants` is ≥ 1 and `outputs.samples` matches the `.fam`
+    row count.
+  - Snapshot `versions.yml`.
+- **Verify**: `nf-test test --profile podman modules/local/plink2/makebed/tests/main.nf.test`.
+- **Done-when**: test passes; assertions in place. **T5 unblocked.**
+
+#### T4f — Fix `vep/annotate` test
+
+- **File**: `modules/local/vep/annotate/tests/main.nf.test`.
+- **Why it fails today**: signature is one 4-element tuple
+  `(meta, input_vcf, input_vcf_tbi, vep_cache)` + 3× `val(species, fasta_path, input_args)`.
+  The current test passes the VCF as a 3-element tuple and `vep_cache` as a separate
+  `input[1]` (old 5-input shape).
+- **Fix**:
+  - Move `vep_cache` into the tuple, leaving 4 inputs.
+  - The existing test references `${projectDir}/../vep_cachedir/homo_sapiens_refseq` — that
+    path exists on this machine but is not portable. Document this in a short comment and
+    tag the test `tag "full"` since the cache is large and machine-specific. CI will skip it.
+  - Drop the `// TODO nf-core:` comment block at the top.
+- **Assertions** (smoke level — VEP output is annotation-heavy, hard to assert business
+  invariants on):
+  - The output VCF header (`bcftools view -h`) contains a `##INFO=<ID=CSQ,...>` line.
+  - At least one record in the output carries a non-empty `CSQ=` field.
+  - Snapshot `versions.yml`.
+- **Verify**: `nf-test test --profile podman --tag full modules/local/vep/annotate/tests/main.nf.test`.
+- **Done-when**: test passes locally; tagged `"full"` because the VEP cache is
+  machine-specific.
+
+#### T4g — Fix `rscript/manhattan_qq_plots` test (**deferred**)
+
+- **File**: `modules/local/rscript/manhattan_qq_plots/tests/main.nf.test`.
+- **Deferred reason**: the module takes an 11-element tuple including `phenotype_file`,
+  `pc_plot_file`, `eda_plots`, `setlist_file`, `regenie_merged`, `mask_file`,
+  `gwas_report_template`, `r_functions_file`, and `rmd_pheno_stats_file`. Hand-crafting all
+  of these for an isolated module test is high effort and low value when the IT-5 reporting
+  subworkflow integration test (T11) will exercise the same path with realistic upstream
+  fixtures.
+- **Plan**: implement this as part of T11 (IT-5), or immediately after, by reusing the IT-5
+  fixture set — keeping the per-module test as a thin re-entry point.
+- **Assertions** (reporting carve-out — smoke level OK):
+  - The output `*.html` exists and is non-empty.
+  - `versions.yml` snapshot.
+- **Verify**: `nf-test test --profile podman modules/local/rscript/manhattan_qq_plots/tests/main.nf.test`.
+- **Done-when**: T11 IT-5 fixtures exist and this test reuses them with smoke-level
+  assertions.
+
+#### T4 sub-task status
+
+| Sub-task | Status | Depends on |
+|---|---|---|
+| T4a — `cmds/merge_results` | pending | none |
+| T4b — `bcftools/annotate` | pending | none |
+| T4c — `bcftools/norm` | pending | none |
+| T4d — `bcftools/view` | pending | none |
+| T4e — `plink2/makebed` (unblocks T5) | pending | none |
+| T4f — `vep/annotate` | pending | none |
+| T4g — `rscript/manhattan_qq_plots` | deferred | T11 (IT-5 fixtures) |
+
+- **Combined done-when**: T4a..T4f all done; `nf-test test --profile podman --tag ci` shows
+  zero Cat-A failures from these six modules. T4g closes once T11 lands.
 
 ### T5 — Fix Cat-D transitive failure (`plink2/write_snplist`)
 
