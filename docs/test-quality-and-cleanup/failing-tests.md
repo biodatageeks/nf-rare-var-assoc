@@ -406,7 +406,7 @@ plan before declaring done.
 
 | Sub-task | Status | Depends on |
 |---|---|---|
-| T4a — `cmds/merge_results` | pending | none |
+| T4a — `cmds/merge_results` | ✅ Done 2026-05-26 — 2 tests pass; meta added to tuple; `.get(2)` for file path | none |
 | T4b — `bcftools/annotate` | pending | none |
 | T4c — `bcftools/norm` | pending | none |
 | T4d — `bcftools/view` | pending | none |

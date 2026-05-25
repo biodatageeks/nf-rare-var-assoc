@@ -170,7 +170,7 @@ command, done-when). Conventions in §0 are assumed throughout.
 | &nbsp;&nbsp;T3c — `regenie/step1` (rewrite against current production shape) | ✅ Done 2026-05-25 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T3d — `regenie/step2` (rewrite against current production shape) | ✅ Done 2026-05-25 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T4 — Fix Cat-A failures (signature mismatches) — split into T4a–T4g on 2026-05-25 | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
-| &nbsp;&nbsp;T4a — `cmds/merge_results` (tuple consolidation; assertions already meet bar) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| &nbsp;&nbsp;T4a — `cmds/merge_results` (tuple consolidation; assertions already meet bar) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4b — `bcftools/annotate` (collapse 5 paths into tuple; many test variants) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4c — `bcftools/norm` (collapse 4 paths into tuple; large test file) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4d — `bcftools/view` (collapse 7 paths into tuple) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
