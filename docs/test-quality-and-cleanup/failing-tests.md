@@ -231,7 +231,7 @@ chain.
 | T3a — `bcftools/filter` | ✅ Done 2026-05-25 — 3 tests pass | none |
 | T3b — `rscript/buildreports` | ✅ Done 2026-05-25 — 1 test passes; fixtures under `tests/fixtures/` | none |
 | T3c — `regenie/step1` | ✅ Done 2026-05-25 — 1 test passes; uses `prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz` for genuine LOCO; Welch t-test (p<0.01) confirms model captures YRI vs CHB population structure | none |
-| T3d — `regenie/step2` | pending | T3c (reuses its setup chain) |
+| T3d — `regenie/step2` | ✅ Done 2026-05-25 — 1 test passes; regenieLines comment-stripping needed (##MASKS prefix); ~60 s wall clock; tagged `"full"` | T3c (reuses its setup chain) |
 
 - **Combined done-when**: all four sub-tasks done; `nf-test test --profile podman --tag ci`
   shows zero Cat-B failures.

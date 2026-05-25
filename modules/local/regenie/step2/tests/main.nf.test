@@ -1,50 +1,48 @@
-// TODO nf-core: Once you have added the required tests, please run the following command to build this file:
-// nf-core modules test regenie
 nextflow_process {
 
     name "Test Process REGENIE_STEP2"
     script "../main.nf"
     process "REGENIE_STEP2"
 
+    tag "full"
     tag "modules"
-    tag "modules_"
-    tag "regeniestep2"
+    tag "regenie"
+    tag "regenie/step2"
 
-    // TODO nf-core: Change the test name preferably indicating the test-data and file-format used
-    test("small vcf") {
+    test("three_chr VCF - step2 produces regenie output and masks snplist") {
 
-        // TODO nf-core: If you are created a test for a chained module
-        // (the module requires running more than one process to generate the required output)
-        // add the 'setup' method here.
-        // You can find more information about how to use a 'setup' method in the docs (https://nf-co.re/docs/contributing/modules#steps-for-creating-nf-test-for-chained-modules).
-
+        // Setup mirrors the production chain in workflows/rare-var-assoc.nf lines 334-488.
+        // VCF: assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz — ~5000 variants
+        // across chr12, chr22, chrX; 3202 1000G samples; VEP CSQ INFO field present.
+        // Phenotype fixture reused from T3c: 500 cases (Y1=1) + 500 controls (Y1=0).
+        // Steps:
+        //   1. PLINK2_MAKEPGEN   — convert VCF → pgen/pvar/psam (same as T3c)
+        //   2. PLINK2_WRITE_SNPLIST — QC pass snplist for step1 (same as T3c)
+        //   3. REGENIE_STEP1     — whole-genome ridge regression, produces pred_list + loco (same as T3c)
+        //   4. BCFTOOLS_ASSIGN_ANNOTATIONS — builds annotations + setlist from VEP CSQ field
+        //      (production replacement for the dead RSCRIPT_ANNOTATE)
+        //   5. PYTHON_VCFTOAAF  — extracts per-variant AAF from the INFO/AF tag
+        //      (production replacement for the dead RSCRIPT_VCFTOAAF)
         setup {
-            run("PLINK2_MAKEBED") {
-                script "../../../plink2/makebed/main.nf"
+            run("PLINK2_MAKEPGEN") {
+                script "../../../plink2/makepgen/main.nf"
                 process {
                     """
                     input[0] = [
-                        [ id:'test', single_end:false ], // meta map
-                        [],  // bed
-                        [],  // bim
-                        [],  // fam
-                        file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true),
-                        []   // frq
+                        [ id:'test', single_end:false ],
+                        [], [],  // pgen, pvar (not provided — converting from VCF)
+                        // psam provides sex for chrX; generated from
+                        // assets/integrated_call_samples_v3.20250704.ALL.ped
+                        file('${projectDir}/assets/three_chr_unprepared/samples.psam', checkIfExists: true),
+                        file('${projectDir}/assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz', checkIfExists: true),
+                        file('${projectDir}/assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz.tbi', checkIfExists: true),
+                        [], [], [], []  // frq, samples_filter, variants_filter, tracking_in
                     ]
-                    input[1] = '--remove'
-                    input[2] = '--exclude'
-                    input[3] = 'filter'
-                    input[4] = '--mac 1 --double-id --vcf-half-call missing'
-                    """
-                }
-            }
-            run("PLINK2_EXPORT_BGEN") {
-                script "../../../plink2/export_bgen/main.nf"
-                process {
-                    """
-                    input[0] = PLINK2_MAKEBED.out.out_bed_bim_fam
-                    input[1] = 'pvcf.norm_zlib'
-                    input[2] = '--1 --export bgen-1.2 bits=8 id-paste=iid ref-first'
+                    input[1] = ''  // samples_filtering_type (not exercised)
+                    input[2] = ''  // variants_filtering_type (not exercised)
+                    input[3] = ''  // vcf_input_options
+                    input[4] = 'makepgen'
+                    input[5] = '--double-id --vcf-half-call missing --split-par b38'
                     """
                 }
             }
@@ -52,68 +50,16 @@ nextflow_process {
                 script "../../../plink2/write_snplist/main.nf"
                 process {
                     """
-                    input[0] = PLINK2_MAKEBED.out.out_bed_bim_fam
-                    input[1] = 'qc_pass'
-                    input[2] = '--maf 0.01 --mac 1 --geno 0.1 --hwe 1e-15 --write-samples'
-                    """
-                }
-            }
-            run("QCTOOL") {
-                script "../../../qctool/main.nf"
-                process {
-                    """
-                    input[0] = PLINK2_EXPORT_BGEN.out.bgen
-                    input[1] = PLINK2_EXPORT_BGEN.out.sample
-                    input[2] = 'pvcf.norm'
-                    input[3] = '-ofiletype bgen -bgen-bits 8 -bgen-compression zstd -bgen-omit-sample-identifier-block'
-                    """
-                }
-            }
-            run("BGENIX") {
-                script "../../../bgenix/main.nf"
-                process {
-                    """
-                    input[0] = QCTOOL.out.bgen
-                    input[1] = '-clobber'
-                    """
-                }
-            }
-            run("RSCRIPT_ANNOTATE") {
-                script "../../../rscript/annotate/main.nf"
-                process {
-                    """
-                    input[0] = file('${projectDir}/modules/local/rscript/assign_annotations/assets/annotate.R', checkIfExists: true)
-                    input[1] = [
-                        [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true)
-                    ]
-                    input[2] = PLINK2_MAKEBED.out.out_bed_bim_fam
-                    input[3] = QCTOOL.out.bgen
-                    input[4] = BGENIX.out.bgen_bgi
-                    input[5] = QCTOOL.out.sample
-                    input[6] = [
-                        [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/medium_data/1kGP_controls.txt', checkIfExists: true)
-                    ]
-                    input[7] = [
-                        [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/medium_data/1kGP_cases.txt', checkIfExists: true)
-                    ]
-                    input[8] = file('${projectDir}/assets/default.masks', checkIfExists: true)
-                    input[9] = '--min_top_annotations 50 --quantile_threshold 0.25 --include-intergenic FALSE'
-                    """
-                }
-            }
-            run("RSCRIPT_VCFTOAAF") {
-                script "../../../rscript/vcf2aaf/main.nf"
-                process {
-                    """
-                    input[0] = file('${projectDir}/modules/local/rscript/vcf2aaf/assets/vcf2aaf.R', checkIfExists: true)
-                    input[1] = [
-                        [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true)
-                    ]
-                    input[2] = 'AF_EUR AF'
+                    // Pass phenotype.tsv as --keep so MAC/MAF are computed over the 1000
+                    // phenotyped samples only; variants monomorphic in that subset are
+                    // excluded from the snplist before REGENIE runs.
+                    input[0] = PLINK2_MAKEPGEN.out.out_pgen_pvar_psam.map { meta, pgen, pvar, psam ->
+                        tuple(meta, pgen, pvar, psam,
+                              file('${projectDir}/modules/local/regenie/step1/tests/fixtures/phenotype.tsv'),
+                              [])
+                    }
+                    input[1] = 'writesnp_pass'
+                    input[2] = '--maf 0.01 --geno 0.1 --mind 0.1'
                     """
                 }
             }
@@ -121,11 +67,49 @@ nextflow_process {
                 script "../../../regenie/step1/main.nf"
                 process {
                     """
-                    input[0] = PLINK2_MAKEBED.out.out_bed_bim_fam
-                    input[1] = PLINK2_WRITE_SNPLIST.out.id
-                    input[2] = PLINK2_WRITE_SNPLIST.out.snplist
-                    input[3] = RSCRIPT_ANNOTATE.out.phenotype
-                    input[4] = '--bt --bsize 100 --lowmem'
+                    // Consolidated 9-element tuple as in workflows/rare-var-assoc.nf lines 390-408.
+                    // covar_file=[] and tracking_in=[] are not exercised here.
+                    input[0] = PLINK2_MAKEPGEN.out.out_pgen_pvar_psam
+                        .join(PLINK2_WRITE_SNPLIST.out.id)
+                        .join(PLINK2_WRITE_SNPLIST.out.snplist)
+                        .map { meta, pgen, pvar, psam, id, snplist ->
+                            tuple(meta, pgen, pvar, psam, id, snplist,
+                                  file('${projectDir}/modules/local/regenie/step1/tests/fixtures/phenotype.tsv'),
+                                  [], [])
+                        }
+                    input[1] = '--bt --bsize 100 --lowmem'
+                    """
+                }
+            }
+            run("BCFTOOLS_ASSIGN_ANNOTATIONS") {
+                script "../../../bcftools/assign_annotations/main.nf"
+                process {
+                    """
+                    // Builds annotations + setlist from VEP CSQ INFO field.
+                    // Same VCF as PLINK2_MAKEPGEN so variant IDs are consistent with the pgen.
+                    input[0] = [
+                        [ id:'test', single_end:false ],
+                        file('${projectDir}/assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz', checkIfExists: true),
+                        file('${projectDir}/assets/default.masks', checkIfExists: true),
+                        file('${projectDir}/modules/local/bcftools/assign_annotations/assets/assign_annotations.py', checkIfExists: true)
+                    ]
+                    input[1] = '--min-top-annotations 30'
+                    """
+                }
+            }
+            run("PYTHON_VCFTOAAF") {
+                script "../../../python/vcf2aaf/main.nf"
+                process {
+                    """
+                    // Primary tag AF_nfe_gnomad is absent from this VCF; the script falls
+                    // back to INFO/AF which is present. Same VCF so variant IDs match.
+                    input[0] = [
+                        [ id:'test', single_end:false ],
+                        file('${projectDir}/assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz', checkIfExists: true),
+                        file('${projectDir}/modules/local/python/vcf2aaf/assets/vcf2aaf.py', checkIfExists: true)
+                    ]
+                    input[1] = 'AF_nfe_gnomad'
+                    input[2] = 'AF'
                     """
                 }
             }
@@ -134,26 +118,84 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = QCTOOL.out.bgen
-                input[1] = RSCRIPT_ANNOTATE.out.out_sample
-                input[2] = RSCRIPT_ANNOTATE.out.phenotype
-                input[3] = RSCRIPT_ANNOTATE.out.annotations
-                input[4] = RSCRIPT_ANNOTATE.out.setlist
-                input[5] = file("${projectDir}/assets/default.masks", checkIfExists: true)
-                input[6] = RSCRIPT_VCFTOAAF.out.aaf
-                input[7] = REGENIE_STEP1.out.pred_list
-                input[8] = '--bt --ref-first --firth --approx --bsize 200 --lowmem --aaf-bins 0.01,0.05,0.1,1 --write-mask --write-mask-snplist --vc-tests skato'
+                // Build the 12-element tuple as in workflows/rare-var-assoc.nf lines 466-488.
+                // covar_file=[] and tracking_in=[] are not exercised in this test.
+                // masks: assets/default.masks — same file that BCFTOOLS_ASSIGN_ANNOTATIONS used,
+                // ensuring the mask categories in the .annotations file are consistent.
+                // return_snplist=true adds --write-mask-snplist so masks_snplist is emitted.
+                input[0] = PLINK2_MAKEPGEN.out.out_pgen_pvar_psam
+                    .join(BCFTOOLS_ASSIGN_ANNOTATIONS.out.annotations)
+                    .join(BCFTOOLS_ASSIGN_ANNOTATIONS.out.setlist)
+                    .join(PYTHON_VCFTOAAF.out.aaf)
+                    .join(REGENIE_STEP1.out.pred_list)
+                    .map { meta, pgen, pvar, psam, annotations, setlist, aaf, pred_list ->
+                        tuple(meta, pgen, pvar, psam,
+                              file("${projectDir}/modules/local/regenie/step1/tests/fixtures/phenotype.tsv"),
+                              annotations, setlist, aaf, pred_list, [],
+                              file("${projectDir}/assets/default.masks"),
+                              [])
+                    }
+                // No --covarColList because covar_file=[].
+                // --write-mask-snplist is appended automatically via return_snplist=true.
+                input[1] = '--bt --minMAC 30 --ref-first --firth --approx --bsize 200 --lowmem --aaf-bins 0.05,0.1 --write-mask'
+                input[2] = true
                 """
             }
         }
 
         then {
-            assertAll(
-                { assert process.success },
-                // { assert snapshot(process.out).match() }
-                //TODO nf-core: Add all required assertions to verify the test output.
-                // See https://nf-co.re/docs/contributing/tutorials/nf-test_assertions for more information and examples.
-            )
+            assert process.success
+
+            // ---- regenie output -------------------------------------------------------
+            // regenie step2 produces one output file per phenotype: test_step2_Y1.regenie.
+            // With a single phenotype (Y1) the glob matches exactly one file.
+            def regenieRaw = process.out.regenie_out[0][1]
+            def regenieFile = regenieRaw instanceof List ? regenieRaw[0] : regenieRaw
+
+            // regenie prepends ##MASKS=<...> comment lines before the column header; strip them.
+            def dataLines = path(regenieFile).readLines().findAll { !it.startsWith('#') }
+            assert dataLines.size() >= 2 :
+                "regenie output should have at least a header + one data row; got ${dataLines.size()} non-comment lines"
+
+            // Locate column indices by name — robust to future column reorder.
+            def colNames  = dataLines[0].trim().split('\\s+')
+            def idIdx     = colNames.findIndexOf { it == 'ID' }
+            def log10pIdx = colNames.findIndexOf { it == 'LOG10P' }
+            assert idIdx     >= 0 : "regenie header must contain ID column"
+            assert log10pIdx >= 0 : "regenie header must contain LOG10P column"
+
+            // Find the data row with the highest LOG10P.
+            // Skip 'NA' entries: with pgen input, SKAT/SKATO tests suppress BETA/SE but not LOG10P;
+            // the ADD (burden) test rows always have numeric LOG10P.
+            def maxLog10p = -1.0
+            def maxCols   = null
+            dataLines[1..-1].each { line ->
+                def cols      = line.trim().split('\\s+')
+                def log10pStr = cols[log10pIdx]
+                if (log10pStr == 'NA') return
+                def v = log10pStr as double
+                if (v > maxLog10p) { maxLog10p = v; maxCols = cols }
+            }
+            assert maxCols != null : "no numeric LOG10P found in regenie output"
+
+            // Gene name is the first dot-delimited component of the ID field
+            // (format: GENE.MASK.AAF_BIN, e.g. "WWC3.Mask_Mod.0.05").
+            // Expected top gene from this fixture: WWC3 on chrX (LOG10P ≈ 2.51).
+            // Second-best is RAD52 at ≈ 2.49 — the 0.02 gap is deterministic for this input.
+            def topGene = maxCols[idIdx].split('\\.')[0]
+            assert topGene == 'WWC3' :
+                "Gene with highest LOG10P should be WWC3 (got '${topGene}', LOG10P=${maxLog10p}). " +
+                "This is deterministic for the three-chr fixture + phenotype.tsv inputs."
+            assert maxLog10p > 2.0 :
+                "Highest LOG10P (WWC3) should exceed 2.0; got ${maxLog10p}"
+
+            // ---- masks_snplist --------------------------------------------------------
+            // Emitted when return_snplist=true adds --write-mask-snplist automatically.
+            def snplistLines = path(process.out.masks_snplist[0][1]).readLines()
+            assert snplistLines.size() >= 1 :
+                "masks_snplist should contain at least one entry; file is empty"
+
+            assert snapshot(process.out.versions).match()
         }
 
     }
