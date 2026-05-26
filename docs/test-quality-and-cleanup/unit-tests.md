@@ -113,7 +113,7 @@ For each sub-task, follow this recipe against the row referenced in §5a above:
 | T7c ✅ 2026-05-26 | `bcftools/assign_annotations` | Hand-rolled VCF (6 genes, 6 distinct consequences with unique frequencies) + masks TSV (2 categories). Three scenarios drive different branches of `filter_annotations` (overlap + normal range, quantile-trim, padding). Also fixed a double-counting bug in `assign_annotations.py` (legacy R-parity behavior was excluding important-and-quantile overlap consequences from the size accounting). |
 | T7d ✅ 2026-05-26 | `python/eda` | Reporting carve-out — filename-only smoke. Reuses `assets/three_chr_unprepared/unprepared_rand_500.vcf.gz`; pheno TSV hand-rolled under `tests/fixtures/`. Also fixed a hemizygous-genotype bug in `main.nf`: `encode_genotype` crashed on chrX male calls (1-element GT tuple). |
 | T7e ✅ 2026-05-26 | `python/draw_pc_plot` | Reporting carve-out — filename-only smoke. Hand-rolled `.sscore` (3 PCs, 10 samples, two-cluster structure) + pheno TSV. Output PNG and SVG asserted by `_pca.` suffix. |
-| T7f | `python/generate_tracking_report` | Reporting carve-out — filename-only smoke. Two hand-rolled `*.tracking.json` chained via `predecessor`. |
+| T7f ✅ 2026-05-26 | `python/generate_tracking_report` | Reporting carve-out — smoke. Two hand-rolled `*.tracking.json` chained via `predecessor` (DAG path). TXT report asserted to contain both step short-names. |
 
 **Done-when (T7 overall)**: all six §5a tests pass; total CI runtime added ≤ ~5 min.
 **Done-when (per sub-task)**: the named module's `main.nf.test` passes under `nf-test

@@ -219,13 +219,13 @@ command, done-when). Conventions in §0 are assumed throughout.
 | &nbsp;&nbsp;T4g — `rscript/manhattan_qq_plots` (11-element tuple; **deferred — needs IT-5 fixtures from T11**) | deferred | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T5 — Fix Cat-D transitive failure (`plink2/write_snplist`) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T6 — Re-record Cat-E snapshot (`bcftools/vcf2frq`) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
-| T7 — Write high-priority unit tests (§5a) — split into T7a–T7f on 2026-05-26 | pending | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
+| T7 — Write high-priority unit tests (§5a) — split into T7a–T7f on 2026-05-26 | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | &nbsp;&nbsp;T7a — `python/calc_f_outliers` (hand-rolled `het` fixture + FID/IID branch) | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | &nbsp;&nbsp;T7b — `python/vcf2aaf` (hand-rolled VCF + AF fallback logic) | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | &nbsp;&nbsp;T7c — `bcftools/assign_annotations` (hand-rolled VCF + masks TSV) | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | &nbsp;&nbsp;T7d — `python/eda` (smoke; reuses `unprepared_rand_500.vcf.gz`) | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | &nbsp;&nbsp;T7e — `python/draw_pc_plot` (smoke; hand-rolled `.sscore` + pheno) | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
-| &nbsp;&nbsp;T7f — `python/generate_tracking_report` (smoke; hand-rolled tracking JSONs) | pending | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
+| &nbsp;&nbsp;T7f — `python/generate_tracking_report` (smoke; hand-rolled tracking JSONs) | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | T8 — Implement IT-1 + IT-1b; record `prepared_500/` fixture | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | T9 — Implement IT-2 (PCA) | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | T10 — Implement IT-3 and IT-4 in parallel | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
