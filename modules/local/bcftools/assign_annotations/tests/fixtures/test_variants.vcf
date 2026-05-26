@@ -1,0 +1,27 @@
+##fileformat=VCFv4.2
+##FILTER=<ID=PASS,Description="All filters passed">
+##INFO=<ID=CSQ,Number=.,Type=String,Description="Consequence annotations from Ensembl VEP. Format: Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|Existing_variation|DISTANCE|STRAND|FLAGS|VARIANT_CLASS|SYMBOL_SOURCE|HGNC_ID|CANONICAL|MANE|MANE_SELECT|MANE_PLUS_CLINICAL|TSL|APPRIS|CCDS|ENSP|SWISSPROT|TREMBL|UNIPARC|UNIPROT_ISOFORM|REFSEQ_MATCH|REFSEQ_OFFSET|GENE_PHENO|SIFT|PolyPhen|DOMAINS|miRNA|CLIN_SIG|SOMATIC|PHENO|PUBMED|MOTIF_NAME|MOTIF_POS|HIGH_INF_POS|MOTIF_SCORE_CHANGE|TRANSCRIPTION_FACTORS">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##contig=<ID=1,length=248956422>
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE1
+1	1000	1_1000_A_T	A	T	50	PASS	CSQ=T|stop_gained|HIGH|GeneA|ENSG0000001|Transcript|ENST0000001|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	1100	1_1100_C_G	C	G	50	PASS	CSQ=G|stop_gained|HIGH|GeneA|ENSG0000001|Transcript|ENST0000001|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	1200	1_1200_G_A	G	A	50	PASS	CSQ=A|stop_gained|HIGH|GeneA|ENSG0000001|Transcript|ENST0000001|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	1300	1_1300_T_C	T	C	50	PASS	CSQ=C|stop_gained|HIGH|GeneA|ENSG0000001|Transcript|ENST0000001|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	1400	1_1400_A_G	A	G	50	PASS	CSQ=G|stop_gained|HIGH|GeneA|ENSG0000001|Transcript|ENST0000001|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	1500	1_1500_C_T	C	T	50	PASS	CSQ=T|stop_gained|HIGH|GeneA|ENSG0000001|Transcript|ENST0000001|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	2000	1_2000_A_G	A	G	50	PASS	CSQ=G|missense_variant|MODERATE|GeneB|ENSG0000002|Transcript|ENST0000002|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	2100	1_2100_C_T	C	T	50	PASS	CSQ=T|missense_variant|MODERATE|GeneB|ENSG0000002|Transcript|ENST0000002|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	2200	1_2200_G_C	G	C	50	PASS	CSQ=C|missense_variant|MODERATE|GeneB|ENSG0000002|Transcript|ENST0000002|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	2300	1_2300_T_A	T	A	50	PASS	CSQ=A|missense_variant|MODERATE|GeneB|ENSG0000002|Transcript|ENST0000002|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	2400	1_2400_A_C	A	C	50	PASS	CSQ=C|missense_variant|MODERATE|GeneB|ENSG0000002|Transcript|ENST0000002|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	3000	1_3000_C_T	C	T	50	PASS	CSQ=T|synonymous_variant|LOW|GeneC|ENSG0000003|Transcript|ENST0000003|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	3100	1_3100_G_A	G	A	50	PASS	CSQ=A|synonymous_variant|LOW|GeneC|ENSG0000003|Transcript|ENST0000003|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	3200	1_3200_T_C	T	C	50	PASS	CSQ=C|synonymous_variant|LOW|GeneC|ENSG0000003|Transcript|ENST0000003|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	3300	1_3300_A_G	A	G	50	PASS	CSQ=G|synonymous_variant|LOW|GeneC|ENSG0000003|Transcript|ENST0000003|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	4000	1_4000_C_A	C	A	50	PASS	CSQ=A|intron_variant|MODIFIER|GeneD|ENSG0000004|Transcript|ENST0000004|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	4100	1_4100_G_T	G	T	50	PASS	CSQ=T|intron_variant|MODIFIER|GeneD|ENSG0000004|Transcript|ENST0000004|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	4200	1_4200_T_G	T	G	50	PASS	CSQ=G|intron_variant|MODIFIER|GeneD|ENSG0000004|Transcript|ENST0000004|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	5000	1_5000_A_T	A	T	50	PASS	CSQ=T|upstream_gene_variant|MODIFIER|GeneE|ENSG0000005|Transcript|ENST0000005|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	5100	1_5100_C_G	C	G	50	PASS	CSQ=G|upstream_gene_variant|MODIFIER|GeneE|ENSG0000005|Transcript|ENST0000005|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1
+1	6000	1_6000_G_C	G	C	50	PASS	CSQ=C|5_prime_UTR_variant|MODIFIER|GeneF|ENSG0000006|Transcript|ENST0000006|protein_coding|||||||||||.|||SNV||||||||||||||||||||||||||||||	GT	0/1

@@ -110,7 +110,7 @@ For each sub-task, follow this recipe against the row referenced in §5a above:
 |---|---|---|
 | T7a ✅ 2026-05-26 | `python/calc_f_outliers` | Three test cases (range_stds=2, range_stds=10, FID-absent branch). Business-meaningful assertions on outlier IIDs. |
 | T7b ✅ 2026-05-26 | `python/vcf2aaf` | Hand-rolled VCF spans `AF`-only, `AF_nfe`-only, neither, and a `chr`-prefixed variant. Assert AF fallback for three named variants. |
-| T7c | `bcftools/assign_annotations` | Hand-rolled VCF (≥2 genes) + masks TSV (2 categories). Assert one variant absent, one triple, one setlist row. |
+| T7c ✅ 2026-05-26 | `bcftools/assign_annotations` | Hand-rolled VCF (6 genes, 6 distinct consequences with unique frequencies) + masks TSV (2 categories). Three scenarios drive different branches of `filter_annotations` (overlap + normal range, quantile-trim, padding). Also fixed a double-counting bug in `assign_annotations.py` (legacy R-parity behavior was excluding important-and-quantile overlap consequences from the size accounting). |
 | T7d | `python/eda` | Reporting carve-out — filename-only smoke. Reuses `assets/three_chr_unprepared/unprepared_rand_500.vcf.gz`; pheno TSV hand-rolled next to the test. |
 | T7e | `python/draw_pc_plot` | Reporting carve-out — filename-only smoke. Hand-rolled `.sscore` (3 PCs, 10 samples) + pheno TSV. |
 | T7f | `python/generate_tracking_report` | Reporting carve-out — filename-only smoke. Two hand-rolled `*.tracking.json` chained via `predecessor`. |

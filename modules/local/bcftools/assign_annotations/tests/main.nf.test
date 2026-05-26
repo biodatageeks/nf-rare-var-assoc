@@ -1,0 +1,167 @@
+nextflow_process {
+
+    name "Test Process BCFTOOLS_ASSIGN_ANNOTATIONS"
+    script "../main.nf"
+    process "BCFTOOLS_ASSIGN_ANNOTATIONS"
+
+    tag "ci"
+    tag "modules"
+    tag "bcftools"
+    tag "bcftools/assign_annotations"
+
+    // Fixture design is documented in tests/fixtures/README.md. 21 variants span 6 genes
+    // with 6 distinct consequences at strictly distinct frequencies:
+    //   stop_gained=6 (LoF, important), missense_variant=5 (missense, important),
+    //   synonymous_variant=4, intron_variant=3, upstream_gene_variant=2, 5_prime_UTR_variant=1.
+    // With quantile_threshold=0.25 the threshold value is 2.25 — so stop_gained, missense,
+    // synonymous, and intron all pass the quantile, while upstream and UTR fall below.
+    // Each test exercises a different branch of filter_annotations by varying min/max args.
+
+    test("overlap + normal range: important and quantile sets overlap; result lands between min and max") {
+        // keep_important = {stop_gained, missense_variant} (both also above the quantile).
+        // keep_quantile (non-important, freq >= 2.25) = {synonymous_variant, intron_variant}.
+        // union has 4 consequences == --min-top-annotations 4, so no padding and no trimming.
+        // The point of this test is to confirm overlap does NOT cause double-counting:
+        // the result is 4 distinct consequences, not 2 (under-counting) or 6 (over-padding).
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test' ],
+                    file('${projectDir}/modules/local/bcftools/assign_annotations/tests/fixtures/test_variants.vcf.gz', checkIfExists: true),
+                    file('${projectDir}/modules/local/bcftools/assign_annotations/tests/fixtures/test_masks.tsv', checkIfExists: true),
+                    file('${projectDir}/modules/local/bcftools/assign_annotations/assets/assign_annotations.py', checkIfExists: true)
+                ]
+                input[1] = "--min-top-annotations 4"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def anno_lines = path(process.out.annotations[0][1]).readLines()
+            def setlist_lines = path(process.out.setlist[0][1]).readLines()
+
+            // Below-quantile consequences must be excluded (none in mask, neither padded in).
+            def excluded_ids = ['1_5000_A_T', '1_5100_C_G', '1_6000_G_C']
+            excluded_ids.each { vid ->
+                assert !anno_lines.any { it.contains(vid) } :
+                    "${vid} should be excluded (below-quantile, not in any mask), but was found"
+            }
+
+            // Exactly 4 distinct consequences kept (would be 6 if overlap caused over-padding).
+            def kept_consequences = anno_lines.collect { it.split('\t')[2] } as Set
+            assert kept_consequences == ['stop_gained','missense_variant','synonymous_variant','intron_variant'] as Set :
+                "expected 4 distinct consequences, got ${kept_consequences}"
+
+            // The mask-A triple is intact.
+            assert anno_lines.contains('1_1000_A_T\tGeneA\tstop_gained')
+
+            // setlist row for GeneA must list exactly the 6 stop_gained variant IDs.
+            def geneA_row = setlist_lines.find { it.startsWith('GeneA\t') }
+            assert geneA_row != null : "GeneA row missing from setlist:\n${setlist_lines.join('\n')}"
+            def geneA_variants = (geneA_row.split('\t')[3]).split(',') as Set
+            def expected_geneA = ['1_1000_A_T','1_1100_C_G','1_1200_G_A','1_1300_T_C','1_1400_A_G','1_1500_C_T'] as Set
+            assert geneA_variants == expected_geneA :
+                "GeneA setlist variants mismatch: expected ${expected_geneA}, got ${geneA_variants}"
+
+            // setlist has exactly the 4 mask-eligible genes (no GeneE/GeneF).
+            def setlist_genes = setlist_lines.collect { it.split('\t')[0] } as Set
+            assert setlist_genes == ['GeneA','GeneB','GeneC','GeneD'] as Set :
+                "expected setlist genes A/B/C/D, got ${setlist_genes}"
+
+            assert snapshot(process.out.versions).match()
+        }
+    }
+
+    test("trimming: union exceeds max; quantile-set portion trimmed by frequency") {
+        // keep_important = {stop_gained, missense_variant}, n_additional = max-2 = 1.
+        // keep_quantile (non-important) starts as {synonymous_variant, intron_variant};
+        // trimmed by frequency descending to top 1 -> {synonymous_variant} (freq 4 > 3).
+        // Result: 3 consequences. intron_variant must be trimmed out even though it passed
+        // the quantile, because GeneC's synonymous_variant wins the frequency tie-break.
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test' ],
+                    file('${projectDir}/modules/local/bcftools/assign_annotations/tests/fixtures/test_variants.vcf.gz', checkIfExists: true),
+                    file('${projectDir}/modules/local/bcftools/assign_annotations/tests/fixtures/test_masks.tsv', checkIfExists: true),
+                    file('${projectDir}/modules/local/bcftools/assign_annotations/assets/assign_annotations.py', checkIfExists: true)
+                ]
+                input[1] = "--min-top-annotations 2 --max-annotations 3"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def anno_lines = path(process.out.annotations[0][1]).readLines()
+            def setlist_lines = path(process.out.setlist[0][1]).readLines()
+
+            // intron_variant got trimmed out by frequency tie-break (3 < 4).
+            assert !anno_lines.any { it.split('\t')[2] == 'intron_variant' } :
+                "intron_variant should have been trimmed out below max=3"
+
+            // synonymous_variant (higher freq) is kept.
+            assert anno_lines.any { it.split('\t')[2] == 'synonymous_variant' } :
+                "synonymous_variant should be kept as the highest-frequency non-important consequence"
+
+            // Both important consequences are always kept.
+            def kept_consequences = anno_lines.collect { it.split('\t')[2] } as Set
+            assert kept_consequences == ['stop_gained','missense_variant','synonymous_variant'] as Set :
+                "expected {stop_gained, missense_variant, synonymous_variant}, got ${kept_consequences}"
+
+            // setlist must NOT contain GeneD (intron) / GeneE / GeneF.
+            def setlist_genes = setlist_lines.collect { it.split('\t')[0] } as Set
+            assert setlist_genes == ['GeneA','GeneB','GeneC'] as Set :
+                "expected setlist genes A/B/C, got ${setlist_genes}"
+        }
+    }
+
+    test("padding: union below min; lowest-frequency non-mask consequences added to reach min") {
+        // keep_important = {stop_gained, missense_variant} (2).
+        // keep_quantile = {synonymous_variant, intron_variant} (2). Union = 4 < min=6.
+        // n_to_keep = min(6-2-2, 6-2-2, 8-2) = 2 -> pad with upstream and 5_prime_UTR by
+        // frequency descending. Both below-quantile consequences end up in the keep set
+        // EVEN THOUGH they are not in any mask, because padding is mask-agnostic.
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test' ],
+                    file('${projectDir}/modules/local/bcftools/assign_annotations/tests/fixtures/test_variants.vcf.gz', checkIfExists: true),
+                    file('${projectDir}/modules/local/bcftools/assign_annotations/tests/fixtures/test_masks.tsv', checkIfExists: true),
+                    file('${projectDir}/modules/local/bcftools/assign_annotations/assets/assign_annotations.py', checkIfExists: true)
+                ]
+                input[1] = "--min-top-annotations 6 --max-annotations 10"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def anno_lines = path(process.out.annotations[0][1]).readLines()
+            def setlist_lines = path(process.out.setlist[0][1]).readLines()
+
+            // Padding pulled in the two below-quantile non-mask consequences.
+            assert anno_lines.any { it.contains('1_5000_A_T') && it.contains('upstream_gene_variant') } :
+                "upstream_gene_variant should be padded into the keep set"
+            assert anno_lines.any { it.contains('1_6000_G_C') && it.contains('5_prime_UTR_variant') } :
+                "5_prime_UTR_variant should be padded into the keep set"
+
+            // All 6 consequences and all 6 genes are now represented.
+            def kept_consequences = anno_lines.collect { it.split('\t')[2] } as Set
+            assert kept_consequences.size() == 6 :
+                "expected 6 distinct consequences after padding, got ${kept_consequences.size()}: ${kept_consequences}"
+
+            def setlist_genes = setlist_lines.collect { it.split('\t')[0] } as Set
+            assert setlist_genes == ['GeneA','GeneB','GeneC','GeneD','GeneE','GeneF'] as Set :
+                "expected all 6 genes in setlist after padding, got ${setlist_genes}"
+        }
+    }
+
+}

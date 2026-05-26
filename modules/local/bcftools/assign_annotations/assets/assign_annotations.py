@@ -198,29 +198,25 @@ def filter_annotations(
     n_important = len(keep_important)
     n_additional = max(0, max_annotations - n_important)
     
-    # 2. Identify all consequences that pass quantile threshold (including important ones)
+    # 2. Identify quantile-passing consequences, excluding ones already kept as important.
+    # Keeping the two sets disjoint makes the size accounting in step 5 trivially correct
+    # when an important consequence is also above the quantile threshold.
     keep_quantile = set()
     for conseq, freq in zip(consequence_names, freq_values):
-        if freq >= threshold_freq:
+        if freq >= threshold_freq and conseq not in keep_important:
             keep_quantile.add(conseq)
-    
-    # 3. Limit keep_quantile to top n_additional by frequency (R's behavior)
-    # Note: This includes important annotations in the count, matching R exactly
+
+    # 3. Trim keep_quantile by frequency to fit alongside the important set under max_annotations.
     if len(keep_quantile) > n_additional:
         # Sort by frequency descending
         quantile_sorted = sorted(keep_quantile, key=lambda c: freq_lookup[c], reverse=True)
         keep_quantile = set(quantile_sorted[:n_additional])
-    
+
     # 4. Combine: keep if important OR in quantile set
     keep_consequences = keep_important | keep_quantile
-    
-    # 5. Ensure at least min_top_annotations are kept (R's exact logic)
-    # R calculates n_to_keep using a formula that prevents adding more than available:
-    # n_to_keep = max(0, min(
-    #     min_top_annotations - n_important - n_quantile,  # How many more needed
-    #     n_consequences - n_important - n_quantile,       # How many available (may be negative due to overlap!)
-    #     n_additional - n_quantile                        # Space in max limit
-    # ))
+
+    # 5. Ensure at least min_top_annotations are kept.
+    # min() terms: more-needed-for-floor, available-remaining, room-before-max.
     n_consequences = len(consequence_names)
     n_quantile = len(keep_quantile)
     n_to_keep = max(0, min(

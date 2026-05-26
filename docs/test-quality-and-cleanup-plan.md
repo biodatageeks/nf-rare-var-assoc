@@ -222,7 +222,7 @@ command, done-when). Conventions in §0 are assumed throughout.
 | T7 — Write high-priority unit tests (§5a) — split into T7a–T7f on 2026-05-26 | pending | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | &nbsp;&nbsp;T7a — `python/calc_f_outliers` (hand-rolled `het` fixture + FID/IID branch) | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | &nbsp;&nbsp;T7b — `python/vcf2aaf` (hand-rolled VCF + AF fallback logic) | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
-| &nbsp;&nbsp;T7c — `bcftools/assign_annotations` (hand-rolled VCF + masks TSV) | pending | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
+| &nbsp;&nbsp;T7c — `bcftools/assign_annotations` (hand-rolled VCF + masks TSV) | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | &nbsp;&nbsp;T7d — `python/eda` (smoke; reuses `unprepared_rand_500.vcf.gz`) | pending | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | &nbsp;&nbsp;T7e — `python/draw_pc_plot` (smoke; hand-rolled `.sscore` + pheno) | pending | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | &nbsp;&nbsp;T7f — `python/generate_tracking_report` (smoke; hand-rolled tracking JSONs) | pending | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
