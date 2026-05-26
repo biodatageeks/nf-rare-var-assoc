@@ -94,7 +94,10 @@ configured arguments. Testing them has lower value (but still has value); if tes
 
 ## T7 — Write high-priority unit tests (§5a)
 
-For each row in §5a:
+Split into T7a–T7f on 2026-05-26 — one sub-task per §5a row. The sub-tasks are
+independent (separate modules, no shared fixtures); they may be done in any order.
+
+For each sub-task, follow this recipe against the row referenced in §5a above:
 
 1. Create `modules/local/<group>/<name>/tests/` if missing.
 2. If the row needs a hand-rolled fixture, create
@@ -103,4 +106,16 @@ For each row in §5a:
 3. Write `main.nf.test` with `tag "ci"`, the listed input, and the listed assertions.
 4. Verify: `nf-test test --profile podman modules/local/<group>/<name>/tests/main.nf.test`.
 
-**Done-when**: all six §5a tests pass; total CI runtime added ≤ ~5 min.
+| Sub-task | §5a row | Notes |
+|---|---|---|
+| T7a | `python/calc_f_outliers` | Three test cases (range_stds=2, range_stds=10, FID-absent branch). Business-meaningful assertions on outlier IIDs. |
+| T7b | `python/vcf2aaf` | Hand-rolled VCF spans `AF`-only, `AF_nfe`-only, neither, and a `chr`-prefixed variant. Assert AF fallback for three named variants. |
+| T7c | `bcftools/assign_annotations` | Hand-rolled VCF (≥2 genes) + masks TSV (2 categories). Assert one variant absent, one triple, one setlist row. |
+| T7d | `python/eda` | Reporting carve-out — filename-only smoke. Reuses `assets/three_chr_unprepared/unprepared_rand_500.vcf.gz`; pheno TSV hand-rolled next to the test. |
+| T7e | `python/draw_pc_plot` | Reporting carve-out — filename-only smoke. Hand-rolled `.sscore` (3 PCs, 10 samples) + pheno TSV. |
+| T7f | `python/generate_tracking_report` | Reporting carve-out — filename-only smoke. Two hand-rolled `*.tracking.json` chained via `predecessor`. |
+
+**Done-when (T7 overall)**: all six §5a tests pass; total CI runtime added ≤ ~5 min.
+**Done-when (per sub-task)**: the named module's `main.nf.test` passes under `nf-test
+test --profile podman <path>`; fixtures (if any) committed with a `README.md`; index +
+this sub-doc updated with status.
