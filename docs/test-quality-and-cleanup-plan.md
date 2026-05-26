@@ -16,6 +16,10 @@ file plus the sub-doc the task points to — you don't need to load the others.
   status, and decision once. Delete superseded resume notes and obsolete detail as soon
   as the task lands. Cite source-of-truth files (paths/line numbers) instead of duplicating
   them.
+- **No git usage by the AI**. After completing a task the user will commit the code manually as part of reviewing the task.
+- **ASCII only in code**. Do not use non-ASCII characters in any source file (`.nf`, `.py`,
+  `.R`, `.config`, `.json`, `.yml`, shell scripts, test files). Non-ASCII is fine in design
+  docs (`.md`). If non-ASCII is necessary for some reason, ask the user before using it.
 
 ## Goals
 
@@ -188,7 +192,7 @@ command, done-when). Conventions in §0 are assumed throughout.
 | &nbsp;&nbsp;T4a — `cmds/merge_results` (tuple consolidation; assertions already meet bar) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4b — `bcftools/annotate` (collapse 5 paths into tuple; many test variants) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4c — `bcftools/norm` (collapse 4 paths into tuple; large test file) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
-| &nbsp;&nbsp;T4d — `bcftools/view` (collapse 7 paths into tuple) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| &nbsp;&nbsp;T4d — `bcftools/view` (collapse 7 paths into tuple) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4e — `plink2/makebed` (8-path tuple + 4 vals; **unblocks T5**) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4f — `vep/annotate` (4-path tuple; needs `../vep_cachedir` reference) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4g — `rscript/manhattan_qq_plots` (11-element tuple; **deferred — needs IT-5 fixtures from T11**) | deferred | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
