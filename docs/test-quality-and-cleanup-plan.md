@@ -223,7 +223,7 @@ command, done-when). Conventions in §0 are assumed throughout.
 | &nbsp;&nbsp;T7a — `python/calc_f_outliers` (hand-rolled `het` fixture + FID/IID branch) | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | &nbsp;&nbsp;T7b — `python/vcf2aaf` (hand-rolled VCF + AF fallback logic) | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | &nbsp;&nbsp;T7c — `bcftools/assign_annotations` (hand-rolled VCF + masks TSV) | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
-| &nbsp;&nbsp;T7d — `python/eda` (smoke; reuses `unprepared_rand_500.vcf.gz`) | pending | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
+| &nbsp;&nbsp;T7d — `python/eda` (smoke; reuses `unprepared_rand_500.vcf.gz`) | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | &nbsp;&nbsp;T7e — `python/draw_pc_plot` (smoke; hand-rolled `.sscore` + pheno) | pending | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | &nbsp;&nbsp;T7f — `python/generate_tracking_report` (smoke; hand-rolled tracking JSONs) | pending | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | T8 — Implement IT-1 + IT-1b; record `prepared_500/` fixture | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |

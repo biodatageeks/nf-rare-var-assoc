@@ -1,0 +1,58 @@
+nextflow_process {
+
+    name "Test Process EXPLORATORY_DATA_ANALYSIS"
+    script "../main.nf"
+    process "EXPLORATORY_DATA_ANALYSIS"
+
+    tag "ci"
+    tag "modules"
+    tag "python"
+    tag "python/eda"
+
+    // Reporting carve-out: only smoke assertions (see main plan -- Reporting carve-out).
+    // Fixture: 10 samples from the canonical unprepared_rand_500 VCF (3202 samples,
+    // ~500 variants, 3 chromosomes) assigned to two phenotype groups (Y1=1 and Y1=2).
+    // Unmatched VCF samples receive Y1=null via left-join; with exactly 2 distinct
+    // phenotype values the script takes the len(phenotypes)==2 code paths
+    // (per-phenotype histograms, DP difference plots between the two groups).
+    // use_dosage=false so DS-related plots are skipped.
+
+    test("eda smoke - process succeeds, PNG and SVG plots emitted, versions.yml names the process") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test' ],
+                    file('${projectDir}/assets/three_chr_unprepared/unprepared_rand_500.vcf.gz', checkIfExists: true),
+                    file('${projectDir}/assets/three_chr_unprepared/unprepared_rand_500.vcf.gz.tbi', checkIfExists: true),
+                    file('${projectDir}/modules/local/python/eda/tests/fixtures/pheno.tsv', checkIfExists: true)
+                ]
+                input[1] = false
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // At least one PNG emitted under plots/
+            def pngs = process.out.plots[0][1]
+            def png_count = pngs instanceof List ? pngs.size() : 1
+            assert png_count >= 1 :
+                "expected at least one PNG in plots/, got ${png_count}"
+
+            // At least one SVG emitted under plots/
+            def svgs = process.out.plots_svg[0][1]
+            def svg_count = svgs instanceof List ? svgs.size() : 1
+            assert svg_count >= 1 :
+                "expected at least one SVG in plots/, got ${svg_count}"
+
+            // versions.yml must name the process (not a generic 'python:' key alone)
+            assert path(process.out.versions[0]).text.contains('EXPLORATORY_DATA_ANALYSIS:') :
+                "versions.yml should contain 'EXPLORATORY_DATA_ANALYSIS:'"
+        }
+
+    }
+
+}

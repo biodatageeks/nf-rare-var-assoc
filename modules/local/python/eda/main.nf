@@ -48,7 +48,9 @@ Path(output_dir).mkdir(exist_ok=True)
 def encode_genotype(gt):
     if gt is None or None in gt:
         return None  # Missing genotype
-    j, k = sorted(gt)  # Sort to treat j/k and k/j the same (unphased or phased)
+    alleles = sorted(gt)
+    j = alleles[0]
+    k = alleles[-1]  # For haploid (e.g. male chrX), k == j; for diploid, k is second allele
     return (k * (k + 1) // 2) + j  # Integer encoding
 
 # Function to load VCF.gz and extract DP, GQ, and missingness
