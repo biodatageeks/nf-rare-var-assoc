@@ -54,15 +54,29 @@ optimization (see the comment at
 different code path (`BCFTOOLS_VIEW_AND_FILTER2`) and must have its own coverage.
 
 - **Test file**: `subworkflows/local/prepare/tests/skip_prep_skip_reporting.nf.test`
-- **Inputs**: same VCF + a pre-prepared `cases.txt` from T8.
+- **Inputs**: a **pre-prepared** VCF (because `skip_preparation=true` means the caller
+  guarantees NORM/ANNOTATE/VEP have already run upstream). Use
+  `assets/medium_data/prepared_chr12_100.vcf.gz` (3202 samples, 100 variants, chr12); same
+  1000G sample IDs as `cases.txt`/`controls.txt`. The joined all.samples fixture lives at
+  `subworkflows/local/prepare/tests/fixtures/all_samples.txt`.
 - **Run with**: `params.skip_preparation=true`, `params.skip_reporting=true`,
-  `params.use_dosage=true`.
-- **Assertions** on `workflow.out.prepared_vcf`:
-  - Output VCF variant count is strictly less than the input (filter actually filtered)
-  - Sample count in the output equals 3202
-  - `prepared_vcf_tbi` is emitted
-- **Tracking-JSON assertion**: contains a key for `bcftools_view_and_filter2` with
-  `samples=3202`.
+  `params.use_dosage=true`. The seven filter thresholds are overridden in a sibling
+  `skip_prep_skip_reporting.config` so each is active against the fixture (variant-level
+  filters drop a known subset; sample-level filters with `--set-GTs '.'` rewrite bad
+  genotypes to missing).
+- **Assertions** on `workflow.out.prepared_vcf` (all derived from one zcat of the output):
+  - Output variant count equals the deterministic survivor count from the fixture +
+    threshold combination (currently 82 of 100)
+  - A specific high-QUAL variant ID is present in the output, a specific low-QUAL variant
+    ID is absent — pins identity-level filter wiring, not just count
+  - Sample count in the output equals 3202, and a known sample ID (`HG00096`) appears in
+    the `#CHROM` header
+  - Missing-genotype count (`./.`) in the output body is well above the input baseline,
+    proving the sample-level `--set-GTs '.'` filter actually ran
+  - `prepared_vcf_tbi` is emitted with a `.tbi` filename suffix
+- **Tracking-JSON assertion**: `process_name` references `BCFTOOLS_VIEW_AND_FILTER2`;
+  `inputs.variants`/`outputs.variants`/`inputs.samples`/`outputs.samples` cross-check
+  against the VCF-derived counts above.
 - **Tag**: `"ci"`.
 
 ## IT-2 — `subworkflows/local/pca`
@@ -226,17 +240,28 @@ script's docstring.
 
 ### T8 — Implement IT-1 and IT-1b (prepare subworkflow); prepare downstream fixture
 
-- **Test files to create**:
-  - `subworkflows/local/prepare/tests/main.nf.test` (IT-1)
-  - `subworkflows/local/prepare/tests/skip_prep_skip_reporting.nf.test` (IT-1b)
+Split into T8a and T8b on 2026-05-26. T8a and T8b are independent and may be parallelised;
+the prepared-fixture step depends on T8b's IT-1 producing the prepared VCF.
+
+#### T8a — IT-1b (skip-preparation + skip-reporting branch)
+
+- **Test file to create**: `subworkflows/local/prepare/tests/skip_prep_skip_reporting.nf.test`.
 - **Asset to commit**: `assets/three_chr_unprepared/cases.txt` and `controls.txt` — full
   3202-sample list split however convenient (e.g. first 2000 controls, last 1202 cases).
+  Reused by T8b and IT-6/IT-7.
+- **Verify**: `nf-test test --profile podman subworkflows/local/prepare/tests/skip_prep_skip_reporting.nf.test`.
+- **Done-when**: IT-1b passes AND `cases.txt` / `controls.txt` are committed.
+
+#### T8b — IT-1 (full preparation branch); record `prepared_500/` fixture
+
+- **Prerequisite**: T8a (reuses the same `cases.txt`).
+- **Test file to create**: `subworkflows/local/prepare/tests/main.nf.test` (IT-1).
 - **After IT-1 passes**: copy the prepared VCF + run
   `plink2 --vcf <prepared> --make-pgen --out prepared_500` outside the test; commit the
   resulting `assets/three_chr_unprepared/prepared_500/prepared_500.{pgen,pvar,psam}` for
   reuse by IT-2..IT-7. Add a short `README.md` next to the files explaining their origin.
-- **Verify**: `nf-test test --profile podman subworkflows/local/prepare/tests/`.
-- **Done-when**: IT-1 and IT-1b pass AND `prepared_500.{pgen,pvar,psam}` are committed.
+- **Verify**: `nf-test test --profile podman subworkflows/local/prepare/tests/main.nf.test`.
+- **Done-when**: IT-1 passes AND `prepared_500.{pgen,pvar,psam}` are committed.
 
 ### T9 — Implement IT-2 (PCA)
 
