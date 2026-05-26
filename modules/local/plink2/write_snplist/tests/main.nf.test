@@ -1,40 +1,53 @@
-// TODO nf-core: Once you have added the required tests, please run the following command to build this file:
-// nf-core modules test plink2
 nextflow_process {
 
     name "Test Process PLINK2_WRITE_SNPLIST"
     script "../main.nf"
     process "PLINK2_WRITE_SNPLIST"
 
+    tag "ci"
     tag "modules"
-    tag "modules_"
-    tag "plink2_write_snplist"
+    tag "plink2"
+    tag "plink2/write_snplist"
 
-    // TODO nf-core: Change the test name preferably indicating the test-data and file-format used
-    test("small vcf - bed,bim,fam") {
+    // Module signature (3 inputs):
+    //   tuple val(meta), path(pgen), path(pvar), path(psam), path(keep), path(tracking_in)
+    //   val(out_name_part)
+    //   val(input_args)
+    //
+    // Fixture: assets/medium_data/prepared_chr12_100.vcf.gz
+    //   First 100 variants (all chr12) from prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz.
+    //   3202 samples, unique variant IDs, no multiallelic sites.
+    //   The unprepared_rand_500 fixture is intentionally NOT used here because it carries
+    //   duplicate variant IDs that --write-snplist rejects.
+    //
+    // Production caller: workflows/rare-var-assoc.nf:323-327.
+    // .snplist output feeds REGENIE_STEP1 (qc_pass_snplist).
+    // .id output feeds REGENIE_STEP1 (qc_pass_id) via --keep.
 
-        // TODO nf-core: If you are created a test for a chained module
-        // (the module requires running more than one process to generate the required output)
-        // add the 'setup' method here.
-        // You can find more information about how to use a 'setup' method in the docs (https://nf-co.re/docs/contributing/modules#steps-for-creating-nf-test-for-chained-modules).
+    test("chr12 pgen (100 variants): snplist and sample IDs emitted; counts consistent with tracking JSON") {
 
+        // Setup: convert the local fixture VCF to pgen/pvar/psam first, mirroring the
+        // production chain (workflows/rare-var-assoc.nf lines 206-247).
+        // No --max-alleles 2 or --split-par needed: the fixture is already prepared
+        // (chr12-only, no multiallelic sites, unique IDs).
         setup {
-            run("PLINK2_MAKEBED") {
-                script "../../../plink2/makebed/main.nf"
+            run("PLINK2_MAKEPGEN") {
+                script "../../../plink2/makepgen/main.nf"
                 process {
                     """
                     input[0] = [
-                        [ id:'test', single_end:false ], // meta map
-                        [],  // bed
-                        [],  // bim
-                        [],  // fam
-                        file('${projectDir}/assets/medium_data/1000g_lpa_hg38_vep.vcf', checkIfExists: true),
-                        []   // frq
+                        [ id:'test' ],
+                        [], [],   // pgen, pvar (VCF input branch)
+                        file('${projectDir}/assets/three_chr_unprepared/samples.psam', checkIfExists: true),
+                        file('${projectDir}/assets/medium_data/prepared_chr12_100.vcf.gz', checkIfExists: true),
+                        file('${projectDir}/assets/medium_data/prepared_chr12_100.vcf.gz.tbi', checkIfExists: true),
+                        [], [], [], []  // frq, samples_filter, variants_filter, tracking_in
                     ]
-                    input[1] = '--remove'
-                    input[2] = '--exclude'
-                    input[3] = 'filter'
-                    input[4] = '--mac 1 --double-id --vcf-half-call missing'
+                    input[1] = ''          // samples_filtering_type (unused)
+                    input[2] = ''          // variants_filtering_type (unused)
+                    input[3] = ''          // vcf_input_options
+                    input[4] = 'makepgen'  // out_name_part
+                    input[5] = '--double-id --vcf-half-call missing'
                     """
                 }
             }
@@ -43,23 +56,49 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = PLINK2_MAKEBED.out.out_bed_bim_fam
-                input[1] = 'snps_pass'
+                // Mirrors production call at workflows/rare-var-assoc.nf:323-327:
+                //   keep=[] (no sample-subset filter), tracking_in=[] (not chaining).
+                // --mac 1 removes monomorphic variants and causes plink2 to emit a
+                //   'variants remaining after main filters' log line, which populates
+                //   tracking.outputs.variants for the consistency assertion below.
+                input[0] = PLINK2_MAKEPGEN.out.out_pgen_pvar_psam
+                    .map { meta, pgen, pvar, psam ->
+                        tuple(meta, pgen, pvar, psam, [], [])
+                    }
+                input[1] = 'writesnp_pass'
                 input[2] = '--mac 1'
                 """
             }
         }
 
         then {
-            assertAll(
-                { assert process.success },
-                // { assert snapshot(process.out).match() }
-                //TODO nf-core: Add all required assertions to verify the test output.
-                // See https://nf-co.re/docs/contributing/tutorials/nf-test_assertions for more information and examples.
-            )
+            assert process.success
+
+            // .snplist: one variant ID per line (no header); the primary downstream input
+            // to REGENIE_STEP1 (qc_pass_snplist). The prepared fixture has exactly 100
+            // variants, all polymorphic in 1kGP data; --mac 1 should retain all of them.
+            def snplist_lines = path(process.out.snplist.get(0).get(1)).readLines()
+            assert snplist_lines.size() == 100 : "snplist must contain all 100 variants from the fixture (all polymorphic)"
+
+            // .id: plink2 --write-samples format is '#FID\tIID' header + one data row per
+            // sample retained. With no --keep filter, all 3202 samples are written.
+            // 3202 data rows + 1 header = 3203 lines total.
+            def id_lines = path(process.out.id.get(0).get(1)).readLines()
+            assert id_lines.size() == 3203 : "expected '#FID IID' header + 3202 sample rows in .id file"
+
+            // Tracking JSON: inputs populated from plink2 log 'loaded from' lines.
+            def tracking = path(process.out.tracking_out[0]).json
+            assert tracking.inputs.samples == 3202 : "tracking.inputs.samples must be 3202 (loaded from psam)"
+            assert tracking.inputs.variants == 100  : "tracking.inputs.variants must be 100 (loaded from pvar)"
+
+            // outputs.variants: set from the 'variants remaining after main filters' log line
+            // (present because --mac 1 is applied). Must equal snplist row count exactly.
+            assert (tracking.outputs.variants as int) == snplist_lines.size() :
+                "tracking.outputs.variants must equal snplist row count"
+
+            assert snapshot(process.out.versions).match()
         }
 
     }
-
 
 }

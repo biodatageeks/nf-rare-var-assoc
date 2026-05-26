@@ -136,12 +136,32 @@ Wall-clock budgets are aspirational, not hard gates.
 
 ### 0.4 Canonical fixtures
 
+**Unprepared fixtures** — raw 1kGP VCFs: duplicate variant IDs, multiallelic sites, no VEP
+annotation. Use these for tests that exercise the preparation steps themselves (bcftools
+norm/annotate, VEP) or for integration tests that run the full pipeline.
+
 | Use case | Fixture path |
 |---|---|
 | Primary VCF input (3 chr inc. X, 3202 samples, ~500 variants) | `assets/three_chr_unprepared/unprepared_rand_500.vcf.gz` |
 | Same dataset, larger when Regenie complains about low variance | `assets/three_chr_unprepared/unprepared_rand_{1k,2k,5k,10k}.vcf.gz` |
 | Pre-prepared pgen/pvar/psam for downstream subworkflow tests | `assets/three_chr_unprepared/prepared_500/` *(created in T8)* |
 | Cases/controls sample lists matching the 3202-sample fixture | `assets/three_chr_unprepared/cases.txt`, `controls.txt` *(created in T8)* |
+
+**Prepared fixtures** — already through bcftools norm + VEP annotation: unique variant IDs,
+biallelic only, CSQ-annotated. Use these for tests of downstream modules (plink2, regenie,
+etc.) where the module under test should not need to handle messy raw-VCF quirks. Note that
+`--write-snplist` and similar plink2 commands **require** unique variant IDs and will refuse
+to run on unprepared data.
+
+| Use case | Fixture path |
+|---|---|
+| Full prepared 3-chr VCF (5000 variants, chr12+chr22+chrX, 3202 samples) | `assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz` |
+| Small chr12-only subset (100 variants, 3202 samples) for fast module tests | `assets/medium_data/prepared_chr12_100.vcf.gz` |
+
+**Other fixtures**
+
+| Use case | Fixture path |
+|---|---|
 | Local cache of nf-core sarscov2 test VCF (9 records, no multiallelic sites) | `assets/sarscov2/test.vcf.gz` |
 | Local cache of nf-core sarscov2 genome FASTA (chromosome MT192765.1, ~30 kb) | `assets/sarscov2/genome.fasta.gz` + `.fai` + `.gzi` |
 | Hand-crafted edge-case inputs for one specific test | `<test-dir>/fixtures/` next to the `.nf.test` file |
@@ -196,7 +216,7 @@ command, done-when). Conventions in §0 are assumed throughout.
 | &nbsp;&nbsp;T4e — `plink2/makebed` (8-path tuple + 4 vals; **unblocks T5**) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4f — `vep/annotate` (4-path tuple; needs `../vep_cachedir` reference) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4g — `rscript/manhattan_qq_plots` (11-element tuple; **deferred — needs IT-5 fixtures from T11**) | deferred | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
-| T5 — Fix Cat-D transitive failure (`plink2/write_snplist`) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| T5 — Fix Cat-D transitive failure (`plink2/write_snplist`) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T6 — Re-record Cat-E snapshot (`bcftools/vcf2frq`) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T7 — Write high-priority unit tests (§5a) | pending | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | T8 — Implement IT-1 + IT-1b; record `prepared_500/` fixture | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |

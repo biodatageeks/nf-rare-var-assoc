@@ -419,11 +419,14 @@ plan before declaring done.
 
 ### T5 — Fix Cat-D transitive failure (`plink2/write_snplist`)
 
-- **Prerequisite**: T4 done (PLINK2_MAKEBED test passes).
-- **File to edit**: `modules/local/plink2/write_snplist/tests/main.nf.test` — provide
-  required input files now that `PLINK2_MAKEBED` is invokable.
-- **Verify**: `nf-test test --profile podman modules/local/plink2/write_snplist/tests/main.nf.test`.
-- **Done-when**: passes with at least one meaningful assertion.
+✅ Done 2026-05-26 — 1 test passes.
+
+Setup uses PLINK2_MAKEPGEN on `tests/fixtures/prepared_100.vcf.gz` (first 100 chr12
+variants extracted from the prepared medium_data fixture; unique IDs, no multiallelic sites
+— the unprepared_rand_500 fixture was unusable here because `--write-snplist` rejects
+duplicate variant IDs). Assertions: snplist == 100 lines; .id == 3203 lines (header +
+3202 samples); tracking.inputs.{samples,variants} == 3202/100;
+tracking.outputs.variants == snplist row count.
 
 ### T6 — Re-record Cat-E snapshot (`bcftools/vcf2frq`)
 
