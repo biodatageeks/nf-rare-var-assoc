@@ -105,9 +105,10 @@ task contradicts a convention, the task wins.
 | Workflow integration test | `workflows/tests/<scenario_name>.nf.test` |
 | Snapshot file (nf-test default) | sibling `main.nf.test.snap` next to the test |
 
-Snapshot files are committed. Snapshot **only** small, deterministic outputs
-(`versions.yml`, text headers, column lists). Do **not** snapshot binary VCFs, pgen,
-png/svg, or anything whose md5 may legitimately drift — assert specific properties instead.
+Snapshot files (`*.nf.test.snap`) are **gitignored** and not committed. Use explicit
+assertions instead of snapshots for all correctness checks. The only acceptable use of
+`snapshot()` is for `versions.yml` (a small, deterministic, human-auditable YAML); all
+other output properties must be asserted directly.
 
 ### 0.2 Required invocation
 
@@ -217,7 +218,7 @@ command, done-when). Conventions in §0 are assumed throughout.
 | &nbsp;&nbsp;T4f — `vep/annotate` (4-path tuple; needs `../vep_cachedir` reference) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4g — `rscript/manhattan_qq_plots` (11-element tuple; **deferred — needs IT-5 fixtures from T11**) | deferred | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T5 — Fix Cat-D transitive failure (`plink2/write_snplist`) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
-| T6 — Re-record Cat-E snapshot (`bcftools/vcf2frq`) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| T6 — Re-record Cat-E snapshot (`bcftools/vcf2frq`) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T7 — Write high-priority unit tests (§5a) | pending | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | T8 — Implement IT-1 + IT-1b; record `prepared_500/` fixture | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | T9 — Implement IT-2 (PCA) | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |

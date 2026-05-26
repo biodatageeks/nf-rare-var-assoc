@@ -430,9 +430,10 @@ tracking.outputs.variants == snplist row count.
 
 ### T6 — Re-record Cat-E snapshot (`bcftools/vcf2frq`)
 
-- **Command**:
-  `nf-test test --profile podman --update-snapshot modules/local/bcftools/vcf2frq/tests/main.nf.test`.
-- **Then**: `git diff modules/local/bcftools/vcf2frq/tests/main.nf.test.snap` — eyeball the
-  diff. Only commit if changes are explained by (a) a `versions.yml` bcftools version bump,
-  or (b) a deliberate change in module behaviour you can name.
-- **Done-when**: snapshot committed; the test passes without `--update-snapshot`.
+✅ Done 2026-05-26 — 1 test passes.
+
+Snap files are gitignored (`.gitignore` rule `**/tests/*.test.snap`), so re-recording was
+not the right fix. The test was rewritten with explicit assertions instead: header columns,
+row count (2594 = 1 header + 2593 variants), all-chr22 invariant, spot-check of the first
+known variant (`22_10935618_T_C`, A1=C A2=T). `snapshot(process.out.versions)` kept for
+the versions YAML only. Test renamed from "sarscov2 - [vcf, tbi]" to "chr22 VCF: ...".
