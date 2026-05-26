@@ -407,7 +407,7 @@ plan before declaring done.
 | Sub-task | Status | Depends on |
 |---|---|---|
 | T4a — `cmds/merge_results` | ✅ Done 2026-05-26 — 2 tests pass; meta added to tuple; `.get(2)` for file path | none |
-| T4b — `bcftools/annotate` | pending | none |
+| T4b — `bcftools/annotate` | ✅ Done 2026-05-26 — 5 tests pass (11→5, 4 stubs + 2 near-dups dropped); bcf.config→-Ov; fixture files for header_lines/rename_chrs | none |
 | T4c — `bcftools/norm` | pending | none |
 | T4d — `bcftools/view` | pending | none |
 | T4e — `plink2/makebed` (unblocks T5) | pending | none |

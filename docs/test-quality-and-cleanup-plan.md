@@ -66,7 +66,8 @@ matched to an input row count, a specific value in a known cell, a column the co
 relies on, a sample/variant ID that *should* (or *should not*) appear given the test
 fixture. When fixing a previously-failing test, audit existing assertions against this bar
 before declaring the test "done"; do not leave a green test that only checks
-`process.success`.
+`process.success`. An example of meaningful assertions in a test is the test developed as 
+part of T3c task: modules/local/regenie/step1/tests/main.nf.test
 
 ### Reporting carve-out
 
@@ -171,7 +172,7 @@ command, done-when). Conventions in §0 are assumed throughout.
 | &nbsp;&nbsp;T3d — `regenie/step2` (rewrite against current production shape) | ✅ Done 2026-05-25 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T4 — Fix Cat-A failures (signature mismatches) — split into T4a–T4g on 2026-05-25 | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4a — `cmds/merge_results` (tuple consolidation; assertions already meet bar) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
-| &nbsp;&nbsp;T4b — `bcftools/annotate` (collapse 5 paths into tuple; many test variants) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| &nbsp;&nbsp;T4b — `bcftools/annotate` (collapse 5 paths into tuple; many test variants) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4c — `bcftools/norm` (collapse 4 paths into tuple; large test file) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4d — `bcftools/view` (collapse 7 paths into tuple) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4e — `plink2/makebed` (8-path tuple + 4 vals; **unblocks T5**) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
