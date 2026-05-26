@@ -1,0 +1,14 @@
+##fileformat=VCFv4.2
+##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
+##INFO=<ID=AF_nfe,Number=A,Type=Float,Description="Non-Finnish European Allele Frequency">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+1	1000	var01	A	T	.	PASS	AF_nfe=0.05;AF=0.08
+1	2000	var02	G	C	.	PASS	AF_nfe=0.15;AF=0.12
+2	1000	var03	T	A	.	PASS	AF_nfe=0.25
+3	1000	var04	C	G	.	PASS	AF=0.10
+4	1000	var05	G	A	.	PASS	.
+chr5	1000	var06	A	C	.	PASS	AF_nfe=0.20
+1	3000	var07	T	G	.	PASS	AF=0.03
+1	4000	var08	C	T	.	PASS	AF_nfe=0.50
+1	5000	var09	A	G	.	PASS	AF=0.08
+1	6000	var10	G	T	.	PASS	.
