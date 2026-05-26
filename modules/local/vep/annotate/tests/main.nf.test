@@ -1,46 +1,50 @@
-// TODO nf-core: Once you have added the required tests, please run the following command to build this file:
-// nf-core modules test vep
 nextflow_process {
 
     name "Test Process VEP_ANNOTATE"
     script "../main.nf"
     process "VEP_ANNOTATE"
 
+    // Tagged "full": the test requires ${projectDir}/../vep_cachedir which is a
+    // machine-local cache (~30 GB) and is not portable. CI skips "full" tests.
+    tag "full"
     tag "modules"
-    tag "modules_"
     tag "vep_annotate"
 
-    // TODO nf-core: Change the test name preferably indicating the test-data and file-format used
-    test("1000g_lpa - vcf") {
-
-        // TODO nf-core: If you are created a test for a chained module
-        // (the module requires running more than one process to generate the required output)
-        // add the 'setup' method here.
-        // You can find more information about how to use a 'setup' method in the docs (https://nf-co.re/docs/contributing/modules#steps-for-creating-nf-test-for-chained-modules).
+    test("1000g_lpa - vcf - vep annotations added") {
 
         when {
             process {
                 """
+                // vep_cache is now the 4th element of the consolidated input tuple
+                // (signature: tuple(meta, input_vcf, input_vcf_tbi, vep_cache) + 3 vals).
+                // input_vcf is plain-text VCF (no tbi); pass [] for input_vcf_tbi.
                 input[0] = [
-                    [ id:'test', single_end:false ], // meta map
+                    [ id:'test', single_end:false ],
                     file('${projectDir}/assets/medium_data/1000g_lpa_hg38.vcf', checkIfExists: true),
-                    []
+                    [],
+                    file('${projectDir}/../vep_cachedir/homo_sapiens_refseq', checkIfExists: true)
                 ]
-                input[1] = file('${projectDir}/../vep_cachedir/homo_sapiens_refseq', checkIfExists: true)
-                input[2] = 'homo_sapiens'
-                input[3] = '113_GRCh38/Homo_sapiens.GRCh38.dna.toplevel.fa.gz'
-                input[4] = '--offline --no_stats --refseq --use_given_ref --exclude_predicted --compress_output bgzip --vcf --numbers --protein --total_length --force_overwrite --format vcf --regulatory --variant_class --symbol --biotype --distance 5000 --canonical --pubmed --mane'
+                input[1] = 'homo_sapiens'
+                input[2] = '113_GRCh38/Homo_sapiens.GRCh38.dna.toplevel.fa.gz'
+                input[3] = '--offline --no_stats --refseq --use_given_ref --exclude_predicted --compress_output bgzip --vcf --numbers --protein --total_length --force_overwrite --format vcf --regulatory --variant_class --symbol --biotype --distance 5000 --canonical --pubmed --mane'
                 """
             }
         }
 
         then {
-            assertAll(
-                { assert process.success },
-                // { assert snapshot(process.out).match() }
-                //TODO nf-core: Add all required assertions to verify the test output.
-                // See https://nf-co.re/docs/contributing/tutorials/nf-test_assertions for more information and examples.
-            )
+            assert process.success
+
+            // The CSQ INFO field must appear in the VCF header — confirms VEP ran and
+            // wrote annotations (as opposed to producing an empty or unformatted output).
+            def vcfLines = path(process.out.vcf[0][1]).linesGzip
+            assert vcfLines.any { it.contains('##INFO=<ID=CSQ') } :
+                "VEP output VCF must contain a ##INFO=<ID=CSQ,...> header line"
+
+            // At least one data record must carry a populated CSQ annotation.
+            assert vcfLines.findAll { !it.startsWith('#') }.any { it.contains('CSQ=') } :
+                "At least one variant in VEP output must carry a non-empty CSQ= annotation"
+
+            assert snapshot(process.out.versions).match()
         }
 
     }

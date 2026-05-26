@@ -411,7 +411,7 @@ plan before declaring done.
 | T4c — `bcftools/norm` | ✅ Done 2026-05-26 — 3 tests pass (16→3, all stubs dropped); split test uses `tests/fixtures/multiallelic_sarscov2.vcf.gz` (8 records, 3 multiallelic → 12 after split), join uses `tests/fixtures/split_sarscov2.vcf.gz` (12 → 8), basic norm uses nf-core sarscov2 test.vcf.gz (9 = 9); tracking JSON asserts strict `>`, `<`, `==` respectively | none |
 | T4d — `bcftools/view` | ✅ Done 2026-05-26 — 2 tests pass (9 old→2 new; 4 stubs + 3 write-index-only variants dropped); regions BED fixture (2/9 variants pass); samples fixture (header asserts 'test'); tracking JSON strict inequalities | none |
 | T4e — `plink2/makebed` (unblocks T5) | ✅ Done 2026-05-26 — 2 tests pass; (1) VCF branch + psam sex info + keep_3_samples.txt fixture; outputs.samples (3) + outputs.variants >= 1 asserted; (2) pgen branch (setup: PLINK2_MAKEPGEN) mirroring production pca/main.nf:25 exactly; fam count (3202) + inputs.samples (3202) asserted; --split-par b38 + --max-alleles 2 needed; plink2 omits "remaining" lines without filters → outputs.{samples,variants} = -1 in that case | none |
-| T4f — `vep/annotate` | pending | none |
+| T4f — `vep/annotate` | ✅ Done 2026-05-26 — 1 test passes; vep_cache moved into 4-element tuple; linesGzip asserts CSQ header + at least one CSQ= data record; tagged "full" (machine-local vep_cachedir) | none |
 | T4g — `rscript/manhattan_qq_plots` | deferred | T11 (IT-5 fixtures) |
 
 - **Combined done-when**: T4a..T4f all done; `nf-test test --profile podman --tag ci` shows
