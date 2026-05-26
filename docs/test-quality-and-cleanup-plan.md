@@ -138,6 +138,8 @@ Wall-clock budgets are aspirational, not hard gates.
 | Same dataset, larger when Regenie complains about low variance | `assets/three_chr_unprepared/unprepared_rand_{1k,2k,5k,10k}.vcf.gz` |
 | Pre-prepared pgen/pvar/psam for downstream subworkflow tests | `assets/three_chr_unprepared/prepared_500/` *(created in T8)* |
 | Cases/controls sample lists matching the 3202-sample fixture | `assets/three_chr_unprepared/cases.txt`, `controls.txt` *(created in T8)* |
+| Local cache of nf-core sarscov2 test VCF (9 records, no multiallelic sites) | `assets/sarscov2/test.vcf.gz` |
+| Local cache of nf-core sarscov2 genome FASTA (chromosome MT192765.1, ~30 kb) | `assets/sarscov2/genome.fasta.gz` + `.fai` + `.gzi` |
 | Hand-crafted edge-case inputs for one specific test | `<test-dir>/fixtures/` next to the `.nf.test` file |
 
 Do not create test-specific VCFs unless none of the above can be coerced into the scenario.
@@ -151,6 +153,18 @@ The five subworkflows (`prepare`, `pca`, `filter_missing_per_pheno`,
 `f_coefficient_filtering`, `reporting`) all emit a channel named `tracking` (not
 `tracking_out` — that is the per-module output name). When asserting tracking-JSON content,
 read the file with `path(workflow.out.tracking[0])`.
+
+### 0.6 Developer tooling
+
+`bcftools` is **not installed** on the development machine and is not going to be. To inspect VCF files locally, use:
+
+```bash
+podman run --rm -v $PWD/:/wd/:z quay.io/biocontainers/bcftools:1.20--h8b25389_0 \
+    sh -c "bcftools <subcommand> /wd/<path>"
+```
+
+This is the same container image used by the `BCFTOOLS_*` modules in tests.
+The same is true for samtools, plink and other such tools, which are available in respective containers (plink2 in docker.io/psuszynski/plink:2.0-alpha.6.9, samtools in biocontainers/samtools:v1.9-4-deb_cv1).
 
 ---
 
@@ -173,7 +187,7 @@ command, done-when). Conventions in §0 are assumed throughout.
 | T4 — Fix Cat-A failures (signature mismatches) — split into T4a–T4g on 2026-05-25 | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4a — `cmds/merge_results` (tuple consolidation; assertions already meet bar) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4b — `bcftools/annotate` (collapse 5 paths into tuple; many test variants) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
-| &nbsp;&nbsp;T4c — `bcftools/norm` (collapse 4 paths into tuple; large test file) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| &nbsp;&nbsp;T4c — `bcftools/norm` (collapse 4 paths into tuple; large test file) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4d — `bcftools/view` (collapse 7 paths into tuple) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4e — `plink2/makebed` (8-path tuple + 4 vals; **unblocks T5**) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4f — `vep/annotate` (4-path tuple; needs `../vep_cachedir` reference) | pending | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |

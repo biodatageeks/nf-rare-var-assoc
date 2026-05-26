@@ -4,578 +4,127 @@ nextflow_process {
     script "../main.nf"
     process "BCFTOOLS_NORM"
 
+    tag "ci"
     tag "modules"
-    tag "modules_nfcore"
     tag "bcftools"
     tag "bcftools/norm"
 
-    test("sarscov2 - [ vcf, [] ], fasta") {
+    // FASTA reference: sarscov2 genome.fasta.gz (chromosome MT192765.1) from nf-core test data.
+    // Consolidated tuple shape: (meta, vcf, tbi, fasta, tracking_in) + val(out_name_part).
+    //
+    // Fixtures under tests/fixtures/:
+    //   multiallelic_sarscov2.vcf.gz - 8 records, 3 multiallelic sites (MT192765.1, 2/2/3 ALTs)
+    //   split_sarscov2.vcf.gz        - 12 records, all biallelic (pre-split form of the above)
+
+    test("split-multiallelic (-m -any): variant count increases from 8 to 12") {
 
         config "./nextflow.config"
 
         when {
             process {
                 """
+                // Hand-crafted fixture with 3 multiallelic sites (positions 200, 400, 600).
+                // After split: 8 input records → 12 output records (each multi-ALT site explodes).
+                // tbi provided; tracking_in = [] because we are not chaining.
                 input[0] = [
-                    [ id:'test' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
+                    [ id:'test' ],
+                    file('${projectDir}/modules/local/bcftools/norm/tests/fixtures/multiallelic_sarscov2.vcf.gz', checkIfExists: true),
+                    file('${projectDir}/modules/local/bcftools/norm/tests/fixtures/multiallelic_sarscov2.vcf.gz.tbi', checkIfExists: true),
+                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true),
                     []
                 ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
+                input[1] = 'norm'
                 """
             }
         }
 
         then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(process.out).match() }
-            )
+            assert process.success
+            assert process.out.vcf.size() == 1
+            assert process.out.tracking_out.size() == 1
+
+            def tracking = new groovy.json.JsonSlurper().parseText(file(process.out.tracking_out[0]).text)
+            assert tracking.inputs.variants == 8  : "fixture has 8 records (3 multiallelic + 5 biallelic)"
+            assert tracking.outputs.variants == 12 : "each multiallelic site (2+2+3 ALTs) split into 12 biallelic records"
+            assert tracking.outputs.variants > tracking.inputs.variants : "split (-m -any) must increase variant count when multiallelic sites are present"
+
+            assert snapshot(process.out.versions).match()
         }
 
     }
 
-    test("sarscov2 - [ vcf, [] ], fasta - vcf_gz_index") {
+    test("join (-m +any): variant count decreases from 12 to 8") {
 
-        config "./vcf_gz_index.config"
+        config "./join.config"
 
         when {
             process {
                 """
+                // Pre-split fixture: 12 biallelic records including duplicate positions (200x2,
+                // 400x2, 600x3).  After join (-m +any) those are merged back into 3 multi-ALT
+                // records giving 8 output records.
                 input[0] = [
-                    [ id:'test' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
+                    [ id:'test' ],
+                    file('${projectDir}/modules/local/bcftools/norm/tests/fixtures/split_sarscov2.vcf.gz', checkIfExists: true),
+                    file('${projectDir}/modules/local/bcftools/norm/tests/fixtures/split_sarscov2.vcf.gz.tbi', checkIfExists: true),
+                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true),
                     []
                 ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
+                input[1] = 'norm'
                 """
             }
         }
 
         then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(
-                    process.out.vcf,
-                    process.out.csi.collect { it.collect { it instanceof Map ? it : file(it).name } }
-                    ).match() },
-                { assert process.out.csi[0][1].endsWith(".csi") }
-            )
+            assert process.success
+            assert process.out.vcf.size() == 1
+            assert process.out.tracking_out.size() == 1
+
+            def tracking = new groovy.json.JsonSlurper().parseText(file(process.out.tracking_out[0]).text)
+            assert tracking.inputs.variants == 12 : "pre-split fixture has 12 biallelic records"
+            assert tracking.outputs.variants == 8  : "joining same-position records merges them back to 8"
+            assert tracking.outputs.variants < tracking.inputs.variants : "join (-m +any) must decrease variant count when same-position records exist"
+
+            assert snapshot(process.out.versions).match()
         }
 
     }
 
-    test("sarscov2 - [ vcf, [] ], fasta - vcf_gz_index_csi") {
+    test("basic norm (no -m flag): variant count preserved, one indel realigned") {
 
-        config "./vcf_gz_index_csi.config"
+        config "./basic_norm.config"
 
         when {
             process {
                 """
+                // nf-core sarscov2 test.vcf.gz has 9 records (no multiallelic sites).
+                // Without -m, only left-alignment and trimming apply; 1 indel is realigned,
+                // total record count stays at 9.
                 input[0] = [
-                    [ id:'test' ], // meta map
+                    [ id:'test' ],
                     file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
+                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz.tbi', checkIfExists: true),
+                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true),
                     []
                 ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
+                input[1] = 'norm'
                 """
             }
         }
 
         then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(
-                    process.out.vcf,
-                    process.out.csi.collect { it.collect { it instanceof Map ? it : file(it).name } }
-                    ).match() },
-                { assert process.out.csi[0][1].endsWith(".csi") }
-            )
+            assert process.success
+            assert process.out.vcf.size() == 1
+            assert process.out.tracking_out.size() == 1
+
+            def tracking = new groovy.json.JsonSlurper().parseText(file(process.out.tracking_out[0]).text)
+            assert tracking.inputs.variants == 9  : "sarscov2 test VCF has exactly 9 records"
+            // Without -m, normalization does not change the record count
+            assert tracking.outputs.variants == tracking.inputs.variants : "basic norm must not change variant count"
+
+            assert snapshot(process.out.versions).match()
         }
 
     }
-
-    test("sarscov2 - [ vcf, [] ], fasta - vcf_gz_index_tbi") {
-
-        config "./vcf_gz_index_tbi.config"
-
-        when {
-            process {
-                """
-                input[0] = [
-                    [ id:'test' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
-                    []
-                ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(
-                    process.out.vcf,
-                    process.out.csi.collect { it.collect { it instanceof Map ? it : file(it).name } }
-                    ).match() },
-                { assert process.out.tbi[0][1].endsWith(".tbi") }
-            )
-        }
-
-    }
-
-    test("sarscov2 - [ vcf, tbi ], fasta") {
-
-        config "./nextflow.config"
-
-        when {
-            process {
-                """
-                input[0] = [
-                    [ id:'test' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz.tbi', checkIfExists: true)
-                ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(process.out).match() }
-            )
-        }
-
-    }
-
-    test("sarscov2 - [ vcf, tbi ], fasta - vcf output") {
-
-        config "./nextflow.vcf.config"
-
-        when {
-            process {
-                """
-                input[0] = [
-                    [ id:'test' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz.tbi', checkIfExists: true)
-                ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(process.out).match() }
-            )
-        }
-
-    }
-
-    test("sarscov2 - [ vcf, tbi ], fasta - vcf_gz output") {
-
-        config "./nextflow.vcf.config"
-
-        when {
-            process {
-                """
-                input[0] = [
-                    [ id:'test' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz.tbi', checkIfExists: true)
-                ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(
-                    process.out.vcf,
-                    process.out.csi.collect { it.collect { it instanceof Map ? it : file(it).name } },
-                    process.out.tbi.collect { it.collect { it instanceof Map ? it : file(it).name } },
-                    process.out.versions
-                ).match() }
-            )
-        }
-
-    }
-
-    test("sarscov2 - [ vcf, tbi ], fasta - bcf output") {
-
-        config "./nextflow.bcf.config"
-
-        when {
-            process {
-                """
-                input[0] = [
-                    [ id:'test' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz.tbi', checkIfExists: true)
-                ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(process.out).match() }
-            )
-        }
-
-    }
-
-    test("sarscov2 - [ vcf, tbi ], fasta - bcf_gz output") {
-
-        config "./nextflow.bcf_gz.config"
-
-        when {
-            process {
-                """
-                input[0] = [
-                    [ id:'test' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz.tbi', checkIfExists: true)
-                ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(process.out).match() }
-            )
-        }
-
-    }
-
-    test("sarscov2 - [ vcf, [] ], fasta - stub") {
-
-        config "./nextflow.config"
-        options "-stub"
-
-        when {
-            process {
-                """
-                input[0] = [
-                    [ id:'test' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
-                    []
-                ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(process.out).match() }
-            )
-        }
-
-    }
-
-    test("sarscov2 - [ vcf, tbi ], fasta -stub") {
-
-        config "./nextflow.config"
-        options "-stub"
-
-        when {
-            process {
-                """
-                input[0] = [
-                    [ id:'test' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz.tbi', checkIfExists: true)
-                ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(process.out).match() }
-            )
-        }
-
-    }
-
-    test("sarscov2 - [ vcf, tbi ], fasta - vcf output -stub") {
-
-        config "./nextflow.vcf.config"
-        options "-stub"
-
-        when {
-            process {
-                """
-                input[0] = [
-                    [ id:'test' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz.tbi', checkIfExists: true)
-                ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(process.out).match() }
-            )
-        }
-
-    }
-
-    test("sarscov2 - [ vcf, tbi ], fasta - vcf_gz output - stub") {
-
-        config "./nextflow.vcf.config"
-
-        when {
-            process {
-                """
-                input[0] = [
-                    [ id:'test' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz.tbi', checkIfExists: true)
-                ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(process.out).match() }
-            )
-        }
-
-    }
-
-    test("sarscov2 - [ vcf, tbi ], fasta - bcf output - stub") {
-
-        config "./nextflow.bcf.config"
-        options "-stub"
-
-        when {
-            process {
-                """
-                input[0] = [
-                    [ id:'test' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz.tbi', checkIfExists: true)
-                ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(process.out).match() }
-            )
-        }
-
-    }
-
-    test("sarscov2 - [ vcf, tbi ], fasta - bcf_gz output - stub") {
-
-        config "./nextflow.bcf_gz.config"
-        options "-stub"
-
-        when {
-            process {
-                """
-                input[0] = [
-                    [ id:'test' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz.tbi', checkIfExists: true)
-                ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(process.out).match() }
-            )
-        }
-
-    }
-
-    test("sarscov2 - [ vcf, [] ], fasta - vcf_gz_index - stub") {
-
-        config "./vcf_gz_index.config"
-        options "-stub"
-
-        when {
-            process {
-                """
-                input[0] = [
-                    [ id:'test' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
-                    []
-                ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(process.out).match() },
-                { assert process.out.csi[0][1].endsWith(".csi") }
-            )
-        }
-
-    }
-
-    test("sarscov2 - [ vcf, [] ], fasta - vcf_gz_index_csi - stub") {
-
-        config "./vcf_gz_index_csi.config"
-        options "-stub"
-
-        when {
-            process {
-                """
-                input[0] = [
-                    [ id:'test' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
-                    []
-                ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(process.out).match() },
-                { assert process.out.csi[0][1].endsWith(".csi") }
-            )
-        }
-
-    }
-
-    test("sarscov2 - [ vcf, [] ], fasta - vcf_gz_index_tbi - stub") {
-
-        config "./vcf_gz_index_tbi.config"
-        options "-stub"
-
-        when {
-            process {
-                """
-                input[0] = [
-                    [ id:'test' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf.gz', checkIfExists: true),
-                    []
-                ]
-                input[1] = [
-                    [ id:'genome' ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.gz', checkIfExists: true)
-                ]
-                input[2] = ''
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(process.out).match() },
-                { assert process.out.tbi[0][1].endsWith(".tbi") }
-            )
-        }
-
-    }
-
 
 }
