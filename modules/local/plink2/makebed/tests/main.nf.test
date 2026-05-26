@@ -1,155 +1,64 @@
-// TODO nf-core: Once you have added the required tests, please run the following command to build this file:
-// nf-core modules test plink2
 nextflow_process {
 
     name "Test Process PLINK2_MAKEBED"
     script "../main.nf"
     process "PLINK2_MAKEBED"
 
+    tag "ci"
     tag "modules"
-    tag "modules_"
-    tag "plink2_MAKEBED"
+    tag "plink2"
+    tag "plink2/makebed"
 
-    // TODO nf-core: Change the test name preferably indicating the test-data and file-format used
-    test("small vcf - bed,bim,fam") {
+    // Module signature (5 inputs):
+    //   tuple val(meta), path(pgen), path(pvar), path(psam), path(vcf), path(frq),
+    //         path(samples_filtering_file), path(variants_filtering_file), path(tracking_in)
+    //   val(samples_filtering_type)
+    //   val(variants_filtering_type)
+    //   val(out_name_part)
+    //   val(input_args)
+    // Use [] for unused path slots.
+    //
+    // Canonical fixture: assets/three_chr_unprepared/unprepared_rand_500.vcf.gz
+    //   3 chromosomes (chr12, chr22, chrX), 3202 samples, 500 records (35 multiallelic).
+    //   --max-alleles 2 drops 35 multiallelic sites; 465 biallelic variants remain.
+    //   --split-par b38 required for chrX PAR handling (2 codes changed).
+    //   samples.psam provides sex info (required by plink2 when chrX is present).
+    //   tests/fixtures/keep_3_samples.txt: FID+IID for 3 samples (HG00096..HG00099).
+    //   Using --keep with a 3-sample subset forces plink2 to emit the "samples remaining"
+    //   log line so tracking.outputs.samples can be asserted as a concrete invariant.
+    // Production caller: subworkflows/local/pca/main.nf:25 (uses pgen/pvar/psam input
+    //   branch with empty vcf/frq/filter slots and no input_args).
 
-        // TODO nf-core: If you are created a test for a chained module
-        // (the module requires running more than one process to generate the required output)
-        // add the 'setup' method here.
-        // You can find more information about how to use a 'setup' method in the docs (https://nf-co.re/docs/contributing/modules#steps-for-creating-nf-test-for-chained-modules).
+    // -------------------------------------------------------------------------
+    // Test 2: pgen/pvar/psam input branch — mirrors the production call in
+    // subworkflows/local/pca/main.nf:25-35 (no filters, no input_args).
+    // Setup runs PLINK2_MAKEPGEN to convert the canonical VCF to pgen format
+    // first so PLINK2_MAKEBED receives the correct tuple shape.
+    // --max-alleles 2 is applied in the setup step because the raw VCF has 35
+    // multiallelic sites and BIM format cannot represent them; in production the
+    // data has already been normalised to biallelic before PLINK2_MAKEPGEN runs.
+    // -------------------------------------------------------------------------
 
-        when {
-            process {
-                """
-                input[0] = [
-                    [ id:'test', single_end:false ], // meta map
-                    file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/plink/test.rnaseq.bed', checkIfExists: true),
-                    file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/plink/test.rnaseq.bim', checkIfExists: true),
-                    file(params.modules_testdata_base_path + 'genomics/homo_sapiens/illumina/plink/test.rnaseq.fam', checkIfExists: true),
-                    [],
-                    []
-                ]
-                input[1] = 'filter'
-                input[2] = '--hwe 1e-13 0.001'
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                // { assert snapshot(process.out).match() }
-                //TODO nf-core: Add all required assertions to verify the test output.
-                // See https://nf-co.re/docs/contributing/tutorials/nf-test_assertions for more information and examples.
-            )
-        }
-
-    }
-
-
-    /*
-    test("split-par - minimal_with_X vcf") {
-
-        when {
-            process {
-                """
-                input[0] = [
-                    [ id:'test', single_end:false ], // meta map
-                    [],  // bed
-                    [],  // bim
-                    [],  // fam
-                    file('${projectDir}/assets/small_data/minimal_with_X.vcf', checkIfExists: true),
-                    []   // frq
-                ]
-                input[1] = 'split_par'
-                input[2] = '--double-id --vcf-half-call missing --split-par b38'
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                // { assert snapshot(process.out).match() }
-                //TODO nf-core: Add all required assertions to verify the test output.
-                // See https://nf-co.re/docs/contributing/tutorials/nf-test_assertions for more information and examples.
-            )
-        }
-
-    }
-
-    test("impute-sex - minimal_with_X vcf") {
+    test("pgen/pvar/psam input branch: bed/bim/fam emitted; 3202 samples in .fam; tracking inputs populated") {
 
         setup {
-            //run("PLINK19_MAKEBED") {
-            //    script "../../../plink19/makebed/main.nf"
-            //    process {
-            //        """
-            //        input[0] = [
-            //            [ id:'test', single_end:false ], // meta map
-            //            file('${projectDir}/assets/small_data/minimal_with_X.vcf', checkIfExists: true)
-            //        ]
-            //        """
-            //    }
-            //}
-            run("BCFTOOLS_VCF2FRQ") {
-                script "../../../bcftools/vcf2frq/main.nf"
+            run("PLINK2_MAKEPGEN") {
+                script "../../../plink2/makepgen/main.nf"
                 process {
                     """
                     input[0] = [
-                        [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/small_data/minimal_with_X.vcf', checkIfExists: true),
-                        []
+                        [ id:'test' ],
+                        [], [],   // pgen, pvar (VCF input branch)
+                        file('${projectDir}/assets/three_chr_unprepared/samples.psam', checkIfExists: true),
+                        file('${projectDir}/assets/three_chr_unprepared/unprepared_rand_500.vcf.gz', checkIfExists: true),
+                        file('${projectDir}/assets/three_chr_unprepared/unprepared_rand_500.vcf.gz.tbi', checkIfExists: true),
+                        [], [], [], []  // frq, samples_filter, variants_filter, tracking_in
                     ]
-                    """
-                }
-            }
-        }
-
-        when {
-            // PLINK19_MAKEBED.out.out_bed_bim_fam[0],
-            // PLINK19_MAKEBED.out.out_bed_bim_fam[1],
-            // PLINK19_MAKEBED.out.out_bed_bim_fam[2],
-            // PLINK19_MAKEBED.out.out_bed_bim_fam[3],
-            process {
-                """
-                input[0] = [
-                    [ id:'test', single_end:false ],
-                    file('${projectDir}/modules/local/plink2/makebed/tests/assets/test.bed', checkIfExists: true),
-                    file('${projectDir}/modules/local/plink2/makebed/tests/assets/test.bim', checkIfExists: true),
-                    file('${projectDir}/modules/local/plink2/makebed/tests/assets/test.fam', checkIfExists: true),
-                    [],
-                    BCFTOOLS_VCF2FRQ.out.frq[1]   // frq
-                ]
-                input[1] = 'impute_sex'
-                input[2] = '--impute-sex'
-                """
-            }
-        }
-
-        then {
-            assertAll(
-                { assert process.success },
-                // { assert snapshot(process.out).match() }
-                //TODO nf-core: Add all required assertions to verify the test output.
-                // See https://nf-co.re/docs/contributing/tutorials/nf-test_assertions for more information and examples.
-            )
-        }
-
-    }
-
-    test("impute-sex - minimal_with_X vcf") {
-
-        setup {
-            run("BCFTOOLS_VCF2FRQ") {
-                script "../../../bcftools/vcf2frq/main.nf"
-                process {
-                    """
-                    input[0] = [
-                        [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/small_data/minimal_with_X.vcf', checkIfExists: true),
-                        []
-                    ]
+                    input[1] = ''          // samples_filtering_type (unused)
+                    input[2] = ''          // variants_filtering_type (unused)
+                    input[3] = ''          // vcf_input_options
+                    input[4] = 'makepgen'  // out_name_part
+                    input[5] = '--double-id --vcf-half-call missing --split-par b38 --max-alleles 2'
                     """
                 }
             }
@@ -158,29 +67,111 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = [
-                    [ id:'test', single_end:false ], // meta map
-                    [],  // bed
-                    [],  // bim
-                    [],  // fam
-                    file('${projectDir}/assets/small_data/minimal_with_X.vcf', checkIfExists: true),
-                    BCFTOOLS_VCF2FRQ.out.frq[1]   // frq
-                ]
-                input[1] = 'impute_sex'
-                input[2] = '--double-id --vcf-half-call missing --split-par b38 --impute-sex'
+                // Mirrors pca/main.nf:25-35: pgen/pvar/psam from makepgen, all other
+                // slots empty, no sample/variant filtering, no input_args.
+                // tracking_in = [] because we are not chaining.
+                input[0] = PLINK2_MAKEPGEN.out.out_pgen_pvar_psam
+                    .map { meta, pgen, pvar, psam ->
+                        tuple(meta, pgen, pvar, psam, [], [], [], [], [])
+                    }
+                input[1] = ''          // samples_filtering_type (unused)
+                input[2] = ''          // variants_filtering_type (unused)
+                input[3] = 'makebed'   // out_name_part
+                input[4] = ''          // input_args (empty — as in production)
                 """
             }
         }
 
         then {
-            assertAll(
-                { assert process.success },
-                // { assert snapshot(process.out).match() }
-                //TODO nf-core: Add all required assertions to verify the test output.
-                // See https://nf-co.re/docs/contributing/tutorials/nf-test_assertions for more information and examples.
+            assert process.success
+            assert process.out.out_bed_bim_fam.size() == 1
+            assert process.out.tracking_out.size() == 1
+
+            // .fam has one row per sample; makepgen retains all 3202 samples from the fixture.
+            def fam_lines = path(process.out.out_bed_bim_fam.get(0).get(3)).readLines()
+            assert fam_lines.size() == 3202 : "expected 3202 samples in .fam (three_chr fixture has 3202 samples)"
+
+            // .bim has one row per biallelic variant; --max-alleles 2 in the setup step
+            // dropped 35 multiallelic sites, leaving 465 biallelic variants.
+            def bim_lines = path(process.out.out_bed_bim_fam.get(0).get(2)).readLines()
+            assert bim_lines.size() >= 1 : "expected at least one biallelic variant in .bim"
+
+            // Tracking JSON: inputs.samples and inputs.variants are populated from the
+            // plink2 log "... loaded from" lines; these are reliable concrete invariants.
+            // outputs.samples and outputs.variants are -1 when no sample/variant filter
+            // is applied (plink2 omits the "remaining after main filters" lines in that
+            // case). The .fam and .bim row counts above are the primary output invariants.
+            def tracking = new groovy.json.JsonSlurper().parseText(
+                file(process.out.tracking_out[0]).text
             )
+            assert tracking.inputs.samples == 3202 : "tracking.inputs.samples must be 3202 (all samples loaded from psam)"
+            assert tracking.inputs.variants >= 1   : "tracking.inputs.variants must be >= 1 (at least one variant loaded from pvar)"
+
+            assert snapshot(process.out.versions).match()
         }
 
     }
-    */
+
+    // -------------------------------------------------------------------------
+    // Test 1: VCF input branch with explicit --keep filter (3 samples).
+    // -------------------------------------------------------------------------
+
+    test("three_chr VCF, keep 3 samples: bed/bim/fam emitted; tracking JSON consistent") {
+
+        when {
+            process {
+                """
+                // VCF input branch: pgen/pvar empty; psam provides sex info (required
+                // for chrX); vcf from canonical fixture.
+                // --keep with 3 sample IDs triggers plink2 to output a 'samples remaining'
+                // log line, so tracking.outputs.samples can be verified as a concrete
+                // invariant rather than -1 (which occurs when no sample filter is applied).
+                // tracking_in = [] because we are not chaining.
+                input[0] = [
+                    [ id:'test' ],
+                    [],   // pgen
+                    [],   // pvar
+                    file('${projectDir}/assets/three_chr_unprepared/samples.psam', checkIfExists: true),  // psam: sex info
+                    file('${projectDir}/assets/three_chr_unprepared/unprepared_rand_500.vcf.gz', checkIfExists: true),
+                    [],   // frq
+                    file('${projectDir}/modules/local/plink2/makebed/tests/fixtures/keep_3_samples.txt', checkIfExists: true),
+                    [],   // variants_filtering_file
+                    []    // tracking_in
+                ]
+                input[1] = '--keep'                        // samples_filtering_type
+                input[2] = ''                              // variants_filtering_type (unused)
+                input[3] = 'makebed'                       // out_name_part
+                input[4] = '--double-id --vcf-half-call missing --split-par b38 --max-alleles 2'  // input_args
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.out_bed_bim_fam.size() == 1
+            assert process.out.tracking_out.size() == 1
+
+            // .fam has one row per sample; --keep reduces 3202 to exactly 3 samples.
+            // This is the primary concrete invariant: row count must match the keep file.
+            def fam_lines = path(process.out.out_bed_bim_fam.get(0).get(3)).readLines()
+            assert fam_lines.size() == 3 : "expected 3 samples in .fam (keep_3_samples.txt has 3 IDs)"
+
+            // .bim has one row per biallelic variant (35 multiallelic sites skipped by --max-alleles 2)
+            def bim_lines = path(process.out.out_bed_bim_fam.get(0).get(2)).readLines()
+            assert bim_lines.size() >= 1 : "expected at least one biallelic variant in .bim"
+
+            // Tracking JSON: --keep causes plink2 to emit a 'samples remaining' log line,
+            // so outputs.samples is populated (not -1) and must equal the .fam row count.
+            def tracking = new groovy.json.JsonSlurper().parseText(
+                file(process.out.tracking_out[0]).text
+            )
+            assert tracking.outputs.samples == 3             : "tracking.outputs.samples must match .fam row count (3)"
+            assert tracking.outputs.samples == fam_lines.size() : "tracking.outputs.samples must equal .fam row count"
+            assert tracking.outputs.variants >= 1            : "at least one variant must remain after plink2 processing"
+
+            assert snapshot(process.out.versions).match()
+        }
+
+    }
+
 }
