@@ -108,7 +108,7 @@ For each sub-task, follow this recipe against the row referenced in §5a above:
 
 | Sub-task | §5a row | Notes |
 |---|---|---|
-| T7a | `python/calc_f_outliers` | Three test cases (range_stds=2, range_stds=10, FID-absent branch). Business-meaningful assertions on outlier IIDs. |
+| T7a ✅ 2026-05-26 | `python/calc_f_outliers` | Three test cases (range_stds=2, range_stds=10, FID-absent branch). Business-meaningful assertions on outlier IIDs. |
 | T7b | `python/vcf2aaf` | Hand-rolled VCF spans `AF`-only, `AF_nfe`-only, neither, and a `chr`-prefixed variant. Assert AF fallback for three named variants. |
 | T7c | `bcftools/assign_annotations` | Hand-rolled VCF (≥2 genes) + masks TSV (2 categories). Assert one variant absent, one triple, one setlist row. |
 | T7d | `python/eda` | Reporting carve-out — filename-only smoke. Reuses `assets/three_chr_unprepared/unprepared_rand_500.vcf.gz`; pheno TSV hand-rolled next to the test. |

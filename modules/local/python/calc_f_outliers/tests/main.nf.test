@@ -1,0 +1,119 @@
+nextflow_process {
+
+    name "Test Process CALCULATE_F_OUTLIERS"
+    script "../main.nf"
+    process "CALCULATE_F_OUTLIERS"
+
+    tag "ci"
+    tag "modules"
+    tag "python"
+    tag "python/calc_f_outliers"
+
+    // Fixture design and per-sample F values are documented in
+    // tests/fixtures/README.md. Both fixtures share 20 normal samples (F=0.01)
+    // plus SPIKE_HIGH (F=0.5) and SPIKE_LOW (F=-0.5).
+    // With np.std(ddof=0): mean ~= 0.0091, std ~= 0.1508 -> 2-sigma bounds
+    // (-0.29, 0.31) catch both spikes and no normals; 10-sigma bounds
+    // (-1.50, 1.52) catch nothing.
+
+    test("range_stds=2 - flags exactly the two spiked sample IIDs") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test' ],
+                    file('${projectDir}/modules/local/python/calc_f_outliers/tests/fixtures/test_het.het', checkIfExists: true)
+                ]
+                input[1] = 2
+                input[2] = 'inbreeding_outliers'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def lines = path(process.out.outliers[0][1]).readLines()
+            assert lines.size() == 2 : "expected exactly 2 outlier rows, got ${lines.size()}: ${lines}"
+
+            // Pin to the engineered IIDs - any-2-IIDs would not catch a regression
+            // that selected the wrong samples while producing the right count.
+            def iids = lines.collect { it.split('\t')[1] } as Set
+            assert iids == ['SPIKE_HIGH', 'SPIKE_LOW'] as Set :
+                "expected outliers SPIKE_HIGH and SPIKE_LOW, got ${iids}"
+
+            // FID branch: output rows must be FID\tIID, not IID\tIID
+            lines.each { line ->
+                def cols = line.split('\t')
+                assert cols.size() == 2 : "expected 2 columns per row, got ${cols.size()}: '${line}'"
+                assert cols[0] == 'FAM1' : "FID column should be 'FAM1' (from fixture), got '${cols[0]}'"
+            }
+        }
+
+    }
+
+    test("range_stds=10 - no outliers, output file is empty") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test' ],
+                    file('${projectDir}/modules/local/python/calc_f_outliers/tests/fixtures/test_het.het', checkIfExists: true)
+                ]
+                input[1] = 10
+                input[2] = 'inbreeding_outliers'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // pandas to_csv(header=False, index=False) on an empty selection writes
+            // zero bytes - assert the literal empty file rather than just "0 rows".
+            def out_text = path(process.out.outliers[0][1]).text
+            assert out_text == '' : "expected empty file at 10 sigma, got ${out_text.length()} bytes: '${out_text}'"
+        }
+
+    }
+
+    test("FID-absent header - spiked IID is duplicated into both output columns") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test_nofid' ],
+                    file('${projectDir}/modules/local/python/calc_f_outliers/tests/fixtures/test_het_no_fid.het', checkIfExists: true)
+                ]
+                input[1] = 2
+                input[2] = 'inbreeding_outliers'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def lines = path(process.out.outliers[0][1]).readLines()
+            assert lines.size() == 2 : "expected exactly 2 outlier rows, got ${lines.size()}: ${lines}"
+
+            // Branch under test (main.nf:44-47): when FID column is missing,
+            // ids_cols becomes ['IID', 'IID'] and each row should write the IID twice.
+            lines.each { line ->
+                def cols = line.split('\t')
+                assert cols.size() == 2 : "expected 2 columns per row, got ${cols.size()}: '${line}'"
+                assert cols[0] == cols[1] :
+                    "FID-absent branch should duplicate IID into both columns, got '${cols[0]}' vs '${cols[1]}'"
+            }
+
+            def iids = lines.collect { it.split('\t')[0] } as Set
+            assert iids == ['SPIKE_HIGH', 'SPIKE_LOW'] as Set :
+                "expected outliers SPIKE_HIGH and SPIKE_LOW, got ${iids}"
+        }
+
+    }
+
+}
