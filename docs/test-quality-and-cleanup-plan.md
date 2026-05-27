@@ -217,7 +217,7 @@ command, done-when). Conventions in §0 are assumed throughout.
 | &nbsp;&nbsp;T4d — `bcftools/view` (collapse 7 paths into tuple) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4e — `plink2/makebed` (8-path tuple + 4 vals; **unblocks T5**) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | &nbsp;&nbsp;T4f — `vep/annotate` (4-path tuple; needs `../vep_cachedir` reference) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
-| &nbsp;&nbsp;T4g — `rscript/manhattan_qq_plots` (11-element tuple; **deferred — needs IT-5 fixtures from T11**) | deferred | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
+| &nbsp;&nbsp;T4g — `rscript/manhattan_qq_plots` (11-element tuple; **deferred — needs IT-5 fixtures from T11**) | ✅ Done 2026-05-28 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T5 — Fix Cat-D transitive failure (`plink2/write_snplist`) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T6 — Re-record Cat-E snapshot (`bcftools/vcf2frq`) | ✅ Done 2026-05-26 | [failing-tests.md](test-quality-and-cleanup/failing-tests.md) |
 | T7 — Write high-priority unit tests (§5a) — split into T7a–T7f on 2026-05-26 | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |

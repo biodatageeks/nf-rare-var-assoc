@@ -412,10 +412,10 @@ plan before declaring done.
 | T4d — `bcftools/view` | ✅ Done 2026-05-26 — 2 tests pass (9 old→2 new; 4 stubs + 3 write-index-only variants dropped); regions BED fixture (2/9 variants pass); samples fixture (header asserts 'test'); tracking JSON strict inequalities | none |
 | T4e — `plink2/makebed` (unblocks T5) | ✅ Done 2026-05-26 — 2 tests pass; (1) VCF branch + psam sex info + keep_3_samples.txt fixture; outputs.samples (3) + outputs.variants >= 1 asserted; (2) pgen branch (setup: PLINK2_MAKEPGEN) mirroring production pca/main.nf:25 exactly; fam count (3202) + inputs.samples (3202) asserted; --split-par b38 + --max-alleles 2 needed; plink2 omits "remaining" lines without filters → outputs.{samples,variants} = -1 in that case | none |
 | T4f — `vep/annotate` | ✅ Done 2026-05-26 — 1 test passes; vep_cache moved into 4-element tuple; linesGzip asserts CSQ header + at least one CSQ= data record; tagged "full" (machine-local vep_cachedir) | none |
-| T4g — `rscript/manhattan_qq_plots` | deferred | T11 (IT-5 fixtures) |
+| T4g — `rscript/manhattan_qq_plots` | ✅ Done 2026-05-28 — 1 test passes; 11-element tuple built from IT-5 fixtures; HTML filename assertion + versions snapshot; 13 s | T11 (IT-5 fixtures) |
 
-- **Combined done-when**: T4a..T4f all done; `nf-test test --profile podman --tag ci` shows
-  zero Cat-A failures from these six modules. T4g closes once T11 lands.
+- **Combined done-when**: T4a..T4g all done; `nf-test test --profile podman --tag ci` shows
+  zero Cat-A failures from all seven modules.
 
 ### T5 — Fix Cat-D transitive failure (`plink2/write_snplist`)
 
