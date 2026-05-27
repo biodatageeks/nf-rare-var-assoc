@@ -226,9 +226,9 @@ command, done-when). Conventions in §0 are assumed throughout.
 | &nbsp;&nbsp;T7d — `python/eda` (smoke; reuses `unprepared_rand_500.vcf.gz`) | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | &nbsp;&nbsp;T7e — `python/draw_pc_plot` (smoke; hand-rolled `.sscore` + pheno) | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
 | &nbsp;&nbsp;T7f — `python/generate_tracking_report` (smoke; hand-rolled tracking JSONs) | ✅ Done 2026-05-26 | [unit-tests.md](test-quality-and-cleanup/unit-tests.md) |
-| T8 — Implement IT-1 + IT-1b; record `prepared_500/` fixture — split into T8a/T8b on 2026-05-26 | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
+| T8 — Implement IT-1 + IT-1b; record `prepared_500/` fixture — split into T8a/T8b on 2026-05-26 | ✅ Done 2026-05-27 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | &nbsp;&nbsp;T8a — IT-1b (skip-prep + skip-reporting branch); commit `cases.txt`/`controls.txt` | ✅ Done 2026-05-26 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
-| &nbsp;&nbsp;T8b — IT-1 (full preparation branch); record `prepared_500/` fixture | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
+| &nbsp;&nbsp;T8b — IT-1 (full preparation branch); record `prepared_500/` fixture | ✅ Done 2026-05-27 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | T9 — Implement IT-2 (PCA) | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | T10 — Implement IT-3 and IT-4 in parallel | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | T11 — Implement IT-5 (reporting subworkflow) | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |

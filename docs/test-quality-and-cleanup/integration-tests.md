@@ -254,14 +254,11 @@ the prepared-fixture step depends on T8b's IT-1 producing the prepared VCF.
 
 #### T8b — IT-1 (full preparation branch); record `prepared_500/` fixture
 
-- **Prerequisite**: T8a (reuses the same `cases.txt`).
-- **Test file to create**: `subworkflows/local/prepare/tests/main.nf.test` (IT-1).
-- **After IT-1 passes**: copy the prepared VCF + run
-  `plink2 --vcf <prepared> --make-pgen --out prepared_500` outside the test; commit the
-  resulting `assets/three_chr_unprepared/prepared_500/prepared_500.{pgen,pvar,psam}` for
-  reuse by IT-2..IT-7. Add a short `README.md` next to the files explaining their origin.
-- **Verify**: `nf-test test --profile podman subworkflows/local/prepare/tests/main.nf.test`.
-- **Done-when**: IT-1 passes AND `prepared_500.{pgen,pvar,psam}` are committed.
+Done 2026-05-27. IT-1 lives at `subworkflows/local/prepare/tests/main.nf.test`;
+the prepared fixture is at `assets/three_chr_unprepared/prepared_500/` (pgen/pvar/psam +
+`prepared_500.vcf.gz`, see the sibling `README.md` for the regeneration recipe). Note:
+the plan's "##INFO=<ID=CSQ,..." assertion was dropped because PREPARE itself does not run
+VEP; VEP_ANNOTATE is called from the outer workflow only when `skip_preparation=false`.
 
 ### T9 — Implement IT-2 (PCA)
 

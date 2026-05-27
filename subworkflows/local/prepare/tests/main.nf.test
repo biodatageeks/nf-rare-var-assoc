@@ -1,0 +1,161 @@
+nextflow_workflow {
+
+    name "Test Subworkflow PREPARE -- full preparation branch (IT-1)"
+    script "../main.nf"
+    workflow "PREPARE"
+
+    tag "ci"
+    tag "subworkflows"
+    tag "subworkflows/prepare"
+
+    // IT-1: exercises the full preparation branch
+    //   REPLACE_SAMPLE_NAMES -> INDEX -> VIEW -> NORM -> ANNOTATE -> FILTER_AND_ENHANCE_VCF
+    // with skip_preparation=false, skip_reporting=false, use_dosage=true.
+    //
+    // VEP itself does NOT run inside PREPARE -- VEP_ANNOTATE is called by the
+    // outer workflow only when use_dosage=false. The VEP cache is consumed by
+    // PREPARE only as a --fasta-ref source for BCFTOOLS_NORM (see prepare/main.nf:82).
+    // The plan's "CSQ in header" assertion was inherited from a misreading of the
+    // workflow flow and is intentionally not asserted here.
+    //
+    // Fixture: assets/three_chr_unprepared/unprepared_rand_500.vcf.gz
+    //   - 500 variants on chr12, chr22, chrX (3 chromosomes, "chr" prefix)
+    //   - 35 multiallelic sites; splitting them with NORM -m -any produces
+    //     82 ALT-records (35 sites become 82), so post-NORM record count is
+    //     465 biallelic + 82 split = 547 minus any --rm-dup exact removals
+    //     (the fixture has 0 exact duplicates so the floor is 547)
+    //   - 3202 samples (1000G high-coverage), sample IDs HG00096..NA21144
+
+    test("full preparation: 3202 samples preserved, multiallelics split, unique IDs assigned, chr prefix stripped") {
+
+        when {
+            params {
+                skip_preparation = false
+                skip_reporting   = false
+                use_dosage       = true
+            }
+            workflow {
+                """
+                input[0] = Channel.of(
+                    tuple(
+                        [ id:'test' ],
+                        file('${projectDir}/assets/three_chr_unprepared/unprepared_rand_500.vcf.gz', checkIfExists: true)
+                    )
+                )
+                // ch_vep_cachesubdir is consumed only by BCFTOOLS_NORM as a source
+                // for --fasta-ref. The combined path is "<cachesubdir>/${params.vep_fasta_path}"
+                // i.e. <homo_sapiens_refseq>/113_GRCh38/Homo_sapiens.GRCh38.dna.toplevel.fa.gz.
+                input[1] = Channel.value(file('${projectDir}/../vep_cachedir/homo_sapiens_refseq', checkIfExists: true))
+                input[2] = Channel.of(
+                    tuple(
+                        [ id:'test' ],
+                        file('${projectDir}/subworkflows/local/prepare/tests/fixtures/all_samples.txt', checkIfExists: true)
+                    )
+                )
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            // ---- Output VCF body assertions (read the output VCF once, derive all checks) ----
+            def vcf_path = workflow.out.prepared_vcf[0][1]
+            def vcf_lines = ["bash", "-c", "zcat ${vcf_path}"].execute().text.split('\n') as List
+
+            def header_line = vcf_lines.find { it.startsWith('#CHROM') }
+            assert header_line != null : "output VCF must have a #CHROM header line"
+
+            // Sample-preservation invariant: REPLACE_SAMPLE_NAMES + VIEW + FILTER_AND_ENHANCE_VCF
+            // must all keep every input sample. The #CHROM header columns 10+ are sample names.
+            def sample_cols = header_line.split('\t').drop(9)
+            assert sample_cols.size() == 3202 :
+                "output VCF must retain all 3202 input samples (got ${sample_cols.size()})"
+            // Spot-check a specific 1000G ID survives (catches REPLACE_SAMPLE_NAMES corrupting IDs).
+            assert 'HG00096' in sample_cols :
+                "expected sample HG00096 to be preserved in output header"
+
+            def data_lines = vcf_lines.findAll { it && !it.startsWith('#') }
+            assert data_lines.size() > 0 : "output VCF must contain at least one variant record"
+
+            // NORM invariant: -m -any splits every multiallelic site -- after NORM no row
+            // may have a comma in ALT. Load-bearing because downstream plink2 ID assignment
+            // collapses on commas and produces broken duplicated IDs otherwise
+            // (see prepare/main.nf:77-78).
+            def alt_col_values = data_lines.collect { it.split('\t')[4] }
+            def multiallelic_rows = alt_col_values.findAll { it.contains(',') }
+            assert multiallelic_rows.isEmpty() :
+                "output VCF must contain no multiallelic ALT entries after NORM -m -any (found ${multiallelic_rows.size()})"
+
+            // ANNOTATE invariant: --set-id '%CHROM_%POS_%REF_%ALT' must produce a UNIQUE id
+            // for every record. Load-bearing because plink2 --write-snplist refuses to run
+            // on duplicate variant IDs (see prepare/main.nf:77-78 again).
+            def variant_ids = data_lines.collect { it.split('\t')[2] }
+            assert variant_ids.toSet().size() == variant_ids.size() :
+                "every output variant ID must be unique after ANNOTATE --set-id (got ${variant_ids.size()} ids, ${variant_ids.toSet().size()} unique)"
+            assert variant_ids.every { it && it != '.' } :
+                "every output variant must have a non-empty ID assigned by ANNOTATE"
+
+            // ANNOTATE --rename-chrs renames chr12->12, chr22->22, chrX->X using
+            // assets/rename_chr.txt. IDs are produced by --set-id AFTER rename, so they
+            // must NOT carry a "chr" prefix.
+            assert variant_ids.every { !it.startsWith('chr') } :
+                "variant IDs must not retain 'chr' prefix after --rename-chrs (sample: ${variant_ids.take(3)})"
+            def chrom_col_values = data_lines.collect { it.split('\t')[0] }.toSet()
+            assert chrom_col_values == ['12', '22', 'X'] as Set :
+                "output CHROM values must be {12, 22, X} after --rename-chrs, got ${chrom_col_values}"
+
+            // Final variant-count invariant. 500 input -> NORM splits 35 multiallelic sites
+            // (82 ALTs total) -> 547 post-NORM (asserted via tracking below) -> ANNOTATE
+            // preserves count -> FILTER_AND_ENHANCE_VCF drops 130 variants on default
+            // thresholds (qual_min=25, avg_gq_min=25, avg_dp_min=25, avg_dp_max=200) -> 417.
+            // Deterministic for this fixture + default params; a regression in any of the
+            // three transformations (split, ID assignment, filter thresholds) will move this.
+            assert data_lines.size() == 417 :
+                "expected exactly 417 surviving variants (500 in -> 547 post-NORM -> 417 post-FILTER_AND_ENHANCE_VCF), got ${data_lines.size()}"
+
+            // ---- prepared_vcf_tbi emit wiring ----
+            // Use_dosage=true routes the prepared VCF through FILTER_AND_ENHANCE_VCF and
+            // a follow-up BCFTOOLS_INDEX_2 which produces the .tbi consumed downstream.
+            def tbi_path = workflow.out.prepared_vcf_tbi[0][1]
+            assert tbi_path.toString().endsWith('.tbi') :
+                "prepared_vcf_tbi emit must carry a .tbi file, got ${tbi_path}"
+
+            // ---- Tracking-JSON cross-checks ----
+            // PREPARE mixes tracking_out from BCFTOOLS_VIEW_1 and BCFTOOLS_NORM (the only
+            // two processes on the full-prep branch that emit tracking JSONs;
+            // REPLACE_SAMPLE_NAMES and ANNOTATE don't emit tracking, and
+            // FILTER_AND_ENHANCE_VCF doesn't either -- see prepare/main.nf:74, 90).
+            def tracking_paths = workflow.out.tracking.collect { it instanceof List ? it[0] : it }
+            assert tracking_paths.size() == 2 :
+                "expected exactly 2 tracking JSON entries (BCFTOOLS_VIEW_1 and BCFTOOLS_NORM), got ${tracking_paths.size()}"
+
+            def trackings = tracking_paths.collect { p ->
+                new groovy.json.JsonSlurper().parseText(file(p).text)
+            }
+            def view_tracking = trackings.find { it.process_name.contains('BCFTOOLS_VIEW_1') }
+            def norm_tracking = trackings.find { it.process_name.contains('BCFTOOLS_NORM') }
+            assert view_tracking != null : "expected a tracking entry from BCFTOOLS_VIEW_1, got process_names=${trackings.collect{it.process_name}}"
+            assert norm_tracking  != null : "expected a tracking entry from BCFTOOLS_NORM, got process_names=${trackings.collect{it.process_name}}"
+
+            // VIEW_1 sees the full 3202 samples on input AND output (no sample subsetting
+            // happens because all_samples.txt already contains every input sample).
+            assert (view_tracking.inputs.samples as int) == 3202 :
+                "BCFTOOLS_VIEW_1 inputs.samples should be 3202, got ${view_tracking.inputs.samples}"
+            assert (view_tracking.outputs.samples as int) == 3202 :
+                "BCFTOOLS_VIEW_1 outputs.samples should be 3202, got ${view_tracking.outputs.samples}"
+            assert (view_tracking.inputs.variants as int) == 500 :
+                "BCFTOOLS_VIEW_1 inputs.variants should match fixture variant count 500, got ${view_tracking.inputs.variants}"
+
+            // NORM with -m -any splits multiallelics: output variant count > input.
+            // The fixture has 35 multiallelic sites with 82 total ALTs, no exact duplicates,
+            // so post-NORM = 465 biallelic + 82 split = 547. Pinned exactly because this
+            // is the load-bearing transformation under test.
+            assert (norm_tracking.outputs.variants as int) == 547 :
+                "BCFTOOLS_NORM should split 35 multiallelic sites (82 ALTs) into 547 records (465 + 82), got ${norm_tracking.outputs.variants}"
+            assert (norm_tracking.outputs.samples as int) == 3202 :
+                "BCFTOOLS_NORM outputs.samples should be 3202, got ${norm_tracking.outputs.samples}"
+        }
+    }
+
+}
