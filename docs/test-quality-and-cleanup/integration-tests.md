@@ -294,12 +294,13 @@ entry (not 2 as the original spec assumed). Fixture is engineered around `12_521
 
 #### T10b — IT-4 (`f_coefficient_filtering`)
 
-- **Test file**: `subworkflows/local/f_coefficient_filtering/tests/main.nf.test`
-- **Fixture**: spiked-pgen variant of `prepared_500` under
-  `subworkflows/local/f_coefficient_filtering/tests/fixtures/`, OR an inline IID-injection
-  in the test setup.
-- **Verify**: `nf-test test --profile podman subworkflows/local/f_coefficient_filtering/tests/main.nf.test`
-- **Done-when**: passes.
+Done 2026-05-27. Test at `subworkflows/local/f_coefficient_filtering/tests/main.nf.test`;
+fixture at `subworkflows/local/f_coefficient_filtering/tests/fixtures/` (see README.md
+inside). Key design: 62-sample synthetic VCF (60 normals with F~0, 2 spikes with F=1.0)
+converted to pgen with `--double-id` (needed so that `calc_f_outliers` writes FID+IID
+columns and plink2 `--remove` can match them). With `inbreeding_outliers_range_stds=3`,
+both spikes are caught (F=1.0 > upper_bound=0.56) and all normals pass. Output psam has
+60 samples. Passes in 17 s.
 
 ### T11 — Implement IT-5 (reporting subworkflow)
 

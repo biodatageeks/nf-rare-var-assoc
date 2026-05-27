@@ -1,0 +1,108 @@
+nextflow_workflow {
+
+    name "Test Subworkflow F_COEFFICIENT_FILTERING (IT-4)"
+    script "../main.nf"
+    workflow "F_COEFFICIENT_FILTERING"
+
+    tag "ci"
+    tag "subworkflows"
+    tag "subworkflows/f_coefficient_filtering"
+
+    // IT-4: exercises F_COEFFICIENT_FILTERING with 2 artificially high-F outlier samples.
+    //
+    // Fixture design (see tests/fixtures/README.md):
+    //   62 samples: 60 normals (NORM_01..NORM_60) + 2 spikes (SPIKE_HIGH1, SPIKE_HIGH2).
+    //   Each normal has exactly 25 hom-ref + 25 hom-alt + 50 het sites across 100 SNPs
+    //   -> F ~ 0 for all normals.
+    //   Each spike is 1/1 at all 100 sites -> F = 1.0.
+    //
+    // With inbreeding_outliers_range_stds=3:
+    //   Distribution of 62 samples: mean=0.025, std=0.178
+    //   upper_bound = 0.025 + 3*0.178 = 0.559
+    //   Spike F=1.0 > 0.559 -> caught; Normal F=-0.007 > lower_bound=-0.509 -> not caught
+    //
+    // Code path:
+    //   PLINK2_INDEP_PAIRWISE -> PLINK2_HET -> CALCULATE_F_OUTLIERS -> PLINK2_MAKEPGEN
+    //   MAKEPGEN uses --remove with the outliers file to drop the 2 spike samples.
+
+    test("f_coefficient_filtering: SPIKE_HIGH1 and SPIKE_HIGH2 removed, 60 samples remain") {
+
+        when {
+            params {
+                inbreeding_outliers_range_stds = 3
+            }
+            workflow {
+                """
+                input[0] = Channel.of(
+                    tuple(
+                        [ id:'test' ],
+                        file('${projectDir}/subworkflows/local/f_coefficient_filtering/tests/fixtures/spiked_fixture.pgen', checkIfExists: true),
+                        file('${projectDir}/subworkflows/local/f_coefficient_filtering/tests/fixtures/spiked_fixture.pvar', checkIfExists: true),
+                        file('${projectDir}/subworkflows/local/f_coefficient_filtering/tests/fixtures/spiked_fixture.psam', checkIfExists: true)
+                    )
+                )
+                input[1] = Channel.fromPath('${projectDir}/assets/empty_tracking.json', checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            // ---- output psam: exactly 60 samples (62 input - 2 spiked) ----
+            // MAKEPGEN --remove drops the 2 spike samples; normals are preserved.
+            assert workflow.out.pgen_pvar_psam_out.size() == 1 :
+                "expected exactly 1 pgen_pvar_psam_out entry, got ${workflow.out.pgen_pvar_psam_out.size()}"
+
+            def psam_path = workflow.out.pgen_pvar_psam_out[0][3]
+            def psam_sample_ids = file(psam_path).readLines()
+                .findAll { !it.startsWith('#') && it.trim() }
+                .collect { it.split('\t')[0] }  // FID column (or IID for no-FID psam)
+
+            assert psam_sample_ids.size() == 60 :
+                "expected 60 samples after removing 2 spikes, got ${psam_sample_ids.size()}"
+
+            // ---- spike samples must not be present in the output psam ----
+            // Pinned to the spiked IIDs, not just "any 2 removed" — regression would catch
+            // a run that silently drops the wrong samples.
+            assert !psam_sample_ids.contains('SPIKE_HIGH1') :
+                "SPIKE_HIGH1 must be absent from output psam (flagged as F outlier)"
+            assert !psam_sample_ids.contains('SPIKE_HIGH2') :
+                "SPIKE_HIGH2 must be absent from output psam (flagged as F outlier)"
+
+            // ---- at least one normal sample is present in the output ----
+            // Guards against a regression that removes all samples.
+            assert psam_sample_ids.contains('NORM_01') :
+                "NORM_01 must be present in output psam (normal sample, within 3-sigma bounds)"
+
+            // ---- tracking: key steps present ----
+            def tracking_paths = workflow.out.tracking.collect { it }
+            def trackings = tracking_paths.collect { p ->
+                new groovy.json.JsonSlurper().parseText(file(p).text)
+            }
+            def process_names = trackings.collect { it.process_name }
+
+            assert process_names.any { it.toLowerCase().contains('plink2_indep_pairwise') } :
+                "expected tracking entry for plink2_indep_pairwise, got: ${process_names}"
+            assert process_names.any { it.toLowerCase().contains('plink2_het') } :
+                "expected tracking entry for plink2_het, got: ${process_names}"
+            assert process_names.any { it.toLowerCase().contains('makepgen') } :
+                "expected tracking entry for plink2_makepgen, got: ${process_names}"
+
+            // ---- tracking: makepgen records the sample reduction ----
+            // inputs.samples=62, outputs.samples=60 proves both spikes were removed.
+            def makepgen_tracking = trackings.find { it.process_name.toLowerCase().contains('makepgen') }
+            assert makepgen_tracking != null : "makepgen tracking entry not found in: ${process_names}"
+
+            def samples_in  = makepgen_tracking.inputs.samples as int
+            def samples_out = makepgen_tracking.outputs.samples as int
+            if (samples_in > 0 && samples_out > 0) {
+                assert samples_in == 62 :
+                    "makepgen inputs.samples must be 62 (full fixture), got ${samples_in}"
+                assert samples_out == 60 :
+                    "makepgen outputs.samples must be 60 (62 - 2 spikes), got ${samples_out}"
+            }
+        }
+    }
+
+}
