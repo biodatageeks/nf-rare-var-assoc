@@ -234,7 +234,7 @@ command, done-when). Conventions in §0 are assumed throughout.
 | T10 — Implement IT-3 and IT-4 — split into T10a/T10b on 2026-05-27 | ✅ Done 2026-05-27 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | &nbsp;&nbsp;T10a — `filter_missing_per_pheno` (IT-3; MAKEPGEN runs once with intersected snplists) | ✅ Done 2026-05-27 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | &nbsp;&nbsp;T10b — `f_coefficient_filtering` (IT-4; spiked outlier fixture) | ✅ Done 2026-05-27 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
-| T11 — Implement IT-5 (reporting subworkflow) | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
+| T11 — Implement IT-5 (reporting subworkflow) | ✅ Done 2026-05-28 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | T12 — Implement IT-6 (workflow, fast path) | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | T13 — Implement IT-7 (workflow, reporting path) | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | T14 — Phase 2 dead-code removal | pending | [dead-code.md](test-quality-and-cleanup/dead-code.md) |

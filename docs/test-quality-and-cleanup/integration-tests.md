@@ -304,11 +304,12 @@ both spikes are caught (F=1.0 > upper_bound=0.56) and all normals pass. Output p
 
 ### T11 — Implement IT-5 (reporting subworkflow)
 
-- **Test file**: `subworkflows/local/reporting/tests/main.nf.test` per IT-5.
-- **Fixtures**: a tiny `.regenie.gz`, annotations file, setlist, and phenotype file under
-  `subworkflows/local/reporting/tests/fixtures/`.
-- **Verify**: `nf-test test --profile podman subworkflows/local/reporting/tests/main.nf.test`.
-- **Done-when**: passes (smoke-only per reporting carve-out).
+Done 2026-05-28. Test at `subworkflows/local/reporting/tests/main.nf.test`; fixtures at
+`subworkflows/local/reporting/tests/fixtures/` (see README.md inside). Added `emit:` section
+to `subworkflows/local/reporting/main.nf` to expose `plots_report` and `versions` for test
+assertions. Smoke assertion: HTML ending in `_manhattan_qq_plots.html` is emitted + versions
+snapshot. Passes in 13 s. PNG fixtures are minimal 1x1 placeholder pixels (reporting
+carve-out). T4g (`rscript/manhattan_qq_plots` module test) can now reuse these fixtures.
 
 ### T12 — Implement IT-6 (full workflow, fast path)
 

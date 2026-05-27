@@ -1,0 +1,95 @@
+nextflow_workflow {
+
+    name "Test Subworkflow REPORTING (IT-5)"
+    script "../main.nf"
+    workflow "REPORTING"
+
+    tag "ci"
+    tag "subworkflows"
+    tag "subworkflows/reporting"
+
+    // IT-5: smoke test per reporting carve-out (see docs/test-quality-and-cleanup-plan.md).
+    // Exercises the full REPORTING subworkflow: joins 6 input channels, combines value
+    // channels for masks/templates, and renders a gene-level HTML report via R Markdown.
+    //
+    // Fixtures (subworkflows/local/reporting/tests/fixtures/):
+    //   Y1.regenie.gz  - 2 genes x 2 masks x 2 AAF combos + one BURDEN-joint row
+    //   masks.txt      - Mask_Mod and Mask_High definitions matching the regenie IDs
+    //   pheno.tsv      - 6 samples (3 cases Y1=1, 3 controls Y1=2)
+    //   pc_plot.png    - 1x1 placeholder PNG (reporting carve-out)
+    //   eda_plot.png   - 1x1 placeholder PNG (reporting carve-out)
+    //   test.setlist   - 2-gene Regenie setlist matching GeneA/GeneB in Y1.regenie.gz
+
+    test("reporting smoke - HTML report emitted with expected filename") {
+
+        when {
+            params {
+                project_name                 = 'test-project'
+                project_date                 = '2026-05-27'
+                phenotypes_apply_rint        = false
+                manhattan_annotation_enabled = false
+                annotation_min_log10p        = 1
+                plot_ylimit                  = 0
+            }
+            workflow {
+                """
+                // results_merged: tuple val(meta), val(phenotype), path(regenie_gz)
+                input[0] = Channel.of(
+                    tuple(
+                        [ id:'test' ],
+                        'Y1',
+                        file('${projectDir}/subworkflows/local/reporting/tests/fixtures/Y1.regenie.gz', checkIfExists: true)
+                    )
+                )
+                // masks_file: value channel (combined, not joined)
+                input[1] = Channel.fromPath(
+                    '${projectDir}/subworkflows/local/reporting/tests/fixtures/masks.txt',
+                    checkIfExists: true
+                ).first()
+                // phenotype_file: tuple val(meta), path(pheno)
+                input[2] = Channel.of(
+                    tuple(
+                        [ id:'test' ],
+                        file('${projectDir}/subworkflows/local/reporting/tests/fixtures/pheno.tsv', checkIfExists: true)
+                    )
+                )
+                // pca_plot_file: tuple val(meta), path(png)
+                input[3] = Channel.of(
+                    tuple(
+                        [ id:'test' ],
+                        file('${projectDir}/subworkflows/local/reporting/tests/fixtures/pc_plot.png', checkIfExists: true)
+                    )
+                )
+                // eda_plots: tuple val(meta), path(png)
+                input[4] = Channel.of(
+                    tuple(
+                        [ id:'test' ],
+                        file('${projectDir}/subworkflows/local/reporting/tests/fixtures/eda_plot.png', checkIfExists: true)
+                    )
+                )
+                // setlist_file: tuple val(meta), path(setlist)
+                input[5] = Channel.of(
+                    tuple(
+                        [ id:'test' ],
+                        file('${projectDir}/subworkflows/local/reporting/tests/fixtures/test.setlist', checkIfExists: true)
+                    )
+                )
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            // Reporting carve-out: assert the HTML report is emitted with the expected filename.
+            // The module uses prefix=meta.id='test', so the output is test_manhattan_qq_plots.html.
+            def html_path = workflow.out.plots_report[0]
+            assert html_path.toString().endsWith('_manhattan_qq_plots.html') :
+                "expected HTML filename ending in '_manhattan_qq_plots.html', got: ${html_path}"
+
+            assert snapshot(workflow.out.versions).match()
+        }
+
+    }
+
+}

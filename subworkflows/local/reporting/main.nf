@@ -31,6 +31,8 @@ workflow REPORTING {
             .combine(r_functions_file)
             .combine(rmd_pheno_stats_file)
     )
+
+    emit:
+    plots_report = RSCRIPT_MANHATTAN_QQ_PLOTS.out.plots_report
+    versions     = RSCRIPT_MANHATTAN_QQ_PLOTS.out.versions
 }
-
-
