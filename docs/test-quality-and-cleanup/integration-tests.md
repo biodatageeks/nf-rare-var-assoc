@@ -262,10 +262,11 @@ VEP; VEP_ANNOTATE is called from the outer workflow only when `skip_preparation=
 
 ### T9 — Implement IT-2 (PCA)
 
-- **Test file**: `subworkflows/local/pca/tests/main.nf.test` per IT-2.
-- **Prerequisite**: T8 (prepared_500 assets committed).
-- **Verify**: `nf-test test --profile podman subworkflows/local/pca/tests/main.nf.test`.
-- **Done-when**: IT-2 passes.
+Done 2026-05-27. Test at `subworkflows/local/pca/tests/main.nf.test`. New fixtures committed:
+`assets/three_chr_unprepared/prepared_500/prepared_500.frq` (generated via `bcftools query` on
+`prepared_500.vcf.gz`); `assets/three_chr_unprepared/pheno.tsv` (1202 cases Y1=1 + 2000
+controls Y1=2, reusable by T10–T13). King cutoff `samples_before > samples_after` assertion is
+guarded by `> 0` check because plink2 king-cutoff may not emit the standard "remaining" log line.
 
 ### T10 — Implement IT-3 and IT-4 in parallel
 

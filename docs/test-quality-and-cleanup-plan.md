@@ -145,8 +145,9 @@ norm/annotate, VEP) or for integration tests that run the full pipeline.
 |---|---|
 | Primary VCF input (3 chr inc. X, 3202 samples, ~500 variants) | `assets/three_chr_unprepared/unprepared_rand_500.vcf.gz` |
 | Same dataset, larger when Regenie complains about low variance | `assets/three_chr_unprepared/unprepared_rand_{1k,2k,5k,10k}.vcf.gz` |
-| Pre-prepared pgen/pvar/psam for downstream subworkflow tests | `assets/three_chr_unprepared/prepared_500/` *(created in T8)* |
+| Pre-prepared pgen/pvar/psam + VCF + frq for downstream subworkflow tests | `assets/three_chr_unprepared/prepared_500/` *(created in T8/T9)* |
 | Cases/controls sample lists matching the 3202-sample fixture | `assets/three_chr_unprepared/cases.txt`, `controls.txt` *(created in T8)* |
+| Phenotype file (1202 cases Y1=1, 2000 controls Y1=2; reusable by T9–T13) | `assets/three_chr_unprepared/pheno.tsv` *(created in T9)* |
 
 **Prepared fixtures** — already through bcftools norm + VEP annotation: unique variant IDs,
 biallelic only, CSQ-annotated. Use these for tests of downstream modules (plink2, regenie,
@@ -229,7 +230,7 @@ command, done-when). Conventions in §0 are assumed throughout.
 | T8 — Implement IT-1 + IT-1b; record `prepared_500/` fixture — split into T8a/T8b on 2026-05-26 | ✅ Done 2026-05-27 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | &nbsp;&nbsp;T8a — IT-1b (skip-prep + skip-reporting branch); commit `cases.txt`/`controls.txt` | ✅ Done 2026-05-26 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | &nbsp;&nbsp;T8b — IT-1 (full preparation branch); record `prepared_500/` fixture | ✅ Done 2026-05-27 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
-| T9 — Implement IT-2 (PCA) | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
+| T9 — Implement IT-2 (PCA) | ✅ Done 2026-05-27 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | T10 — Implement IT-3 and IT-4 in parallel | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | T11 — Implement IT-5 (reporting subworkflow) | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | T12 — Implement IT-6 (workflow, fast path) | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
