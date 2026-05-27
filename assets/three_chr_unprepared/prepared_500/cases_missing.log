@@ -1,0 +1,27 @@
+PLINK v2.0.0-a.6.9LM AVX2 Intel (29 Jan 2025)
+Options in effect:
+  --keep /wd/assets/three_chr_unprepared/cases.txt
+  --missing variant-only
+  --out /wd/assets/three_chr_unprepared/prepared_500/cases_missing
+  --pgen /wd/assets/three_chr_unprepared/prepared_500/prepared_500.pgen
+  --psam /wd/assets/three_chr_unprepared/prepared_500/prepared_500.psam
+  --pvar /wd/assets/three_chr_unprepared/prepared_500/prepared_500.pvar
+  --threads 4
+
+Hostname: 525559eabedd
+Working directory: /
+Start time: Wed May 27 21:00:40 2026
+
+Random number seed: 1779915640
+63994 MiB RAM detected, ~45174 available; reserving 31997 MiB for main
+workspace.
+Using up to 4 compute threads.
+3202 samples (1603 females, 1598 males, 1 ambiguous; 3202 founders) loaded from
+/wd/assets/three_chr_unprepared/prepared_500/prepared_500.psam.
+417 variants loaded from
+/wd/assets/three_chr_unprepared/prepared_500/prepared_500.pvar.
+Note: No phenotype data present.
+--keep: 0 samples remaining.
+Error: No samples remaining after main filters.
+
+End time: Wed May 27 21:00:40 2026

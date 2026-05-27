@@ -104,18 +104,30 @@ different code path (`BCFTOOLS_VIEW_AND_FILTER2`) and must have its own coverage
 
 - **Test file**: `subworkflows/local/filter_missing_per_pheno/tests/main.nf.test`
 - **Inputs**: pgen/pvar/psam from `assets/three_chr_unprepared/prepared_500/` + a
-  hand-crafted phenotype file with **two phenotypes**, where ~20% of samples are present
-  for one phenotype only. Author at
+  hand-crafted phenotype file at
   `subworkflows/local/filter_missing_per_pheno/tests/fixtures/two_pheno.tsv` with a short
-  `README.md` documenting the missingness pattern.
+  `README.md` explaining the fixture.
+- **Fixture design**: 3-column TSV (FID, IID, Y1) engineered around variant
+  `12_52171632_T_C` (35.2% total missing). Samples are split so Group 1 (Y1=1, 1202
+  samples) has ~15% missing and Group 2 (Y1=2, 2000 samples) has ~47% missing for that
+  variant. See `tests/fixtures/README.md` for the construction recipe.
+- **Run with**: `plink2_missing_per_pheno_options = '--geno 0.30'` (threshold sits between
+  the two group rates).
+- **Code path note**: `PLINK2_WRITE_SNPLIST` runs **twice** via the `flatMap` in
+  [main.nf:33-39](../../subworkflows/local/filter_missing_per_pheno/main.nf#L33-L39).
+  `PLINK2_MAKEPGEN` runs **once** with `--extract-intersect` of both snplists
+  ([main.nf:49-62](../../subworkflows/local/filter_missing_per_pheno/main.nf#L49-L62)),
+  producing one pgen/pvar/psam with all 3202 samples.
 - **Assertions**:
-  - `workflow.out.pgen_pvar_psam_out` is a list of 2 entries (one per phenotype) — this
-    tests the per-phenotype `flatMap` split in
-    [filter_missing_per_pheno/main.nf:33-39](../../subworkflows/local/filter_missing_per_pheno/main.nf#L33-L39)
-  - Sample counts in the two output `.psam` files differ by the expected ~20% margin
-  - Both output entries' `meta.id` matches the source cohort `meta.id` (verifies the
-    `orig_id` round-trip in [main.nf:50-53](../../subworkflows/local/filter_missing_per_pheno/main.nf#L50-L53))
-  - `tracking` JSON contains per-phenotype `samples_before` / `samples_after` entries
+  - `workflow.out.pgen_pvar_psam_out` has exactly **1 entry**
+  - `12_52171632_T_C` is **absent** from the output pvar — it passes Group 1 (14.97% <
+    30%) but fails Group 2 (47.35% > 30%), so `--extract-intersect` drops it
+  - `12_553708_G_A` is **present** in the output pvar — 0% missing in both groups
+  - Output `.psam` has exactly **3202 samples** (no `--keep` in MAKEPGEN)
+  - `meta.id` equals `'test'` — verifies `orig_id` round-trip in
+    [main.nf:50-53](../../subworkflows/local/filter_missing_per_pheno/main.nf#L50-L53)
+  - ≥ 2 WRITE_SNPLIST tracking entries; `outputs.samples` values are **1202** and **2000**
+    (proves the `flatMap` split used the correct per-phenotype sample sets)
 - **Tag**: `"ci"`.
 
 ## IT-4 — `subworkflows/local/f_coefficient_filtering`
@@ -268,19 +280,26 @@ Done 2026-05-27. Test at `subworkflows/local/pca/tests/main.nf.test`. New fixtur
 controls Y1=2, reusable by T10–T13). King cutoff `samples_before > samples_after` assertion is
 guarded by `> 0` check because plink2 king-cutoff may not emit the standard "remaining" log line.
 
-### T10 — Implement IT-3 and IT-4 in parallel
+### T10 — Implement IT-3 and IT-4
 
-Both reuse `prepared_500/` from T8.
+Split into T10a and T10b on 2026-05-27. Both reuse `prepared_500/` from T8.
 
-- **IT-3 test file**: `subworkflows/local/filter_missing_per_pheno/tests/main.nf.test`;
-  fixture: `subworkflows/local/filter_missing_per_pheno/tests/fixtures/two_pheno.tsv`.
-- **IT-4 test file**: `subworkflows/local/f_coefficient_filtering/tests/main.nf.test`;
-  fixture: spiked-pgen variant of `prepared_500` under
+#### T10a — IT-3 (`filter_missing_per_pheno`)
+
+Done 2026-05-27. Test at `subworkflows/local/filter_missing_per_pheno/tests/main.nf.test`;
+fixture at `subworkflows/local/filter_missing_per_pheno/tests/fixtures/two_pheno.tsv`. Key
+finding: MAKEPGEN runs once with `--extract-intersect`, so `pgen_pvar_psam_out` has 1
+entry (not 2 as the original spec assumed). Fixture is engineered around `12_52171632_T_C`
+(~15% missing in Group 1, ~47% in Group 2; threshold `--geno 0.30`). Passes in 14 s.
+
+#### T10b — IT-4 (`f_coefficient_filtering`)
+
+- **Test file**: `subworkflows/local/f_coefficient_filtering/tests/main.nf.test`
+- **Fixture**: spiked-pgen variant of `prepared_500` under
   `subworkflows/local/f_coefficient_filtering/tests/fixtures/`, OR an inline IID-injection
   in the test setup.
-- **Verify**:
-  `nf-test test --profile podman subworkflows/local/filter_missing_per_pheno/tests/main.nf.test subworkflows/local/f_coefficient_filtering/tests/main.nf.test`.
-- **Done-when**: both pass.
+- **Verify**: `nf-test test --profile podman subworkflows/local/f_coefficient_filtering/tests/main.nf.test`
+- **Done-when**: passes.
 
 ### T11 — Implement IT-5 (reporting subworkflow)
 
