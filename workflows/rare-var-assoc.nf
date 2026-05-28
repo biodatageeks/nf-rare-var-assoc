@@ -100,6 +100,9 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(PREPARE.out.versions.first())
     ch_tracking = PREPARE.out.tracking
 
+    ch_vep_vcf = Channel.empty()
+    ch_eda_plots = Channel.empty()
+
     if (!params.skip_reporting) {
         if (!params.use_dosage) {
             // do this only to be able to produce plots
@@ -176,7 +179,7 @@ workflow RARE_VAR_ASSOC {
             Channel.value(params.vep_fasta_path),
             Channel.value(params.vep_annotate_options)
         )
-        ch_vep_vcf  = VEP_ANNOTATE.out.vcf
+        ch_vep_vcf  = VEP_ANNOTATE.out.vcf  // also exposed as test-support emit
         ch_versions = ch_versions.mix(VEP_ANNOTATE.out.versions.first())
 
         BCFTOOLS_INDEX_3 (
@@ -592,6 +595,8 @@ workflow RARE_VAR_ASSOC {
     regenie_step1_loco      = ch_regenie_step1_loco
     setlist                 = ch_setlist
     annotations             = ch_annotations
+    vep_annotated_vcf       = ch_vep_vcf
+    eda_plots_out           = ch_eda_plots
 
 }
 

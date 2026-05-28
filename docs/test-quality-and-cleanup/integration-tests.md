@@ -350,7 +350,28 @@ Key decisions / deviations from the original spec:
 
 ### T13 — Implement IT-7 (full workflow, reporting path)
 
-- **Test file**: `workflows/tests/full_reporting.nf.test` per IT-7.
+**Status: BLOCKED on Phase 3 (2026-05-28).** The test file, config, and helper are written
+(`workflows/tests/full_reporting.nf.test` + `full_reporting.config`, reusing the IT-6
+`recompute_naive_log10p.py`) and the workflow exposes the `vep_annotated_vcf` /
+`eda_plots_out` test-support emits. But the run fails inside `FIX_ZERO_PL`:
+
+```
+RARE_VAR_ASSOC:FIX_ZERO_PL  ->  comp_ds_htslib panicked at src/main.rs:121:41:
+index out of bounds: the len is 2 but the index is 2   (exit 101)
+```
+
+This is a real bug in the `comp_ds_htslib` Rust binary (container `bioinf_combo:1.1.1`),
+which only runs on the `!skip_reporting && !use_dosage` branch — exactly the IT-7 path. It is
+NOT a test bug. The fix is the Phase-3 refactor: replace the in-pipeline preparation code
+(the `skip_preparation=false` path, including `FIX_ZERO_PL`) with a single delegation to the
+sibling `nf-prepare-vcf` pipeline, whose `CALC_DOSAGE_POLARSBIO` step (polars-bio in
+`python_tools:1.0.11`) supersedes `comp_ds_htslib`. See
+[phase3-prepare-refactor.md](phase3-prepare-refactor.md).
+
+Phase 3 runs between T12 and T13. After it lands, finish T13:
+- **Test file**: `workflows/tests/full_reporting.nf.test` (already drafted; revisit the
+  fixture choice — currently `unprepared_rand_2k.vcf.gz` — and assertions against the new
+  prep wiring).
 - **Tag**: `"full"` (slow).
 - **Verify**: `nf-test test --profile podman workflows/tests/full_reporting.nf.test`.
 - **Done-when**: passes. Document expected wall-clock at the top of the test file.

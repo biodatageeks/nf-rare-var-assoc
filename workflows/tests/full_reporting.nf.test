@@ -1,0 +1,141 @@
+nextflow_workflow {
+
+    name "Test Workflow RARE_VAR_ASSOC -- full reporting path (IT-7)"
+    script "../rare-var-assoc.nf"
+    workflow "RARE_VAR_ASSOC"
+
+    tag "full"
+    tag "workflows"
+    tag "workflows/rare_var_assoc"
+
+    // IT-7: the full pipeline end-to-end (skip_preparation=false, skip_reporting=false,
+    // use_dosage=false). Runs NORM -> ANNOTATE -> VEP -> quality filters -> plink2 ->
+    // Regenie step1/step2 -> REPORTING (Manhattan/QQ HTML + EDA plots).
+    //
+    // Reuses the same naive-LOG10P statistical-soundness helper as IT-6 but runs against
+    // the 500-variant unprepared fixture (3 chr, 3202 samples). If the fixture turns out
+    // too small for Regenie to produce stable top-5 genes, switch to a larger fixture.
+    //
+    // Tag "full": nightly only (VEP + full reporting make this slow).
+
+    config "./full_reporting.config"
+
+    test("full reporting path: VEP annotates, Regenie runs, HTML reports emitted") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+            }
+            workflow {
+                """
+                input[0] = Channel.of(
+                    tuple(
+                        [ id:'test' ],
+                        file('${projectDir}/assets/three_chr_unprepared/unprepared_rand_2k.vcf.gz', checkIfExists: true)
+                    )
+                )
+                input[1] = Channel.of(
+                    tuple(
+                        [ id:'test' ],
+                        file('${projectDir}/assets/three_chr_unprepared/pheno_binary.tsv', checkIfExists: true)
+                    )
+                )
+                input[2] = Channel.of(
+                    tuple(
+                        [ id:'test' ],
+                        file('${projectDir}/assets/three_chr_unprepared/all_samples.txt', checkIfExists: true)
+                    )
+                )
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            // ---- VEP annotation: CSQ in header ----
+            def vep_vcf_path = workflow.out.vep_annotated_vcf[0][1]
+            def vep_header = ["bash", "-c", "zcat ${vep_vcf_path}"].execute().text
+                .split('\n').findAll { it.startsWith('#') }
+            assert vep_header.any { it.contains('##INFO=<ID=CSQ,') } :
+                "VEP-annotated VCF must contain ##INFO=<ID=CSQ,...> in header"
+
+            // ---- EDA plots emitted ----
+            def eda_plots = workflow.out.eda_plots_out
+            assert eda_plots.size() > 0 : "EDA module must emit at least one plot"
+
+            // ---- Regenie step 1: one LOCO manifest + one LOCO file ----
+            assert workflow.out.regenie_step1_pred_list.size() == 1
+            def pred_list = path(workflow.out.regenie_step1_pred_list[0][1])
+            assert pred_list.toString().endsWith('_pred.list')
+            def pred_first = pred_list.readLines()[0].split(/\s+/)
+            assert pred_first[0] == 'Y1' :
+                "pred.list must reference phenotype Y1, got '${pred_first[0]}'"
+            assert workflow.out.regenie_step1_loco.size() == 1
+            def loco = workflow.out.regenie_step1_loco[0][1]
+            assert loco.toString().endsWith('.loco') :
+                "expected a single .loco file, got ${loco}"
+
+            // ---- Regenie step 2: one uncompressed *_Y1.regenie covering all chromosomes ----
+            def regenie = path(workflow.out.regenie_step2_out[0][1])
+            assert regenie.toString().endsWith('_Y1.regenie') :
+                "expected step2 output ending in _Y1.regenie, got ${regenie}"
+            def data_lines = regenie.readLines().findAll { it && !it.startsWith('##') }
+            def header = data_lines[0].split(/\s+/) as List
+            assert header == ['CHROM','GENPOS','ID','ALLELE0','ALLELE1','A1FREQ','N','TEST','BETA','SE','CHISQ','LOG10P','EXTRA'] :
+                "unexpected regenie column header: ${header}"
+            def chroms = data_lines.drop(1).collect { it.split(/\s+/)[0] } as Set
+            assert ['12','22','23'].every { it in chroms } :
+                "expected chromosomes 12/22/23(=X) in regenie output, got ${chroms}"
+            def id_i = header.indexOf('ID')
+            assert data_lines.drop(1).any { it.split(/\s+/)[id_i].contains('.Mask_') } :
+                "regenie output should contain gene.mask burden rows"
+
+            // ---- GWAS HTML report emitted ----
+            def qq_dir = file("${params.outdir}/rscript_manhattan_qq_plots")
+            assert qq_dir.exists() :
+                "expected rscript_manhattan_qq_plots/ directory under ${params.outdir}"
+            def html_files = qq_dir.listFiles().findAll { it.name.endsWith('.html') }
+            assert html_files.size() > 0 :
+                "expected at least one HTML report under rscript_manhattan_qq_plots/, got none"
+
+            // ---- MultiQC + tracking report present ----
+            assert file("${params.outdir}/multiqc/multiqc_report.html").exists() :
+                "expected a MultiQC report under ${params.outdir}/multiqc/"
+            def tracking_html = file("${params.outdir}/generate_tracking_report").listFiles()
+                .findAll { it.name.endsWith('_sankey_report.html') }
+            assert tracking_html.size() == 1 :
+                "expected one tracking sankey report under generate_tracking_report/, got ${tracking_html}"
+
+            // ---- Statistical-soundness check (same helper as IT-6) ----
+            def setlist = workflow.out.setlist[0][1]
+            def annotations = workflow.out.annotations[0][1]
+            def helper = "${projectDir}/workflows/tests/helpers/recompute_naive_log10p.py"
+            def cmd = [
+                'podman', 'run', '--rm',
+                '-v', "${projectDir}:${projectDir}",
+                '-w', "${projectDir}",
+                'docker.io/psuszynski/bioinf_combo:1.5.1',
+                'python3', helper.toString(),
+                '--regenie', regenie.toString(),
+                '--vcf', vep_vcf_path.toString(),
+                '--setlist', setlist.toString(),
+                '--annotations', annotations.toString(),
+                '--masks', "${projectDir}/assets/default.masks",
+                '--cases', "${projectDir}/assets/three_chr_unprepared/cases.txt",
+                '--controls', "${projectDir}/assets/three_chr_unprepared/controls.txt",
+                '--top-n', '5', '--floor', '0.5', '--tol', '2.0', '--max-violations', '3'
+            ]
+            def sout = new StringBuilder()
+            def serr = new StringBuilder()
+            def proc = cmd.execute()
+            proc.consumeProcessOutput(sout, serr)
+            proc.waitFor()
+            println "naive-LOG10P check stdout:\n${sout}"
+            if (serr.length() > 0) println "naive-LOG10P check stderr:\n${serr}"
+            assert proc.exitValue() == 0 :
+                "naive-LOG10P soundness check failed:\n${sout}\n${serr}"
+        }
+    }
+
+}
