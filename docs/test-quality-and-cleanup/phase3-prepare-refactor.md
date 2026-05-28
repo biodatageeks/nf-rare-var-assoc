@@ -88,23 +88,32 @@ Copy the handful of modules + the workflow body into this repo.
 - Cost: code duplication and drift from upstream — directly against the "single source of
   truth" goal that motivated using `nf-prepare-vcf` at all.
 
-### Recommendation
+### Decision (2026-05-28): Option B selected
 
-Pick based on whether nested Nextflow submission is acceptable on PLGrid:
+**D1 is LOCKED to Option B (`NEXTFLOW_RUN` / nested run).** Both `skip_preparation` values are
+**real production paths** (neither is dev/CI-only):
 
-- If you want the **cleanest isolation and zero edits to `nf-prepare-vcf`**, and a quick
-  PLGrid spike shows a child `nextflow run` can submit hq/slurm jobs from within a job →
-  **Option B**. It is the option that actually answers "give `nf-prepare-vcf` its own params
-  and `projectDir`".
-- If nested submission is blocked or risky on PLGrid (likely for plain slurm) →
-  **Option A**, accepting the param-porting + scoped-selector work below. It is the most
-  HPC-robust and keeps one resumable DAG.
-- **Option C** only if both A's coupling and B's nesting prove unworkable.
+- **`skip_preparation=false` — the main production path.** Actual association testing, usually run
+  **on clinical-center machines** (patient data must stay within that infrastructure). This is the
+  path that runs the nested `nf-prepare-vcf`. It is **not** run on PLGrid HPC.
+- **`skip_preparation=true` — the parameter-tuning path on PLGrid HPC.** Tuning assoc params
+  (e.g. GQ thresholds) means many runs; the un-tuned transformations were factored into
+  `nf-prepare-vcf`, run **once** by a separate upstream driver, then assoc runs many times with
+  `skip_preparation=true`.
 
-The task list below is written for **Option A** (the HPC-safe default). If you choose Option
-B, P3a/P3b are replaced by a single "build the `NEXTFLOW_RUN` wrapper + per-child params
-file" task and P3e shrinks (nothing to port); the rest (P3c wiring, P3d tests) stay similar.
-**This is the one decision to lock before P3c** — see D1.
+The classic Option-B risk — nested Nextflow submission (sbatch-within-sbatch) being disallowed on
+a cluster — therefore does **not** bite: the nested run only happens on the `skip_preparation=false`
+path, which runs on clinical-center machines, **not** under slurm/HyperQueue on PLGrid HPC.
+
+Option B is chosen for its decisive advantage: **full config/params isolation and zero edits
+to `nf-prepare-vcf`** — the child loads its own `nextflow.config`, `projectDir`, and params via
+`-params-file`, running byte-for-byte as it does standalone. This sidesteps the `projectDir`
+foot-guns and scoped-selector work Option A requires (the make-or-break audit in old P3b).
+
+The **Option B task list (PB1–PB4) is below**; the original **Option A breakdown (P3a–P3e) is
+retained as a backup plan** further down, in case Option B's isolation cost (two work dirs,
+glob-from-results) proves worse than Option A's coupling. Option C stays the last resort if both
+fail.
 
 ## Current vs target architecture
 
@@ -147,10 +156,18 @@ FILTER_AND_ENHANCE_VCF (and the local INDEX_2).
 
 ## Decisions
 
-- **D1 — Composition strategy.** OPEN, and the one blocker before P3c. Choose Option A
-  (include), B (`NEXTFLOW_RUN`/nf-cascade), or C (vendor) from the assessment above. Drives
-  whether the task list stays as written (Option A) or is reshaped (B). Pending a PLGrid
-  spike on nested Nextflow submission if Option B is attractive.
+- **D1 — Composition strategy.** LOCKED 2026-05-28 -> **Option B (`NEXTFLOW_RUN` / nested run)**.
+  Rationale: the nested run only fires on the `skip_preparation=false` (main) path, which runs on
+  clinical-center machines, **not** under slurm/HyperQueue on PLGrid HPC (HPC uses the
+  `skip_preparation=true` tuning path), so the nested-submission risk is moot; Option B buys full
+  param/`projectDir` isolation and zero edits to `nf-prepare-vcf`. Both `skip_preparation` values
+  are production. Option A (P3a–P3e) is retained as the backup plan. See the Decision note above
+  and the **Tasks (Option B — SELECTED)** list below.
+- **D6 — Nested-run details.** ADDED 2026-05-28 (Option B): (a) **Resume for the child run —
+  OPEN, decide later.** Options: no `-resume` (fresh each time), or nf-cascade fixed-cache
+  workaround for persistent resume. (b) **Forward `cpu_support_avx2`** from this pipeline's
+  params into the child ([nextflow.config:150](../../nextflow.config#L150)) — it selects the
+  AVX2 vs non-AVX2 plink container in the child's `PLINK2_MAKEPGEN` (which still runs per D5).
 - **D2 — Prep runs at the front.** CONFIRMED 2026-05-28:
   `NF_PREPARE_VCF -> REPLACE_SAMPLE_NAMES -> INDEX_1 -> VIEW_AND_FILTER2`, so both
   `skip_preparation` values share an identical tail (the tuner case is just a manual
@@ -169,12 +186,122 @@ FILTER_AND_ENHANCE_VCF (and the local INDEX_2).
 
 ---
 
-## Tasks
+## Tasks (Option B — SELECTED)
 
-> The breakdown below assumes **Option A (include)** — the HPC-safe default. If D1 selects
-> **Option B (`NEXTFLOW_RUN`)**, P3a + P3b collapse into a single "build the `NEXTFLOW_RUN`
-> wrapper + per-child params file + glob outputs" task (no emits, no param porting, no scoped
-> selectors), P3c wiring stays similar, and P3e shrinks (nothing to port). Lock D1 first.
+> Composition via a local `NEXTFLOW_RUN`-style process (the nf-cascade pattern) that runs
+> `nf-prepare-vcf` as a child `nextflow run`. **No edits to `../nf-prepare-vcf`.** The child
+> loads its own config/params/`projectDir`; we hand it `--input_vcf` / `--outdir` and glob the
+> published prepared VCF back into our channels. Grounding facts (verified 2026-05-28):
+> child entry point is `../nf-prepare-vcf/main.nf`; the DS-carrying, CSQ-annotated output lands
+> at `results/bcftools_reheader/*_reheader.vcf.gz` with its index at
+> `results/bcftools_index/*_reheader.vcf.gz.tbi`.
+>
+> PB1 replaces Option-A P3a+P3b (no emits, no param porting, no scoped selectors). PB2/PB3/PB4
+> mirror Option-A P3c/P3d/P3e. PB2..PB4 depend on PB1. PB2 must land before PB3/PB4.
+
+### PB1 — Build the `PREPARE_VCF` wrapper process (child `nextflow run` + glob outputs)
+
+- **New module**: e.g. `modules/local/nextflow_run/prepare_vcf/main.nf` (process `PREPARE_VCF`),
+  modeled on nf-cascade's `NEXTFLOW_RUN`.
+- **Script** runs the child pipeline on the same node. Per D6, resume strategy is **OPEN** —
+  either no `-resume` (fresh run), or nf-cascade fixed-cache workaround for persistent resume.
+  Placeholder script (no resume shown):
+
+  ```
+  nextflow run <repoRoot>/../nf-prepare-vcf/main.nf \
+      -params-file ${params_file} -c ${add_config} \
+      --input_vcf ${vcf} --outdir results \
+      --cpu_support_avx2 ${params.cpu_support_avx2} \
+      -work-dir ${task.workDir}/child_work -ansi-log false
+  ```
+
+  Forward `cpu_support_avx2` from this pipeline into the child (D6). Stage `meta` + `vcf`
+  (+ `.tbi`) as process inputs; pass the per-child `prep.yml` params file and optional
+  `prep.config` as inputs.
+- **Outputs** (glob from the child's published `results/`):
+  - `prepared_vcf      = results/bcftools_reheader/*_reheader.vcf.gz`
+  - `prepared_vcf_tbi  = results/bcftools_index/*_reheader.vcf.gz.tbi`
+  - `tracking          = results/**/*tracking*.json` — confirm the publish path for NORM/MAKEPGEN
+    tracking JSON during implementation (`NF_PREPARE_VCF` emits tracking only from those two
+    modules; it is not exposed on the workflow `emit:`, so it must come from `publishDir`).
+  - optionally `versions = results/pipeline_info/nf-prepare-vcf_software_versions.yml`.
+- **Per-child params** (`prep.yml`, committed under the wrapper's `assets/` or `conf/`): pin only
+  what must differ from `nf-prepare-vcf`'s own defaults — set `skip_ld_report=true` (we don't use
+  the LD report; saves wall-clock), and point `vep_*` at the shared sibling cache if the child's
+  default `${projectDir}/../vep_cachedir` does not already resolve to it. Everything else comes
+  from the child repo's untouched `nextflow.config`.
+- **Runtime**: `nextflow` must be on `PATH` inside the process. Pin a container/conda shipping
+  Nextflow + Java, or run the process via the host launcher; document the choice in the module.
+- **Resume strategy** (D6 — OPEN): decide at implementation time whether to use `-resume` with
+  nf-cascade fixed-cache workaround, or run fresh each time. Document the choice in the module.
+- **Done-when**: `PREPARE_VCF(ch_input_vcf)` on `unprepared_rand_500.vcf.gz` emits a DS-carrying,
+  CSQ-annotated `prepared_vcf` + `.tbi` and a non-empty tracking JSON, with **zero changes to
+  `../nf-prepare-vcf`**.
+
+### PB2 — Wire `PREPARE_VCF` in; remove the old prep code
+
+Identical to Option-A **P3c** below, except the include is the local `PREPARE_VCF` process, not a
+cross-repo `NF_PREPARE_VCF` workflow.
+- **File**: `workflows/rare-var-assoc.nf`.
+  - `include { PREPARE_VCF } from '../modules/local/nextflow_run/prepare_vcf'`.
+  - **Remove** includes + call sites + guards for VEP_UPDATECACHE, FIX_ZERO_PL, BCFTOOLS_FILTER_1,
+    BCFTOOLS_FILTER_2, VEP_ANNOTATE, BCFTOOLS_INDEX_3 (and now-dead `trackingFirstOrEmpty` /
+    `trackingLastOrEmpty` uses tied to them).
+  - New flow (D2 — prep at the front): for `skip_preparation=false`, run `PREPARE_VCF(ch_input_vcf)`
+    first, then feed its `prepared_vcf` / `prepared_vcf_tbi` into PREPARE (REPLACE_SAMPLE_NAMES ->
+    INDEX_1 -> VIEW_AND_FILTER2). For `skip_preparation=true`, feed `ch_input_vcf` straight into
+    PREPARE. Both converge into the existing `ch_vep_vcf_with_index` consumed by VCF2FRQ / VCF2PSAM
+    / MAKEPGEN_1.
+  - Reconcile `use_dosage`: the prepared VCF always carries `DS` now; keep the downstream
+    `if (params.use_dosage)` EXPORT/IMPORT block, drop the dosage-compute branch in EDA setup.
+  - Per D4, point EDA at the `PREPARE_VCF` output (pre-VIEW_AND_FILTER2); re-point the
+    `vep_annotated_vcf` test emit at the prepared VCF.
+- **File**: `subworkflows/local/prepare/main.nf` — keep REPLACE_SAMPLE_NAMES, INDEX_1,
+  VIEW_AND_FILTER2 as the single shared body for both branches; drop VIEW_1 / NORM / ANNOTATE /
+  FILTER_AND_ENHANCE_VCF (+ local INDEX_2). The `PREPARE_VCF` call lives in the **outer** workflow.
+- **Tracking continuity**: thread `PREPARE_VCF.out.tracking` into this repo's `ch_tracking` so the
+  Sankey report stays non-empty (IT-6/IT-7 assert it).
+- **Verify**: a manual `skip_preparation=false, skip_reporting=false, use_dosage=false` run on a
+  small fixture completes through Regenie with no `FIX_ZERO_PL`.
+- **Done-when**: full path runs end to end; `rg -n 'FIX_ZERO_PL|BCFTOOLS_FILTER_[12]\b' workflows/`
+  is empty.
+
+### PB3 — Rework IT-1 / IT-1b for the new PREPARE shape
+
+Same scope as Option-A **P3d**. The NORM-split / unique-ID / chr-rename invariants now belong to
+the child `nf-prepare-vcf` run, not PREPARE:
+- Move those invariant assertions to a wrapper-level test on `PREPARE_VCF` (or a thin
+  `NF_PREPARE_VCF` test).
+- Shrink IT-1 to what PREPARE still does (sample-name replace + subset + quality filter), or fold
+  it into IT-1b if both branches now share the same PREPARE body.
+- Re-run IT-1b (`skip_preparation=true`); it exercises VIEW_AND_FILTER2 and should be largely
+  unchanged.
+- Update the IT-1 / IT-1b descriptions in [integration-tests.md](integration-tests.md) and the
+  §1f note in [dead-code.md](dead-code.md) (FILTER_AND_ENHANCE_VCF is no longer exercised by IT-1).
+- **Done-when**: prepare-subworkflow tests pass against the new shape; no test still asserts
+  behavior that moved to `nf-prepare-vcf`.
+
+### PB4 — Delete prep modules orphaned by the refactor
+
+Same scope as Option-A **P3e** (under Option B nothing was imported from the sibling, so all of
+this repo's now-unused prep copies can go once ref-checked). After PB2, `rg`-check and remove,
+coordinating with T14:
+- `modules/local/python/fix_zero_PL`
+- `modules/local/combo/filter_and_enhance_vcf`
+- `modules/local/python/filter_and_enhance_vcf_polarsbio` (already a §1f candidate)
+- this repo's now-unused prep copies **iff** unreferenced: `bcftools/norm`, `bcftools/annotate`,
+  `vep/annotate`, `vep/updatecache`, `bcftools/filter` (grep first — some may have only tests).
+- **Verify**: `nf-test test --profile podman --tag ci` green; `rg` finds no dangling imports.
+- **Done-when**: orphaned prep modules gone, CI green. Then proceed to T13.
+
+---
+
+## Tasks (Option A — BACKUP PLAN)
+
+> **NOT the selected plan.** Retained per D1 in case Option B's nested-run isolation cost proves
+> worse than Option A's coupling. Option A composes via a cross-repo `include` of
+> `NF_PREPARE_VCF` (one Nextflow DAG, native channels) and pays for it with param porting,
+> scoped `withName` selectors, and a `projectDir` audit.
 
 > **Cross-repo note**: under Option A, P3a edits `../nf-prepare-vcf`, a **separate git repo**.
 > Per the working agreement the AI does not run git; the developer commits each repo
