@@ -201,39 +201,28 @@ FILTER_AND_ENHANCE_VCF (and the local INDEX_2).
 
 ### PB1 — Build the `PREPARE_VCF` wrapper process (child `nextflow run` + glob outputs)
 
-- **New module**: e.g. `modules/local/nextflow_run/prepare_vcf/main.nf` (process `PREPARE_VCF`),
-  modeled on nf-cascade's `NEXTFLOW_RUN`.
-- **Script** runs the child pipeline on the same node. Per D6, resume strategy is **OPEN** —
-  either no `-resume` (fresh run), or nf-cascade fixed-cache workaround for persistent resume.
-  Placeholder script (no resume shown):
+**Status: Done (pending user verification run)**
 
-  ```
-  nextflow run <repoRoot>/../nf-prepare-vcf/main.nf \
-      -params-file ${params_file} -c ${add_config} \
-      --input_vcf ${vcf} --outdir results \
-      --cpu_support_avx2 ${params.cpu_support_avx2} \
-      -work-dir ${task.workDir}/child_work -ansi-log false
-  ```
-
-  Forward `cpu_support_avx2` from this pipeline into the child (D6). Stage `meta` + `vcf`
-  (+ `.tbi`) as process inputs; pass the per-child `prep.yml` params file and optional
-  `prep.config` as inputs.
-- **Outputs** (glob from the child's published `results/`):
-  - `prepared_vcf      = results/bcftools_reheader/*_reheader.vcf.gz`
-  - `prepared_vcf_tbi  = results/bcftools_index/*_reheader.vcf.gz.tbi`
-  - `tracking          = results/**/*tracking*.json` — confirm the publish path for NORM/MAKEPGEN
-    tracking JSON during implementation (`NF_PREPARE_VCF` emits tracking only from those two
-    modules; it is not exposed on the workflow `emit:`, so it must come from `publishDir`).
-  - optionally `versions = results/pipeline_info/nf-prepare-vcf_software_versions.yml`.
-- **Per-child params** (`prep.yml`, committed under the wrapper's `assets/` or `conf/`): pin only
-  what must differ from `nf-prepare-vcf`'s own defaults — set `skip_ld_report=true` (we don't use
-  the LD report; saves wall-clock), and point `vep_*` at the shared sibling cache if the child's
-  default `${projectDir}/../vep_cachedir` does not already resolve to it. Everything else comes
-  from the child repo's untouched `nextflow.config`.
-- **Runtime**: `nextflow` must be on `PATH` inside the process. Pin a container/conda shipping
-  Nextflow + Java, or run the process via the host launcher; document the choice in the module.
-- **Resume strategy** (D6 — OPEN): decide at implementation time whether to use `-resume` with
-  nf-cascade fixed-cache workaround, or run fresh each time. Document the choice in the module.
+- **Module**: `modules/local/nextflow_run/prepare_vcf/main.nf` (process `PREPARE_VCF`).
+  Input: `tuple val(meta), path(vcf)` — no tbi (child starts with BCFTOOLS_SORT which
+  does not need a pre-built index).
+- **Test**: `modules/local/nextflow_run/prepare_vcf/tests/main.nf.test` (tag "full").
+  Verifies DS FORMAT + CSQ INFO in header, 3202 samples preserved, unique IDs from
+  BCFTOOLS_ANNOTATE, record count >= 500, and NORM tracking counts.
+  Requires `tests/fixtures/child_podman.config` passed as add_config to the child run.
+- **Per-child params**: `modules/local/nextflow_run/prepare_vcf/assets/prep.yml`:
+  - `skip_ld_report: true` — saves wall-clock; LD report unused by this repo.
+  - `publish_intermediate: true` — required so BCFTOOLS_NORM and PLINK2_MAKEPGEN publish
+    their tracking JSONs to `results/bcftools_norm/` and `results/plink2_makepgen/`.
+  - Everything else comes from nf-prepare-vcf's own `nextflow.config`.
+- **Runtime**: `nextflow` must be on PATH; no container on the wrapper process itself.
+- **Resume strategy** (D6 resolved): no `-resume`; child runs fresh each time the parent cache
+  misses. Child work dir lives at `${task.workDir}/child_work` (ephemeral, cleaned with parent).
+- **Tracking glob confirmed**: `results/**/*tracking*.json` catches `*_norm_tracking.json` from
+  `results/bcftools_norm/` and `*_makepgen_tracking.json` from `results/plink2_makepgen/`.
+- **add_config**: optional path input; pass `[]` when no extra config is needed.
+  Caller must supply a config enabling the right container manager (e.g. `podman.enabled=true`)
+  for the child run; `add_config_arg` is suppressed when `[]`.
 - **Done-when**: `PREPARE_VCF(ch_input_vcf)` on `unprepared_rand_500.vcf.gz` emits a DS-carrying,
   CSQ-annotated `prepared_vcf` + `.tbi` and a non-empty tracking JSON, with **zero changes to
   `../nf-prepare-vcf`**.

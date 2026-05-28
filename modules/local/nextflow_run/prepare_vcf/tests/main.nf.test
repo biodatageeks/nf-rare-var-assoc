@@ -1,0 +1,126 @@
+nextflow_process {
+
+    name "Test Process PREPARE_VCF (PB1)"
+    script "../main.nf"
+    process "PREPARE_VCF"
+
+    tag "full"
+    tag "modules"
+    tag "modules/nextflow_run/prepare_vcf"
+
+    // Runs the full nf-prepare-vcf child pipeline on the unprepared_rand_500 fixture.
+    // The child pipeline does: BCFTOOLS_SORT -> BCFTOOLS_NORM (split multiallelics,
+    // strip chr prefix, assign unique IDs) -> VEP_ANNOTATE (CSQ) ->
+    // CALC_DOSAGE_POLARSBIO -> BCFTOOLS_REHEADER (adds DS FORMAT header).
+    //
+    // Fixture: assets/three_chr_unprepared/unprepared_rand_500.vcf.gz
+    //   - 500 variants across chr12, chr22, chrX; 35 multiallelic sites
+    //   - 3202 samples (1000G high-coverage, HG00096..NA21144)
+    //
+    // The child run is configured via prep.yml (skip_ld_report=true, publish_intermediate=true).
+    // Container + resource settings are forwarded automatically via workflow.profile:
+    //   the module passes -profile ${workflow.profile} to the child nextflow run.
+    // publish_intermediate=true is mandatory: without it BCFTOOLS_NORM and
+    // PLINK2_MAKEPGEN do not publish their tracking JSONs, so process.out.tracking
+    // would be empty.
+    //
+    // Run with: nf-test test modules/local/nextflow_run/prepare_vcf/tests/main.nf.test
+    //   (podman is the default profile in nf-test.config; no extra flags needed).
+    //   child_podman.config is passed as add_config to cap process_high at 7 GB so
+    //   PLINK2_MAKEPGEN (72 GB default in nf-prepare-vcf) fits on a dev machine.
+    //
+    // This test is tagged "full" because VEP annotation alone takes many minutes.
+    // It does NOT run under CI (tag "ci" is intentionally absent).
+
+    test("prepare_vcf on unprepared_rand_500: DS FORMAT + CSQ INFO in header, 3202 samples preserved, unique IDs, tracking from NORM") {
+
+        when {
+            params {
+                cpu_support_avx2 = true
+            }
+            process {
+                """
+                input[0] = Channel.of(
+                    tuple(
+                        [ id: 'rand500' ],
+                        file('${projectDir}/assets/three_chr_unprepared/unprepared_rand_500.vcf.gz', checkIfExists: true)
+                    )
+                )
+                input[1] = Channel.value(
+                    file('${projectDir}/modules/local/nextflow_run/prepare_vcf/assets/prep.yml', checkIfExists: true)
+                )
+                // add_config caps process_high at 7 GB so PLINK2_MAKEPGEN fits on a
+                // dev machine (default is 72 GB). Podman is handled by profile forwarding.
+                input[2] = Channel.value(
+                    file('${projectDir}/modules/local/nextflow_run/prepare_vcf/tests/fixtures/child_podman.config', checkIfExists: true)
+                )
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // ---- Read the output VCF once; derive all header + body checks from it ----
+            def vcf_path = process.out.prepared_vcf[0][1]
+            def vcf_lines = ["bash", "-c", "zcat ${vcf_path}"].execute().text.split('\n') as List
+
+            // DS FORMAT: added by BCFTOOLS_REHEADER after CALC_DOSAGE_POLARSBIO ran.
+            // Absence means either REHEADER was skipped or CALC_DOSAGE_POLARSBIO failed.
+            assert vcf_lines.any { it.startsWith('##FORMAT=<ID=DS') } :
+                "output VCF must have ##FORMAT=<ID=DS,...> header line (added by BCFTOOLS_REHEADER)"
+
+            // CSQ INFO: added by VEP_ANNOTATE. Absence means VEP did not annotate.
+            assert vcf_lines.any { it.startsWith('##INFO=<ID=CSQ') } :
+                "output VCF must have ##INFO=<ID=CSQ,...> header line (added by VEP_ANNOTATE)"
+
+            // Sample-count invariant: all 3202 input samples must be preserved.
+            def header_line = vcf_lines.find { it.startsWith('#CHROM') }
+            assert header_line != null : "output VCF must have a #CHROM header line"
+            def sample_count = header_line.split('\t').size() - 9
+            assert sample_count == 3202 :
+                "expected 3202 samples in output VCF, got ${sample_count}"
+
+            // Record-count invariant: BCFTOOLS_NORM -m -any splits multiallelics (35
+            // multiallelic sites in the fixture), so post-NORM count is >= 500.
+            def data_lines = vcf_lines.findAll { it && !it.startsWith('#') }
+            assert data_lines.size() >= 500 :
+                "expected at least 500 variant records after normalization, got ${data_lines.size()}"
+
+            // Unique-ID invariant: BCFTOOLS_ANNOTATE sets each ID to CHROM_POS_REF_ALT.
+            // Duplicate IDs would indicate the --rm-dup or ID-assignment step failed.
+            def ids = data_lines.collect { it.split('\t')[2] }
+            assert ids.toSet().size() == ids.size() :
+                "variant IDs in output VCF must all be unique (set by BCFTOOLS_ANNOTATE)"
+            assert ids.every { it != '.' } :
+                "no variant ID should be missing (.) in output VCF after BCFTOOLS_ANNOTATE"
+
+            // ---- prepared_vcf_tbi emit ----
+            assert process.out.prepared_vcf_tbi[0][1].toString().endsWith('.tbi') :
+                "prepared_vcf_tbi emit must carry a .tbi file"
+
+            // ---- Tracking assertions ----
+            // With publish_intermediate=true, BCFTOOLS_NORM and PLINK2_MAKEPGEN each
+            // publish a tracking JSON. The glob results/**/*tracking*.json must catch both.
+            def tracking_raw = process.out.tracking[0]
+            def tracking_list = (tracking_raw instanceof List) ? tracking_raw : [tracking_raw]
+            assert tracking_list.size() >= 2 :
+                "expected at least 2 tracking JSONs (NORM + MAKEPGEN), got ${tracking_list.size()}"
+
+            // Find the NORM tracking JSON and validate its counts against the fixture.
+            def norm_json_path = tracking_list.find { file(it).text.contains('BCFTOOLS_NORM') }
+            assert norm_json_path != null :
+                "expected a tracking JSON whose process_name contains BCFTOOLS_NORM"
+            def norm_tracking = new groovy.json.JsonSlurper().parseText(file(norm_json_path).text)
+            assert (norm_tracking.inputs.variants as int) == 500 :
+                "NORM tracking.inputs.variants should equal input fixture count (500), got ${norm_tracking.inputs.variants}"
+            assert (norm_tracking.inputs.samples as int) == 3202 :
+                "NORM tracking.inputs.samples should be 3202, got ${norm_tracking.inputs.samples}"
+            assert (norm_tracking.outputs.variants as int) >= 500 :
+                "NORM tracking.outputs.variants should be >= 500 after multiallelic splitting, got ${norm_tracking.outputs.variants}"
+            assert (norm_tracking.outputs.samples as int) == 3202 :
+                "NORM tracking.outputs.samples should be 3202, got ${norm_tracking.outputs.samples}"
+        }
+    }
+
+}
