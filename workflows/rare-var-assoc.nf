@@ -585,6 +585,13 @@ workflow RARE_VAR_ASSOC {
 
     emit:multiqc_report = MULTIQC.out.report.toList() // channel: /path/to/multiqc_report.html
     versions       = ch_versions                 // channel: [ path(versions.yml) ]
+    // Exposed for integration tests (IT-6/IT-7): the regenie association results and the
+    // annotation artifacts the naive-LOG10P soundness check recomputes against.
+    regenie_step2_out       = ch_regenie_step2_regenie_out
+    regenie_step1_pred_list = ch_regenie_step1_pred_list
+    regenie_step1_loco      = ch_regenie_step1_loco
+    setlist                 = ch_setlist
+    annotations             = ch_annotations
 
 }
 

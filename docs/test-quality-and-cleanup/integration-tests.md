@@ -161,24 +161,32 @@ different code path (`BCFTOOLS_VIEW_AND_FILTER2`) and must have its own coverage
 
 - **Test file**: `workflows/tests/skip_prep_skip_reporting.nf.test`
 - **Config**: `skip_preparation=true`, `skip_reporting=true`, `use_dosage=true`.
-- **Inputs**: same shape as `conf/test_skip_preparation_and_reporting.config` but pointed
-  at the 500-variant fixture set (pre-prepared VCF + psam + phenotype file + masks).
-  Commit any missing pieces to `assets/three_chr_unprepared/prepared_500/`.
+- **Inputs**: the fast path **skips VEP** (VEP_ANNOTATE only runs when
+  `skip_preparation=false`), so the input VCF must already carry CSQ. `prepared_500.vcf.gz`
+  does **not** (PREPARE never runs VEP), so the test feeds the CSQ-annotated
+  `assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz` (4955 variants,
+  3202 samples) — the same input shape the production fast-path config uses. Phenotype:
+  `assets/three_chr_unprepared/pheno_binary.tsv` (`FID IID Y1`, controls=0/cases=1) — the
+  three-column form Regenie needs (`pheno.tsv` is the two-column `IID Y1` variant for the PCA
+  test). All-samples: `assets/three_chr_unprepared/all_samples.txt`.
 
 ### File-shape and presence assertions
 
-The fixture has **one phenotype** (`Y1`, derived from cases/controls).
+The fixture has **one phenotype** (`Y1`, derived from cases/controls). The test reads the
+artifacts from new test-support emits on `RARE_VAR_ASSOC` (`regenie_step2_out`,
+`regenie_step1_pred_list`, `regenie_step1_loco`, `setlist`, `annotations`).
 
-- Regenie step 1 emits exactly one `*_pred.list` (a per-phenotype LOCO manifest) and one
-  `*_1.loco` file (one LOCO file per phenotype; chromosomes are stored inside).
+- Regenie step 1 emits exactly one `*_pred.list` (LOCO manifest naming `Y1`) and one
+  `*.loco` file.
 - Regenie step 2 emits exactly one **`*_Y1.regenie`** file (uncompressed; covers all
-  chromosomes in a single file because `--chr` is not used).
-- `MERGE_RESULTS` output: a single `Y1.regenie.gz` (the `.gz` extension belongs to this
-  aggregate, not to step 2's output). After `zcat`, the file has a `##MASKS=<...>`
-  metadata line followed by a header line with these exact whitespace-separated columns:
-  `CHROM GENPOS ID ALLELE0 ALLELE1 A1FREQ N TEST BETA SE CHISQ LOG10P EXTRA`.
-- MultiQC HTML report emitted under `outdir` (filename check only — reporting carve-out).
-- `outdir/pipeline_info/*tracking*.json` present.
+  chromosomes in one file because `--chr` is not used). Header columns are exactly
+  `CHROM GENPOS ID ALLELE0 ALLELE1 A1FREQ N TEST BETA SE CHISQ LOG10P EXTRA`; chromosomes
+  `12`, `22`, `23` (plink2 codes chrX as 23) all appear; IDs are gene-burden `GENE.MASK.AAF`
+  rows. (`MERGE_RESULTS` / the aggregate `Y1.regenie.gz` do **not** run here — they are
+  gated behind `!skip_reporting`; that assertion belongs to IT-7.)
+- MultiQC HTML report present under `outdir/multiqc/` (filename check — reporting carve-out).
+- Tracking report present: `outdir/generate_tracking_report/*_sankey_report.html` (the
+  pipeline emits no `pipeline_info/*tracking*.json`).
 
 ### Statistical-soundness assertion (the load-bearing one)
 
@@ -277,7 +285,7 @@ VEP; VEP_ANNOTATE is called from the outer workflow only when `skip_preparation=
 Done 2026-05-27. Test at `subworkflows/local/pca/tests/main.nf.test`. New fixtures committed:
 `assets/three_chr_unprepared/prepared_500/prepared_500.frq` (generated via `bcftools query` on
 `prepared_500.vcf.gz`); `assets/three_chr_unprepared/pheno.tsv` (1202 cases Y1=1 + 2000
-controls Y1=2, reusable by T10–T13). King cutoff `samples_before > samples_after` assertion is
+controls Y1=0, reusable by T10–T13). King cutoff `samples_before > samples_after` assertion is
 guarded by `> 0` check because plink2 king-cutoff may not emit the standard "remaining" log line.
 
 ### T10 — Implement IT-3 and IT-4
@@ -313,15 +321,32 @@ carve-out). T4g (`rscript/manhattan_qq_plots` module test) can now reuse these f
 
 ### T12 — Implement IT-6 (full workflow, fast path)
 
-- **Test file**: `workflows/tests/skip_prep_skip_reporting.nf.test` per IT-6.
-- **Helper to author**: `workflows/tests/helpers/recompute_naive_log10p.py` implementing
-  the naive LOG10P recipe documented in IT-6. Reused by IT-7. Include a docstring with the
-  recipe and chosen tolerances.
-- **Prerequisite**: T8.
+Done 2026-05-28. Test at `workflows/tests/skip_prep_skip_reporting.nf.test` (+ sibling
+`skip_prep_skip_reporting.config`); helper at
+`workflows/tests/helpers/recompute_naive_log10p.py`, run inside
+`docker.io/psuszynski/bioinf_combo:1.5.1` (host lacks pysam/scipy). Full run ~2 min wall
+clock, within the `ci` budget.
+
+Key decisions / deviations from the original spec:
+- **Fixture**: used the CSQ-annotated `prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz`
+  instead of a new 500-variant fixture — the fast path skips VEP, so the input must already
+  carry CSQ, and `prepared_500.vcf.gz` does not. New committed fixtures are sample-derived
+  only: `pheno_binary.tsv` + `all_samples.txt` (see `assets/three_chr_unprepared/README.md`).
+- **Test-support emits** added to `workflows/rare-var-assoc.nf` (`regenie_step2_out`,
+  `regenie_step1_pred_list`, `regenie_step1_loco`, `setlist`, `annotations`) — cleaner than
+  globbing `publishDir` (and `BCFTOOLS_ASSIGN_ANNOTATIONS` runs twice, colliding in the
+  default publish path).
+- **Tolerances** (calibrated on a healthy run): `--floor 0.5 --tol 2.0 --max-violations 3`.
+  Observed top-5: HIP1R/C12orf56/ABCB9/NINJ2 agree within ~0.5 of Regenie; POLE diverges
+  (naive 2.7 vs Regenie 6.3) because its signal is burden-aggregated across rare variants —
+  exactly the single tolerated violation the design anticipates (1/5 < 3 → PASS).
+- **Reference-output guard**: a second assertion (always on) compares the step-2 output
+  field-by-field against the committed `workflows/tests/fixtures/expected_step2_Y1.regenie`
+  (floats within `params.regenie_reference_tol`, ~4 dp; non-numeric tokens exact; rows keyed
+  by `(ID, TEST)`). When developing a replacement implementation, regenerate the fixture from
+  the new output to adopt it as the baseline. Regenie is deterministic on this fixture
+  (identical LOG10P across runs), so the guard is stable in CI.
 - **Verify**: `nf-test test --profile podman workflows/tests/skip_prep_skip_reporting.nf.test`.
-- **Done-when**: passes within the ≤5 min `ci` budget (including the
-  naive-LOG10P recomputation step). If slower, profile the helper first; if Regenie
-  itself is the bottleneck, downgrade to `tag "full"`.
 
 ### T13 — Implement IT-7 (full workflow, reporting path)
 

@@ -18,7 +18,7 @@ nextflow_workflow {
     //
     // Fixture: assets/three_chr_unprepared/prepared_500/
     //   - 417 variants, 3202 samples (1kGP high-coverage); pgen/pvar/psam + pre-computed frq
-    //   - pheno.tsv: 1202 cases (Y1=1) + 2000 controls (Y1=2) from cases.txt / controls.txt
+    //   - pheno.tsv: 1202 cases (Y1=1) + 2000 controls (Y1=0) from cases.txt / controls.txt
 
     test("pca: sscore has 10 PC columns, king_cutoff prunes relateds, projection_score predecessor is pca") {
 

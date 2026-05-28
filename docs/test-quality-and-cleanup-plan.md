@@ -147,7 +147,7 @@ norm/annotate, VEP) or for integration tests that run the full pipeline.
 | Same dataset, larger when Regenie complains about low variance | `assets/three_chr_unprepared/unprepared_rand_{1k,2k,5k,10k}.vcf.gz` |
 | Pre-prepared pgen/pvar/psam + VCF + frq for downstream subworkflow tests | `assets/three_chr_unprepared/prepared_500/` *(created in T8/T9)* |
 | Cases/controls sample lists matching the 3202-sample fixture | `assets/three_chr_unprepared/cases.txt`, `controls.txt` *(created in T8)* |
-| Phenotype file (1202 cases Y1=1, 2000 controls Y1=2; reusable by T9–T13) | `assets/three_chr_unprepared/pheno.tsv` *(created in T9)* |
+| Phenotype file (1202 cases Y1=1, 2000 controls Y1=0; reusable by T9–T13) | `assets/three_chr_unprepared/pheno.tsv` *(created in T9)* |
 
 **Prepared fixtures** — already through bcftools norm + VEP annotation: unique variant IDs,
 biallelic only, CSQ-annotated. Use these for tests of downstream modules (plink2, regenie,
@@ -235,7 +235,7 @@ command, done-when). Conventions in §0 are assumed throughout.
 | &nbsp;&nbsp;T10a — `filter_missing_per_pheno` (IT-3; MAKEPGEN runs once with intersected snplists) | ✅ Done 2026-05-27 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | &nbsp;&nbsp;T10b — `f_coefficient_filtering` (IT-4; spiked outlier fixture) | ✅ Done 2026-05-27 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | T11 — Implement IT-5 (reporting subworkflow) | ✅ Done 2026-05-28 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
-| T12 — Implement IT-6 (workflow, fast path) | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
+| T12 — Implement IT-6 (workflow, fast path) | ✅ Done 2026-05-28 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | T13 — Implement IT-7 (workflow, reporting path) | pending | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | T14 — Phase 2 dead-code removal | pending | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
 | T15 — Update `nextflow_schema.json` | pending | [schema-and-config.md](test-quality-and-cleanup/schema-and-config.md) |
