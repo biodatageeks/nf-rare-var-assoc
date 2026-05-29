@@ -238,10 +238,11 @@ command, done-when). Conventions in §0 are assumed throughout.
 | T12 — Implement IT-6 (workflow, fast path) | ✅ Done 2026-05-28 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | **Phase 3 — Delegate VCF prep to `nf-prepare-vcf` (runs between T12 and T13; unblocks T13). D1 LOCKED -> Option B (`NEXTFLOW_RUN` nested run); Option A retained as backup** | pending | [phase3-prepare-refactor.md](test-quality-and-cleanup/phase3-prepare-refactor.md) |
 | &nbsp;&nbsp;PB1 — Build `PREPARE_VCF` wrapper (child `nextflow run` + glob outputs; no edits to `nf-prepare-vcf`) | ✅ Done 2026-05-28 | [phase3-prepare-refactor.md](test-quality-and-cleanup/phase3-prepare-refactor.md) |
-| &nbsp;&nbsp;PB2 — Wire `PREPARE_VCF` into `rare-var-assoc.nf`; rip out the old prep path | pending | [phase3-prepare-refactor.md](test-quality-and-cleanup/phase3-prepare-refactor.md) |
-| &nbsp;&nbsp;PB3 — Rework IT-1 / IT-1b for the new PREPARE shape | pending | [phase3-prepare-refactor.md](test-quality-and-cleanup/phase3-prepare-refactor.md) |
+| &nbsp;&nbsp;PB2 — Wire `PREPARE_VCF` into `rare-var-assoc.nf`; rip out the old prep path | ✅ Done 2026-05-29 | [phase3-prepare-refactor.md](test-quality-and-cleanup/phase3-prepare-refactor.md) |
+| &nbsp;&nbsp;PB3 — Drop subworkflow-level IT-1 / IT-1b (PREPARE subworkflow eliminated) | ✅ Done 2026-05-29 | [phase3-prepare-refactor.md](test-quality-and-cleanup/phase3-prepare-refactor.md) |
+| T13 — Implement IT-7 (workflow, reporting path) — moved ahead of PB4/PB5 on 2026-05-29 | ✅ Done 2026-05-29 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | &nbsp;&nbsp;PB4 — Delete prep modules orphaned by the refactor | pending | [phase3-prepare-refactor.md](test-quality-and-cleanup/phase3-prepare-refactor.md) |
-| T13 — Implement IT-7 (workflow, reporting path) | ⛔ Blocked on Phase 3 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
+| &nbsp;&nbsp;PB5 — Migrate `prepare__to_delete/tests` into `../nf-prepare-vcf`, then delete the dir | pending | [phase3-prepare-refactor.md](test-quality-and-cleanup/phase3-prepare-refactor.md) |
 | T14 — Phase 2 dead-code removal | pending | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
 | T15 — Update `nextflow_schema.json` | pending | [schema-and-config.md](test-quality-and-cleanup/schema-and-config.md) |
 | T16 — Remove nf-core template comments | pending | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
@@ -260,13 +261,14 @@ T1 ──► T2 ──► T2.5
                                 T8 ──┼──► T9
                                      ├──► T10
                                      ├──► T11
-                                     └──► T12 ──► Phase 3 ──► T13 ──► T14 ──► T15 ──► T16
+                                     └──► T12 ──► PB1..PB3 ──► T13 ──► PB4 ──► PB5 ──► T14 ──► T15 ──► T16
 ```
 
-Phase 3 was inserted between T12 and T13 on 2026-05-28: T13 (IT-7) cannot pass until the broken
-`FIX_ZERO_PL` step is removed by delegating preparation to `nf-prepare-vcf`. D1 is LOCKED to
-Option B, so the live tasks are PB1..PB4 (PB2..PB4 depend on PB1; PB2 precedes PB3/PB4). The
-Option A breakdown (P3a..P3e) is retained in the sub-doc as a backup plan only.
+Phase 3 was inserted between T12 and T13 on 2026-05-28: T13 (IT-7) could not pass until the broken
+`FIX_ZERO_PL` step was removed by delegating preparation to `nf-prepare-vcf`. D1 is LOCKED to
+Option B. PB1..PB3 are done; T13 was reordered ahead of PB4/PB5 on 2026-05-29 (the IT-7 test passes
+once PB2 lands — it does not depend on the orphaned-module deletion in PB4 or the upstream test
+migration in PB5). The Option A breakdown (P3a..P3e) is retained in the sub-doc as a backup plan only.
 
 T3/T4/T5/T6/T7/T8 are independent of each other and may be parallelised. T9..T12 all depend
 on T8 (they need `prepared_500/`). T14 is the only task that strictly requires every

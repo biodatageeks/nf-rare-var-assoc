@@ -49,11 +49,6 @@ nextflow_process {
                 input[1] = Channel.value(
                     file('${projectDir}/modules/local/nextflow_run/prepare_vcf/assets/prep.yml', checkIfExists: true)
                 )
-                // add_config caps process_high at 7 GB so PLINK2_MAKEPGEN fits on a
-                // dev machine (default is 72 GB). Podman is handled by profile forwarding.
-                input[2] = Channel.value(
-                    file('${projectDir}/modules/local/nextflow_run/prepare_vcf/tests/fixtures/child_podman.config', checkIfExists: true)
-                )
                 """
             }
         }

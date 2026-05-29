@@ -64,16 +64,19 @@ with `conf/benchmark.config` once §1a modules are deleted.
 
 ## §1f — Phase 2 candidates from the VCF-preparation refactor
 
-Some preparation logic is being migrated to the upstream `nf-prepare-vcf` pipeline. These
-modules are removal candidates once that refactor is defined and agreed:
+Preparation logic was migrated to the upstream `nf-prepare-vcf` pipeline in Phase 3 (PB2,
+2026-05-29). As of that change **none of these modules are referenced by any prepare-path code**
+— they are confirmed-orphaned and slated for removal in PB4:
 
 - `modules/local/python/filter_and_enhance_vcf_polarsbio`
 - `modules/local/python/fix_zero_PL`
 - `modules/local/combo/filter_and_enhance_vcf`
 
-Do **not** write tests for these modules — they are likely to be removed. Note that
-`combo/filter_and_enhance_vcf` is currently exercised by IT-1 in its `use_dosage=true` path
-(see [integration-tests.md](integration-tests.md) — IT-1 needs revisiting after this refactor).
+Do **not** write tests for these modules — they are being removed. The old IT-1 `use_dosage=true`
+path that used to exercise `combo/filter_and_enhance_vcf` is gone (IT-1/IT-1b were retired in PB3;
+see [integration-tests.md](integration-tests.md)). PB4 should `rg`-check and delete these three
+plus this repo's now-unused prep copies (`bcftools/norm`, `bcftools/annotate`, `vep/annotate`,
+`vep/updatecache`, `bcftools/filter`) iff unreferenced.
 
 ## §1g — Abandoned `tests/` scaffold (delete in T2.5)
 

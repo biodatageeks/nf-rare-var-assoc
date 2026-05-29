@@ -14,13 +14,12 @@ process PREPARE_VCF {
     input:
     tuple val(meta), path(vcf)
     path(params_file)
-    path(add_config)
 
     output:
     tuple val(meta), path("results/bcftools_reheader/*_reheader.vcf.gz"),    emit: prepared_vcf
     tuple val(meta), path("results/bcftools_index/*_reheader.vcf.gz.tbi"),   emit: prepared_vcf_tbi
-    path("results/**/*tracking*.json"),                                        emit: tracking
-    path("results/pipeline_info/nf-prepare-vcf_software_versions.yml"),       emit: versions, optional: true
+    path("results/**/*tracking*.json"),                                      emit: tracking, optional: true
+    path("results/pipeline_info/nf-prepare-vcf_software_versions.yml"),      emit: versions, optional: true
 
     when:
     task.ext.when == null || task.ext.when
@@ -28,12 +27,10 @@ process PREPARE_VCF {
     script:
     def child_pipeline = "${projectDir}/../nf-prepare-vcf/main.nf"
     def profile_arg    = workflow.profile ? "-profile ${workflow.profile}" : ''
-    def add_config_arg = add_config ? "-c ${add_config}" : ''
     """
     nextflow run ${child_pipeline} \\
         ${profile_arg} \\
         -params-file ${params_file} \\
-        ${add_config_arg} \\
         --input_vcf ${vcf} \\
         --outdir results \\
         --cpu_support_avx2 ${params.cpu_support_avx2} \\

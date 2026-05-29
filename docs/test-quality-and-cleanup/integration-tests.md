@@ -20,7 +20,21 @@ Read tracking JSON with `path(workflow.out.tracking[0]).text` and `JsonSlurper`.
 
 ---
 
-## IT-1 — `subworkflows/local/prepare` (full preparation branch)
+## IT-1 / IT-1b — SUPERSEDED by Phase 3 (PB2)
+
+> **Status (2026-05-29): both retired.** Phase 3 / PB2 eliminated the `PREPARE` subworkflow
+> (its REPLACE_SAMPLE_NAMES -> INDEX -> VIEW_AND_FILTER2 body was inlined into
+> `workflows/rare-var-assoc.nf`), so these subworkflow-level tests no longer have a target.
+> Coverage moved:
+> - NORM-split / unique-ID / chr-rename / DS-dosage invariants -> the PB1 wrapper test
+>   `modules/local/nextflow_run/prepare_vcf/tests/main.nf.test`, and ultimately tests migrated
+>   into `../nf-prepare-vcf` (Phase 3 PB5).
+> - sample-name replace + cohort subset + quality filter (VIEW_AND_FILTER2) -> the workflow-level
+>   IT-6 (`skip_preparation=true`) and IT-7 (`skip_preparation=false`).
+> The old `subworkflows/local/prepare/` tree was renamed to `prepare__to_delete/` pending PB5.
+> The historical IT-1/IT-1b spec is kept below for reference only.
+
+### IT-1 (historical) — `subworkflows/local/prepare` (full preparation branch)
 
 - **Test file**: `subworkflows/local/prepare/tests/main.nf.test`
 - **Inputs**: `unprepared_rand_500.vcf.gz` (+ `.tbi`),
@@ -46,7 +60,7 @@ Read tracking JSON with `path(workflow.out.tracking[0]).text` and `JsonSlurper`.
   `samples` count in the final entry equals 3202.
 - **Tag**: `"ci"`.
 
-## IT-1b — `subworkflows/local/prepare` (skip_preparation + skip_reporting branch)
+### IT-1b (historical) — `subworkflows/local/prepare` (skip_preparation + skip_reporting branch)
 
 This branch is the main production path used by `nextflow-gene-assoc-tuner` for parameter
 optimization (see the comment at
@@ -243,15 +257,21 @@ script's docstring.
 
 ## IT-7 — `workflows/rare-var-assoc` — full reporting path
 
+**Status: Done 2026-05-29 (T13).** Test green; preparation now runs via the nested `PREPARE_VCF`
+(Phase 3 PB2), so there is no inline NORM/ANNOTATE/VEP and no `FIX_ZERO_PL`.
+
 - **Test file**: `workflows/tests/full_reporting.nf.test`
 - **Config**: `skip_preparation=false`, `skip_reporting=false`, `use_dosage=false`.
-- **Inputs**: `unprepared_rand_500.vcf.gz` + cases/controls (or phenotype file) committed
-  to `assets/three_chr_unprepared/`.
-- **Assertions**: all IT-6 assertions (including the naive-LOG10P statistical-soundness
-  check — reuses the same `recompute_naive_log10p.py` helper) PLUS
-  - `bcftools view -h <prepared_vcf>` contains `##INFO=<ID=CSQ,`
-  - The expected EDA plot files are emitted under `outdir` (filename check only)
-  - The GWAS HTML report files are emitted under `outdir` (filename check only)
+- **Inputs**: `unprepared_rand_2k.vcf.gz` + `pheno_binary.tsv` + `all_samples.txt` from
+  `assets/three_chr_unprepared/`. (Uses the 2k fixture, not 500 — the 500-variant set was too
+  small for Regenie to produce a stable top-5 gene ranking for the naive-LOG10P check.)
+- **Assertions** (as implemented): all IT-6 assertions (including the naive-LOG10P
+  statistical-soundness check — reuses the same `recompute_naive_log10p.py` helper, now passed
+  `--vcf-tbi` so pysam can colocate the index) PLUS
+  - the prepared/`vep_annotated_vcf` header contains `##INFO=<ID=CSQ,`
+  - EDA plots are emitted (checked via the `eda_plots_out` emit, `size() > 0` — equivalent smoke
+    check to the outdir-filename check, per the reporting carve-out)
+  - GWAS HTML report files are emitted under `outdir/rscript_manhattan_qq_plots/` (filename check)
 - **Tag**: `"full"`. This is the slowest test; nightly only.
 
 ---
@@ -350,28 +370,10 @@ Key decisions / deviations from the original spec:
 
 ### T13 — Implement IT-7 (full workflow, reporting path)
 
-**Status: BLOCKED on Phase 3 (2026-05-28).** The test file, config, and helper are written
-(`workflows/tests/full_reporting.nf.test` + `full_reporting.config`, reusing the IT-6
-`recompute_naive_log10p.py`) and the workflow exposes the `vep_annotated_vcf` /
-`eda_plots_out` test-support emits. But the run fails inside `FIX_ZERO_PL`:
-
-```
-RARE_VAR_ASSOC:FIX_ZERO_PL  ->  comp_ds_htslib panicked at src/main.rs:121:41:
-index out of bounds: the len is 2 but the index is 2   (exit 101)
-```
-
-This is a real bug in the `comp_ds_htslib` Rust binary (container `bioinf_combo:1.1.1`),
-which only runs on the `!skip_reporting && !use_dosage` branch — exactly the IT-7 path. It is
-NOT a test bug. The fix is the Phase-3 refactor: replace the in-pipeline preparation code
-(the `skip_preparation=false` path, including `FIX_ZERO_PL`) with a single delegation to the
-sibling `nf-prepare-vcf` pipeline, whose `CALC_DOSAGE_POLARSBIO` step (polars-bio in
-`python_tools:1.0.11`) supersedes `comp_ds_htslib`. See
-[phase3-prepare-refactor.md](phase3-prepare-refactor.md).
-
-Phase 3 runs between T12 and T13. After it lands, finish T13:
-- **Test file**: `workflows/tests/full_reporting.nf.test` (already drafted; revisit the
-  fixture choice — currently `unprepared_rand_2k.vcf.gz` — and assertions against the new
-  prep wiring).
-- **Tag**: `"full"` (slow).
-- **Verify**: `nf-test test --profile podman workflows/tests/full_reporting.nf.test`.
-- **Done-when**: passes. Document expected wall-clock at the top of the test file.
+**Status: DONE 2026-05-29.** Unblocked by Phase 3 PB2 (the `skip_preparation=false` path now
+delegates to the nested `PREPARE_VCF` / `nf-prepare-vcf` run, so the broken `FIX_ZERO_PL`
+`comp_ds_htslib` step — which panicked `index out of bounds` on `bioinf_combo:1.1.1` — is gone;
+dosage is computed upstream by `CALC_DOSAGE_POLARSBIO`). The full spec and as-built assertions are
+in the **## IT-7** section above; the test passes against `unprepared_rand_2k.vcf.gz`.
+- **Test file**: `workflows/tests/full_reporting.nf.test`. **Tag**: `"full"` (slow; nightly only).
+- **Verify**: `nf-test test --profile podman workflows/tests/full_reporting.nf.test` (green).

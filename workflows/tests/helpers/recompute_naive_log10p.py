@@ -53,6 +53,7 @@ def parse_args():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--regenie", required=True, help="regenie step-2 / merged output")
     p.add_argument("--vcf", required=True, help="CSQ-annotated input VCF (indexed)")
+    p.add_argument("--vcf-tbi", required=False, default=None, help="index for the input VCF")
     p.add_argument("--setlist", required=True, help="gene\\tchrom\\tpos\\tvar1,var2,...")
     p.add_argument("--annotations", required=True, help="variant_id\\tgene\\tconsequence")
     p.add_argument("--masks", required=True, help="mask_name\\tconseq1,conseq2,...")
@@ -214,6 +215,10 @@ def main():
 
     top = sorted(regenie.items(), key=lambda kv: kv[1][0], reverse=True)[:a.top_n]
 
+    if a.vcf_tbi is not None and a.vcf_tbi != f"{a.vcf}.tbi":
+        import shutil
+        shutil.copy(a.vcf_tbi, f"{a.vcf}.tbi")
+    
     vcf = pysam.VariantFile(a.vcf)
 
     rows = []

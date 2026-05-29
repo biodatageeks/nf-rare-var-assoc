@@ -9,8 +9,10 @@ nextflow_workflow {
     tag "workflows/rare_var_assoc"
 
     // IT-7: the full pipeline end-to-end (skip_preparation=false, skip_reporting=false,
-    // use_dosage=false). Runs NORM -> ANNOTATE -> VEP -> quality filters -> plink2 ->
-    // Regenie step1/step2 -> REPORTING (Manhattan/QQ HTML + EDA plots).
+    // use_dosage=false). VCF preparation (sort/norm/annotate/VEP/dosage) is delegated to a
+    // nested nf-prepare-vcf run via the PREPARE_VCF process; this repo then does sample-name
+    // replace -> quality filters (VIEW_AND_FILTER2) -> plink2 -> Regenie step1/step2 ->
+    // REPORTING (Manhattan/QQ HTML + EDA plots).
     //
     // Reuses the same naive-LOG10P statistical-soundness helper as IT-6 but runs against
     // the 500-variant unprepared fixture (3 chr, 3202 samples). If the fixture turns out
@@ -55,6 +57,7 @@ nextflow_workflow {
 
             // ---- VEP annotation: CSQ in header ----
             def vep_vcf_path = workflow.out.vep_annotated_vcf[0][1]
+            def vep_vcf_tbi_path = workflow.out.vep_annotated_vcf_tbi[0][1]
             def vep_header = ["bash", "-c", "zcat ${vep_vcf_path}"].execute().text
                 .split('\n').findAll { it.startsWith('#') }
             assert vep_header.any { it.contains('##INFO=<ID=CSQ,') } :
@@ -119,6 +122,7 @@ nextflow_workflow {
                 'python3', helper.toString(),
                 '--regenie', regenie.toString(),
                 '--vcf', vep_vcf_path.toString(),
+                '--vcf-tbi', vep_vcf_tbi_path.toString(),
                 '--setlist', setlist.toString(),
                 '--annotations', annotations.toString(),
                 '--masks', "${projectDir}/assets/default.masks",

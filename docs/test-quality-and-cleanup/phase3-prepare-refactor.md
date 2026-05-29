@@ -174,9 +174,9 @@ FILTER_AND_ENHANCE_VCF (and the local INDEX_2).
   `nf-prepare-vcf` run done out-of-band).
 - **D3 — Quality filtering home.** `NF_PREPARE_VCF` does **no** QUAL/GQ/DP filtering;
   `BCFTOOLS_VIEW_AND_FILTER2` is the single quality gate for both branches, applying the
-  seven `filter_and_enhance_vcf_*` thresholds (IT-1b proves this) and replacing
-  `BCFTOOLS_FILTER_1/2` + `FILTER_AND_ENHANCE_VCF`. (Confirm the thresholds are the intended
-  gate for the full path.)
+  seven `filter_and_enhance_vcf_*` thresholds and replacing `BCFTOOLS_FILTER_1/2` +
+  `FILTER_AND_ENHANCE_VCF`. (The threshold wiring was originally proven by the retired IT-1b;
+  it is now exercised by the workflow-level IT-6/IT-7.)
 - **D4 — EDA input.** CONFIRMED 2026-05-28: EDA runs on **pre-quality-filter** data — i.e.
   the `NF_PREPARE_VCF` output (CSQ + DS present), before `VIEW_AND_FILTER2`.
 - **D5 — Run all of NF_PREPARE_VCF.** CONFIRMED 2026-05-28: do **not** add a `skip_downstream`
@@ -238,46 +238,84 @@ FILTER_AND_ENHANCE_VCF (and the local INDEX_2).
 
 ### PB2 — Wire `PREPARE_VCF` in; remove the old prep code
 
-Identical to Option-A **P3c** below, except the include is the local `PREPARE_VCF` process, not a
-cross-repo `NF_PREPARE_VCF` workflow.
+**Status: Done 2026-05-29.** Implemented with a structural change vs. the original sketch: the
+`PREPARE` subworkflow was **eliminated** rather than kept as a thin shared body. Its three
+remaining steps (REPLACE_SAMPLE_NAMES -> INDEX -> VIEW_AND_FILTER2) are now **inlined directly**
+into `workflows/rare-var-assoc.nf`, which is simpler than a one-call wrapper subworkflow.
+
+As built:
 - **File**: `workflows/rare-var-assoc.nf`.
-  - `include { PREPARE_VCF } from '../modules/local/nextflow_run/prepare_vcf'`.
-  - **Remove** includes + call sites + guards for VEP_UPDATECACHE, FIX_ZERO_PL, BCFTOOLS_FILTER_1,
-    BCFTOOLS_FILTER_2, VEP_ANNOTATE, BCFTOOLS_INDEX_3 (and now-dead `trackingFirstOrEmpty` /
-    `trackingLastOrEmpty` uses tied to them).
-  - New flow (D2 — prep at the front): for `skip_preparation=false`, run `PREPARE_VCF(ch_input_vcf)`
-    first, then feed its `prepared_vcf` / `prepared_vcf_tbi` into PREPARE (REPLACE_SAMPLE_NAMES ->
-    INDEX_1 -> VIEW_AND_FILTER2). For `skip_preparation=true`, feed `ch_input_vcf` straight into
-    PREPARE. Both converge into the existing `ch_vep_vcf_with_index` consumed by VCF2FRQ / VCF2PSAM
-    / MAKEPGEN_1.
-  - Reconcile `use_dosage`: the prepared VCF always carries `DS` now; keep the downstream
-    `if (params.use_dosage)` EXPORT/IMPORT block, drop the dosage-compute branch in EDA setup.
-  - Per D4, point EDA at the `PREPARE_VCF` output (pre-VIEW_AND_FILTER2); re-point the
-    `vep_annotated_vcf` test emit at the prepared VCF.
-- **File**: `subworkflows/local/prepare/main.nf` — keep REPLACE_SAMPLE_NAMES, INDEX_1,
-  VIEW_AND_FILTER2 as the single shared body for both branches; drop VIEW_1 / NORM / ANNOTATE /
-  FILTER_AND_ENHANCE_VCF (+ local INDEX_2). The `PREPARE_VCF` call lives in the **outer** workflow.
-- **Tracking continuity**: thread `PREPARE_VCF.out.tracking` into this repo's `ch_tracking` so the
-  Sankey report stays non-empty (IT-6/IT-7 assert it).
-- **Verify**: a manual `skip_preparation=false, skip_reporting=false, use_dosage=false` run on a
-  small fixture completes through Regenie with no `FIX_ZERO_PL`.
-- **Done-when**: full path runs end to end; `rg -n 'FIX_ZERO_PL|BCFTOOLS_FILTER_[12]\b' workflows/`
-  is empty.
+  - `include { PREPARE_VCF } from '../modules/local/nextflow_run/prepare_vcf'`; also inlined
+    `BCFTOOLS_REPLACE_SAMPLE_NAMES`, `BCFTOOLS_INDEX`, `BCFTOOLS_VIEW_AND_FILTER2` includes.
+  - **Removed** includes + call sites + guards for VEP_UPDATECACHE, FIX_ZERO_PL, BCFTOOLS_FILTER_1,
+    BCFTOOLS_FILTER_2, VEP_ANNOTATE, BCFTOOLS_INDEX_2/_3, and the `PREPARE` subworkflow import.
+  - Flow (D2 — prep at the front): `if (skip_preparation==false)` runs `PREPARE_VCF(ch_input_vcf,
+    ch_prep_params_file)` and feeds its `prepared_vcf` into REPLACE_SAMPLE_NAMES; else feeds
+    `ch_input_vcf` straight in. Both converge through INDEX -> VIEW_AND_FILTER2 into
+    `ch_filtered_vcf_with_index` (renamed from `ch_vep_vcf_with_index`) consumed by VCF2FRQ /
+    VCF2PSAM / MAKEPGEN_1 / VIEW_2 / VCFTOAAF / EXPORT_OTHER.
+  - `use_dosage`: prepared VCF always carries `DS` (child computes it; on `skip_preparation=true`
+    the manual upstream `nf-prepare-vcf` run already did — D4/item 5). Kept the downstream
+    `if (use_dosage)` EXPORT/IMPORT block; dropped the dosage-compute branch.
+  - Per D4, EDA runs on `ch_vcf_with_sample_names_corrected` (post-reheader + sample-rename,
+    pre-VIEW_AND_FILTER2). `vep_annotated_vcf` test emit re-pointed at that VCF; added a
+    `vep_annotated_vcf_tbi` emit so IT-7's naive-LOG10P helper can colocate the index.
+- **Child params file**: `conf/nf_prepare_params.yml` (`skip_ld_report: true`,
+  `publish_intermediate: false`). `publish_intermediate: false` is safe — the child's
+  BCFTOOLS_REHEADER + BCFTOOLS_INDEX publish unconditionally (no `enabled:` guard), so the
+  `prepared_vcf`/`tbi` globs always resolve; only the NORM/MAKEPGEN tracking JSONs are suppressed,
+  so the wrapper's `tracking` output is now `optional: true`. (The PB1 module test keeps its own
+  `assets/prep.yml` at `publish_intermediate: true` so its NORM-tracking assertions still hold.)
+- **Tracking continuity**: `PREPARE_VCF.out.tracking` is threaded into `ch_tracking`, but is empty
+  under `publish_intermediate: false`; the Sankey stays non-empty from VIEW_AND_FILTER2 onward
+  (IT-6/IT-7 assert the report exists, not its node set). Child prep steps therefore do **not**
+  appear in the production Sankey — acceptable; set `publish_intermediate: true` in the conf file
+  if they are ever wanted.
+- **Resourcing**: the deleted dev-only `child_podman.config` (7 GB cap) is replaced by forwarding
+  the `low_resources` profile to the child via `workflow.profile`; `nf-test.config` now sets
+  `profile "podman,low_resources"`.
+- **Verified**: green — `nf-test test workflows/tests/skip_prep_skip_reporting.nf.test` (IT-6),
+  `workflows/tests/full_reporting.nf.test` (IT-7), and
+  `modules/local/nextflow_run/prepare_vcf/tests/main.nf.test` (PB1).
+- **Done-when**: met. `rg -n 'FIX_ZERO_PL|BCFTOOLS_FILTER_[12]\b' workflows/` is empty.
 
-### PB3 — Rework IT-1 / IT-1b for the new PREPARE shape
+### PB3 — Drop subworkflow-level IT-1 / IT-1b (PREPARE subworkflow eliminated)
 
-Same scope as Option-A **P3d**. The NORM-split / unique-ID / chr-rename invariants now belong to
-the child `nf-prepare-vcf` run, not PREPARE:
-- Move those invariant assertions to a wrapper-level test on `PREPARE_VCF` (or a thin
-  `NF_PREPARE_VCF` test).
-- Shrink IT-1 to what PREPARE still does (sample-name replace + subset + quality filter), or fold
-  it into IT-1b if both branches now share the same PREPARE body.
-- Re-run IT-1b (`skip_preparation=true`); it exercises VIEW_AND_FILTER2 and should be largely
-  unchanged.
-- Update the IT-1 / IT-1b descriptions in [integration-tests.md](integration-tests.md) and the
-  §1f note in [dead-code.md](dead-code.md) (FILTER_AND_ENHANCE_VCF is no longer exercised by IT-1).
-- **Done-when**: prepare-subworkflow tests pass against the new shape; no test still asserts
+**Status: Done 2026-05-29.** Docs updated (integration-tests.md IT-1/IT-1b marked superseded;
+dead-code.md §1f updated). The retired test files still live under `prepare__to_delete/` for PB5
+migration; to keep them from running and failing against the now-thin PREPARE body, they are
+excluded via `ignore "subworkflows/local/prepare__to_delete/**"` in `nf-test.config`
+(`nf-test list` confirms only the PB1 wrapper test remains under "prepare").
+
+PB2 removed the `PREPARE` subworkflow, so its subworkflow-level tests (IT-1 full-prep branch,
+IT-1b skip-prep branch) no longer have a target. The invariants they checked are now covered
+elsewhere:
+- NORM-split / unique-ID / chr-rename / DS-dosage invariants -> the **PB1 wrapper test**
+  (`modules/local/nextflow_run/prepare_vcf/tests/main.nf.test`) and, ultimately, tests in
+  `../nf-prepare-vcf` (PB5).
+- sample-name replace + cohort subset + quality-filter (VIEW_AND_FILTER2) -> exercised by the
+  **workflow-level** IT-6 (`skip_preparation=true`) and IT-7 (`skip_preparation=false`).
+- The old `subworkflows/local/prepare/` tree was renamed to `subworkflows/local/prepare__to_delete/`
+  and is deleted in PB5 (its test logic is being migrated upstream, not discarded).
+
+Tasks:
+- Update the IT-1 / IT-1b sections in [integration-tests.md](integration-tests.md) to mark them
+  superseded (subworkflow gone; coverage moved to PB1 wrapper test + IT-6/IT-7).
+- Update the §1f note in [dead-code.md](dead-code.md): FILTER_AND_ENHANCE_VCF is no longer
+  referenced by any prepare-path code.
+- **Done-when**: no doc still describes IT-1/IT-1b as live subworkflow tests; no test asserts
   behavior that moved to `nf-prepare-vcf`.
+
+### PB5 — Migrate `prepare__to_delete/tests` upstream, then delete the dir
+
+The renamed `subworkflows/local/prepare__to_delete/` dir is kept **only** to preserve its test
+fixtures and assertions (`tests/main.nf.test`, `tests/skip_prep_skip_reporting.nf.test`,
+`tests/fixtures/`) for reuse — the NORM/ANNOTATE/VEP invariants they encode belong to
+`../nf-prepare-vcf`, which currently lacks equivalent integration coverage.
+- Port the still-relevant assertions/fixtures into a `nf-prepare-vcf` integration test
+  (sibling repo; the AI does not commit there — hand back the edits).
+- Then delete `subworkflows/local/prepare__to_delete/` entirely (coordinate with T14).
+- **Done-when**: the dir is gone; equivalent coverage lives in `../nf-prepare-vcf`.
 
 ### PB4 — Delete prep modules orphaned by the refactor
 
