@@ -1,2 +1,0 @@
-##INFO=<ID=SGB,Number=1,Type=Float,Description="Segregation based metric.">
-##INFO=<ID=MQ0F,Number=1,Type=Float,Description="Fraction of MQ0 reads (smaller is better)">

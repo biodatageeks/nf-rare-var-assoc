@@ -242,8 +242,8 @@ command, done-when). Conventions in §0 are assumed throughout.
 | &nbsp;&nbsp;PB3 — Drop subworkflow-level IT-1 / IT-1b (PREPARE subworkflow eliminated) | ✅ Done 2026-05-29 | [phase3-prepare-refactor.md](test-quality-and-cleanup/phase3-prepare-refactor.md) |
 | T13 — Implement IT-7 (workflow, reporting path) — moved ahead of PB4/PB5 on 2026-05-29 | ✅ Done 2026-05-29 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
 | &nbsp;&nbsp;PB5 — Migrate `prepare__to_delete/tests` into `../nf-prepare-vcf`, then delete the dir (done before PB4) | ✅ Done 2026-05-29 | [phase3-prepare-refactor.md](test-quality-and-cleanup/phase3-prepare-refactor.md) |
-| &nbsp;&nbsp;PB4 — Delete prep modules orphaned by the refactor | pending | [phase3-prepare-refactor.md](test-quality-and-cleanup/phase3-prepare-refactor.md) |
-| T14 — Phase 2 dead-code removal | pending | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
+| &nbsp;&nbsp;PB4 — Delete prep modules orphaned by the refactor | ✅ Done 2026-05-29 | [phase3-prepare-refactor.md](test-quality-and-cleanup/phase3-prepare-refactor.md) |
+| T14 — Phase 2 dead-code removal | ✅ Done 2026-05-29 | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
 | T15 — Update `nextflow_schema.json` | pending | [schema-and-config.md](test-quality-and-cleanup/schema-and-config.md) |
 | T16 — Remove nf-core template comments | pending | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
 | T17 — Set up GitHub Actions CI (run `--tag ci` tests) + update `README.md` | pending | [ci-and-readme.md](test-quality-and-cleanup/ci-and-readme.md) |

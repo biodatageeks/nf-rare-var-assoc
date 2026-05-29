@@ -337,16 +337,18 @@ Tasks:
 
 ### PB4 — Delete prep modules orphaned by the refactor
 
-Same scope as Option-A **P3e** (under Option B nothing was imported from the sibling, so all of
-this repo's now-unused prep copies can go once ref-checked). After PB2, `rg`-check and remove,
-coordinating with T14:
+**Status: Done 2026-05-29.** `rg` confirmed zero `include`/`from` references to all candidate
+modules. Removed (coordinated with T14):
 - `modules/local/python/fix_zero_PL`
 - `modules/local/combo/filter_and_enhance_vcf`
-- `modules/local/python/filter_and_enhance_vcf_polarsbio` (already a §1f candidate)
-- this repo's now-unused prep copies **iff** unreferenced: `bcftools/norm`, `bcftools/annotate`,
-  `vep/annotate`, `vep/updatecache`, `bcftools/filter` (grep first — some may have only tests).
-- **Verify**: `nf-test test --profile podman --tag ci` green; `rg` finds no dangling imports.
-- **Done-when**: orphaned prep modules gone, CI green. Then proceed to T13.
+- `modules/local/python/filter_and_enhance_vcf_polarsbio`
+- `modules/local/bcftools/norm`, `modules/local/bcftools/annotate`, `modules/local/bcftools/filter`
+- `modules/local/vep/` (entire dir — both `annotate` and `updatecache` orphaned)
+- Removed 3 dead params from `nextflow.config` (lines 45-47):
+  `filter_and_enhance_vcf_calc_ds_min_gq`, `view_and_filter2_polarsbio_script`,
+  `filter_and_enhance_vcf_polarsbio_script`.
+- `modules/local/combo/` and `modules/local/vcftools/` became empty after combined PB4+T14
+  deletions and were removed too.
 
 ---
 

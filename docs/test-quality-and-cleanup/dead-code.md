@@ -130,22 +130,9 @@ next to each `.nf.test`, pointing at the canonical `assets/three_chr_unprepared/
 
 ### T14 — Phase 2 dead-code removal
 
-- **Prerequisite**: all tests in T3..T13 pass.
-- **Action**: `git rm -r` every `*__to_delete*` path:
-  - `modules/local/bcftools/{assign_annotations/main_shell__to_delete.nf, filter_qual_dp__to_delete, tag2tag__to_delete, vcf2aaf__to_delete}`
-  - `modules/local/bgenix__to_delete`
-  - `modules/local/cmds/download_file__to_delete`
-  - `modules/local/combo/{filter2__to_delete, prepare__to_delete}`
-  - `modules/local/plink19/makebed__to_delete`
-  - `modules/local/plink2/export_bgen__to_delete`
-  - `modules/local/python/view_and_filter2_polarsbio__to_delete`
-  - `modules/local/qctool__to_delete`
-  - `modules/local/rscript/{assign_annotations__to_delete, vcf2aaf__to_delete}`
-  - `modules/local/vcftools/filter_qual_dp__to_delete`
-  - `workflows/benchmark_implementations.nf`, `conf/benchmark.config`
-- **Verify**: `nf-test test --profile podman --tag ci` still passes;
-  `find . -name '*__to_delete*'` returns empty.
-- **Done-when**: no `__to_delete` paths remain; all CI tests still pass.
+**Status: Done 2026-05-29** (coordinated with PB4). All `__to_delete` paths removed plus orphaned
+prep modules from PB4 (see phase3-prepare-refactor.md §PB4).
+`find . -name '*__to_delete*'` returns empty; 3 dead params removed from `nextflow.config`.
 
 ### T16 — Remove nf-core template comments
 
