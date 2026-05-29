@@ -201,15 +201,24 @@ FILTER_AND_ENHANCE_VCF (and the local INDEX_2).
 
 ### PB1 — Build the `PREPARE_VCF` wrapper process (child `nextflow run` + glob outputs)
 
-**Status: Done (pending user verification run)**
+**Status: Done **
 
 - **Module**: `modules/local/nextflow_run/prepare_vcf/main.nf` (process `PREPARE_VCF`).
   Input: `tuple val(meta), path(vcf)` — no tbi (child starts with BCFTOOLS_SORT which
   does not need a pre-built index).
 - **Test**: `modules/local/nextflow_run/prepare_vcf/tests/main.nf.test` (tag "full").
-  Verifies DS FORMAT + CSQ INFO in header, 3202 samples preserved, unique IDs from
-  BCFTOOLS_ANNOTATE, record count >= 500, and NORM tracking counts.
-  Requires `tests/fixtures/child_podman.config` passed as add_config to the child run.
+  Verifies, per child-pipeline step: DS FORMAT + CSQ INFO header lines (CSQ Format
+  field order checked, since downstream parses by position); 3202 samples preserved;
+  chr-prefix stripped + CHROM in {12,22,X} (ANNOTATE rename_chr); every record biallelic
+  (NORM -m -any), with spanning-deletion star alleles (ALT='*') present as expected;
+  ID == CHROM_POS_REF_ALT and globally unique (ANNOTATE set-id); non-empty CSQ on every
+  non-star record (VEP); and **dosage correctness recomputed from the spec** — DS
+  reconstructed from each genotype's PL (10^(-PL/10), normalized, P(het)+2*P(hom_alt)),
+  asserting mean |DS-spec| < 1e-3 and >0.01-violation fraction < 5e-4 (only the PL=255
+  saturation tail deviates; ~17/1.54M on the fixture). Plus a DP-plausibility check
+  (DP>20 -> round(DS)==GT >= 99.9%; intermediate dosages from shallower calls) and a
+  record-count cross-check against NORM tracking (inputs 500 / 3202 samples; output count
+  == NORM outputs.variants). Requires `tests/fixtures/child_podman.config` as add_config.
 - **Per-child params**: `modules/local/nextflow_run/prepare_vcf/assets/prep.yml`:
   - `skip_ld_report: true` — saves wall-clock; LD report unused by this repo.
   - `publish_intermediate: true` — required so BCFTOOLS_NORM and PLINK2_MAKEPGEN publish

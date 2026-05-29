@@ -65,14 +65,22 @@ nextflow_process {
             def vcf_path = process.out.prepared_vcf[0][1]
             def vcf_lines = ["bash", "-c", "zcat ${vcf_path}"].execute().text.split('\n') as List
 
+            // === Header invariants =================================================
+
             // DS FORMAT: added by BCFTOOLS_REHEADER after CALC_DOSAGE_POLARSBIO ran.
             // Absence means either REHEADER was skipped or CALC_DOSAGE_POLARSBIO failed.
             assert vcf_lines.any { it.startsWith('##FORMAT=<ID=DS') } :
                 "output VCF must have ##FORMAT=<ID=DS,...> header line (added by BCFTOOLS_REHEADER)"
 
-            // CSQ INFO: added by VEP_ANNOTATE. Absence means VEP did not annotate.
-            assert vcf_lines.any { it.startsWith('##INFO=<ID=CSQ') } :
+            // CSQ INFO: added by VEP_ANNOTATE. The downstream BCFTOOLS_ASSIGN_ANNOTATIONS
+            // step parses CSQ by field *position*, so the Format field order is a contract,
+            // not just decoration. Assert the leading fields it depends on are present and
+            // in the expected order.
+            def csq_header = vcf_lines.find { it.startsWith('##INFO=<ID=CSQ') }
+            assert csq_header != null :
                 "output VCF must have ##INFO=<ID=CSQ,...> header line (added by VEP_ANNOTATE)"
+            assert csq_header.contains('Format: Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE') :
+                "CSQ header Format must begin with the field order downstream parsing relies on; got: ${csq_header}"
 
             // Sample-count invariant: all 3202 input samples must be preserved.
             def header_line = vcf_lines.find { it.startsWith('#CHROM') }
@@ -81,25 +89,186 @@ nextflow_process {
             assert sample_count == 3202 :
                 "expected 3202 samples in output VCF, got ${sample_count}"
 
+            // === Per-record body invariants ========================================
+            // Split each row but cap at 11 fields so we keep CHROM..sample1 (indices
+            // 0-9) without splitting all 3202 sample columns (index 10 = the rest).
+            // Columns: 0=CHROM 1=POS 2=ID 3=REF 4=ALT 5=QUAL 6=FILTER 7=INFO 8=FORMAT 9=sample1
+            def data_lines = vcf_lines.findAll { it && !it.startsWith('#') }
+            def rows = data_lines.collect { it.split('\t', 11) }
+
             // Record-count invariant: BCFTOOLS_NORM -m -any splits multiallelics (35
             // multiallelic sites in the fixture), so post-NORM count is >= 500.
-            def data_lines = vcf_lines.findAll { it && !it.startsWith('#') }
-            assert data_lines.size() >= 500 :
-                "expected at least 500 variant records after normalization, got ${data_lines.size()}"
+            assert rows.size() >= 500 :
+                "expected at least 500 variant records after normalization, got ${rows.size()}"
 
-            // Unique-ID invariant: BCFTOOLS_ANNOTATE sets each ID to CHROM_POS_REF_ALT.
-            // Duplicate IDs would indicate the --rm-dup or ID-assignment step failed.
-            def ids = data_lines.collect { it.split('\t')[2] }
+            // (1) Chromosome rename (BCFTOOLS_ANNOTATE + rename_chr.txt): the "chr" prefix
+            //     must be stripped, and the fixture only spans chr12/chr22/chrX -> {12,22,X}.
+            def chroms = rows.collect { it[0] }.toSet()
+            assert chroms.every { !it.startsWith('chr') } :
+                "all CHROM values must have the 'chr' prefix stripped (rename_chr.txt); got ${chroms}"
+            assert chroms.every { it in ['12', '22', 'X'] } :
+                "CHROM values must be a subset of the fixture's {12,22,X}; got ${chroms}"
+            assert chroms.size() >= 2 :
+                "expected multiple chromosomes carried through preparation; got ${chroms}"
+
+            // (2) Multiallelic split (BCFTOOLS_NORM -m -any): every record must be biallelic.
+            def multiallelic = rows.findAll { it[4].contains(',') }
+            assert multiallelic.isEmpty() :
+                "no record may carry a multiallelic ALT after NORM -m -any; offending: ${multiallelic.take(3).collect { it[2] }}"
+
+            // (3) ID assignment (BCFTOOLS_ANNOTATE --set-id %CHROM_%POS_%REF_%ALT): each ID
+            //     must reconstruct exactly from this record's own CHROM/POS/REF/ALT.
+            def bad_ids = rows.findAll { it[2] != "${it[0]}_${it[1]}_${it[3]}_${it[4]}".toString() }
+            assert bad_ids.isEmpty() :
+                "every ID must equal CHROM_POS_REF_ALT; offending (id vs expected): " +
+                "${bad_ids.take(3).collect { [it[2], "${it[0]}_${it[1]}_${it[3]}_${it[4]}"] }}"
+            def ids = rows.collect { it[2] }
             assert ids.toSet().size() == ids.size() :
-                "variant IDs in output VCF must all be unique (set by BCFTOOLS_ANNOTATE)"
-            assert ids.every { it != '.' } :
-                "no variant ID should be missing (.) in output VCF after BCFTOOLS_ANNOTATE"
+                "variant IDs must all be unique after --rm-dup + set-id (duplicates break plink write-snplist)"
+
+            // (4) VEP annotation: every *annotatable* record must carry a non-empty CSQ
+            //     value. Spanning-deletion star alleles (ALT='*'), which NORM -m -any emits
+            //     when splitting a multiallelic site that overlaps an upstream deletion,
+            //     are not annotatable by VEP and legitimately have no CSQ -- exclude them.
+            def star_rows = rows.findAll { it[4] == '*' }
+            def missing_csq = rows.findAll { row ->
+                if (row[4] == '*') return false
+                def csq = row[7].split(';').find { it.startsWith('CSQ=') }
+                csq == null || csq.substring(4).trim().isEmpty()
+            }
+            assert missing_csq.isEmpty() :
+                "every non-star (ALT!='*') record must carry a non-empty CSQ= INFO field; " +
+                "offending: ${missing_csq.take(3).collect { it[2] }}"
+            // And the split genuinely produced star alleles, proving NORM handled
+            // deletion-overlapping multiallelics (33 such records on the fixture).
+            assert !star_rows.isEmpty() :
+                "expected some spanning-deletion star alleles (ALT='*') from NORM -m -any splitting"
+
+            // (5) Dosage correctness (CALC_DOSAGE_POLARSBIO + BCFTOOLS_REHEADER).
+            //     First, DS must be the last FORMAT key on every record.
+            def bad_format = rows.findAll { it[8].split(':').last() != 'DS' }
+            assert bad_format.isEmpty() :
+                "every record's FORMAT must end with the DS key; offending: ${bad_format.take(3).collect { [it[2], it[8]] }}"
+
+            // The substantive correctness check: DS must equal the genotype dosage
+            // defined by the SPEC, recomputed independently of the CALC_DOSAGE
+            // implementation. Spec: convert each PL (Phred-scaled) to a likelihood
+            // L_g = 10^(-PL_g/10), normalise across the genotypes, then
+            //   DS = P(het) + 2 * P(hom_alt).
+            // Diploid PL has 3 entries [ref,het,alt]; haploid (male chrX) PL has 2
+            // [ref,alt] and DS = P(alt). We recompute DS from every genotype's own PL
+            // and require it to match the written value. Agreement is essentially exact
+            // (mean |diff| ~1.5e-6 on the fixture). The only deviations are PL-saturation
+            // artifacts: a handful of extreme-LowQual calls whose PLs all sit near the 255
+            // cap, where the dosage of a fully-saturated likelihood is implementation-
+            // defined (17 of ~1.54M genotypes, all at one site). So we assert a negligible
+            // mean deviation plus a violation fraction far below anything a real systematic
+            // dosage bug would produce -- NOT zero, which the saturation tail would break.
+            //
+            // Alongside the spec check, a biological-plausibility check: dosage must
+            // track read depth. Deep calls (DP > 20) collapse onto the integer GT dosage
+            // almost perfectly, and the rare intermediate dosages come from shallow calls.
+            // DP separates these far better than GQ -- on this fixture DP>20 match-rate is
+            // 0.99999 and intermediate-DS mean DP 8.4 vs clean-integer mean DP 32.9.
+            def specDs = { plInts ->
+                def ls = plInts.collect { Math.pow(10.0, -(it as double) / 10.0) }
+                double tot = ls.sum() as double
+                if (tot <= 0) return null
+                if (plInts.size() == 3) return (ls[1] + 2.0 * ls[2]) / tot
+                if (plInts.size() == 2) return ls[1] / tot
+                return null
+            }
+            int dsChecked = 0, specViolations = 0
+            double specDiffSum = 0.0, specMaxDiff = 0.0
+            def specExamples = []
+            int hiDpTotal = 0, hiDpMatch = 0
+            int inBetween = 0
+            double inBetweenDpSum = 0.0
+            int cleanInteger = 0
+            double cleanIntegerDpSum = 0.0
+            data_lines.each { line ->
+                def cols = line.split('\t')
+                def keys = cols[8].split(':') as List
+                int gtIdx = keys.indexOf('GT')
+                int dpIdx = keys.indexOf('DP')
+                int dsIdx = keys.indexOf('DS')
+                int plIdx = keys.indexOf('PL')
+                if (dsIdx < 0 || plIdx < 0) return
+                for (int s = 9; s < cols.size(); s++) {
+                    def sv = cols[s].split(':')
+                    if (sv.size() <= Math.max(dsIdx, plIdx)) continue
+                    if (!sv[dsIdx].isNumber()) continue        // DS only emitted for usable calls
+                    double ds = sv[dsIdx] as double
+
+                    // ---- spec recomputation from this genotype's own PL ----
+                    def plParts = sv[plIdx].split(',')
+                    if (plParts.every { it.isInteger() } && (plParts.size() in [2, 3])) {
+                        def plInts = plParts.collect { it.toInteger() }
+                        def expected = specDs(plInts)
+                        if (expected != null) {
+                            dsChecked++
+                            double diff = Math.abs(ds - (expected as double))
+                            specDiffSum += diff
+                            if (diff > specMaxDiff) specMaxDiff = diff
+                            if (diff > 0.01) {
+                                specViolations++
+                                if (specExamples.size() < 5)
+                                    specExamples << [pos: "${cols[0]}:${cols[1]}", pl: sv[plIdx], actual: ds, spec: expected]
+                            }
+                        }
+                    }
+
+                    // ---- DP-vs-dosage plausibility ----
+                    if (gtIdx >= 0 && dpIdx >= 0 && dpIdx < sv.size() && sv[dpIdx].isNumber()) {
+                        double dp = sv[dpIdx] as double
+                        def gt = sv[gtIdx]
+                        if (!gt.contains('.')) {                // skip missing genotypes
+                            def alleles = gt.split('[/|]')      // post-split records are biallelic
+                            if (alleles.every { it.isInteger() } && dp > 20) {
+                                hiDpTotal++
+                                if (Math.round(ds) == (long) alleles.collect { it.toInteger() }.sum()) hiDpMatch++
+                            }
+                        }
+                        if (Math.abs(ds - Math.round(ds)) <= 0.1) { cleanInteger++; cleanIntegerDpSum += dp }
+                        if ((ds >= 0.2 && ds <= 0.8) || (ds >= 1.2 && ds <= 1.8)) { inBetween++; inBetweenDpSum += dp }
+                    }
+                }
+            }
+
+            // Spec correctness: DS reproduces the spec dosage for essentially every genotype.
+            assert dsChecked > 100000 :
+                "expected to spec-check a large number of DS values, only checked ${dsChecked}"
+            double specMeanDiff = specDiffSum / dsChecked
+            double specViolFrac = specViolations / (double) dsChecked
+            assert specMeanDiff < 1e-3 :
+                "mean |DS - spec| must be negligible; got ${specMeanDiff} over ${dsChecked} genotypes"
+            assert specViolFrac < 0.0005 :
+                "fraction of genotypes where |DS - spec| > 0.01 must be tiny (PL-saturation tail " +
+                "only); got ${specViolFrac} (${specViolations}/${dsChecked}, max diff ${specMaxDiff}), " +
+                "e.g. ${specExamples}"
+
+            // Plausibility: dosage tracks read depth. Deep calls match the integer GT
+            // dosage, and intermediate dosages are concentrated in shallow calls.
+            assert hiDpTotal > 0 : "expected some deep (DP>20) genotypes to validate DS against"
+            double hiDpMatchRate = hiDpMatch / (double) hiDpTotal
+            assert hiDpMatchRate >= 0.999 :
+                "at least 99.9% of DP>20 genotypes must have round(DS) == GT allele count; " +
+                "match rate was ${hiDpMatchRate} (${hiDpMatch}/${hiDpTotal})"
+            assert inBetween > 0 :
+                "expected some intermediate-dosage genotypes (DS in [0.2,0.8] or [1.2,1.8])"
+            assert cleanInteger > 0 : "expected clean integer-dosage genotypes to compare against"
+            double inBetweenAvgDp = inBetweenDpSum / inBetween
+            double cleanAvgDp = cleanIntegerDpSum / cleanInteger
+            assert inBetweenAvgDp < cleanAvgDp * 0.5 :
+                "intermediate-dosage genotypes must come from shallower calls than integer-dosage " +
+                "ones; mean DP ${inBetweenAvgDp} over ${inBetween} entries vs ${cleanAvgDp} over " +
+                "${cleanInteger} clean entries (expected < half)"
 
             // ---- prepared_vcf_tbi emit ----
             assert process.out.prepared_vcf_tbi[0][1].toString().endsWith('.tbi') :
                 "prepared_vcf_tbi emit must carry a .tbi file"
 
-            // ---- Tracking assertions ----
+            // === Tracking assertions ===============================================
             // With publish_intermediate=true, BCFTOOLS_NORM and PLINK2_MAKEPGEN each
             // publish a tracking JSON. The glob results/**/*tracking*.json must catch both.
             def tracking_raw = process.out.tracking[0]
@@ -120,6 +289,13 @@ nextflow_process {
                 "NORM tracking.outputs.variants should be >= 500 after multiallelic splitting, got ${norm_tracking.outputs.variants}"
             assert (norm_tracking.outputs.samples as int) == 3202 :
                 "NORM tracking.outputs.samples should be 3202, got ${norm_tracking.outputs.samples}"
+
+            // Body-vs-tracking cross-check: nothing between NORM and the final output
+            // (ANNOTATE, VEP, CALC_DOSAGE, REHEADER) adds or drops records, so the output
+            // record count must equal NORM's reported output variant count exactly.
+            assert rows.size() == (norm_tracking.outputs.variants as int) :
+                "output record count (${rows.size()}) must equal NORM tracking.outputs.variants " +
+                "(${norm_tracking.outputs.variants}); a mismatch means a step silently changed the record set"
         }
     }
 
