@@ -241,11 +241,12 @@ command, done-when). Conventions in §0 are assumed throughout.
 | &nbsp;&nbsp;PB2 — Wire `PREPARE_VCF` into `rare-var-assoc.nf`; rip out the old prep path | ✅ Done 2026-05-29 | [phase3-prepare-refactor.md](test-quality-and-cleanup/phase3-prepare-refactor.md) |
 | &nbsp;&nbsp;PB3 — Drop subworkflow-level IT-1 / IT-1b (PREPARE subworkflow eliminated) | ✅ Done 2026-05-29 | [phase3-prepare-refactor.md](test-quality-and-cleanup/phase3-prepare-refactor.md) |
 | T13 — Implement IT-7 (workflow, reporting path) — moved ahead of PB4/PB5 on 2026-05-29 | ✅ Done 2026-05-29 | [integration-tests.md](test-quality-and-cleanup/integration-tests.md) |
+| &nbsp;&nbsp;PB5 — Migrate `prepare__to_delete/tests` into `../nf-prepare-vcf`, then delete the dir (done before PB4) | ✅ Done 2026-05-29 | [phase3-prepare-refactor.md](test-quality-and-cleanup/phase3-prepare-refactor.md) |
 | &nbsp;&nbsp;PB4 — Delete prep modules orphaned by the refactor | pending | [phase3-prepare-refactor.md](test-quality-and-cleanup/phase3-prepare-refactor.md) |
-| &nbsp;&nbsp;PB5 — Migrate `prepare__to_delete/tests` into `../nf-prepare-vcf`, then delete the dir | pending | [phase3-prepare-refactor.md](test-quality-and-cleanup/phase3-prepare-refactor.md) |
 | T14 — Phase 2 dead-code removal | pending | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
 | T15 — Update `nextflow_schema.json` | pending | [schema-and-config.md](test-quality-and-cleanup/schema-and-config.md) |
 | T16 — Remove nf-core template comments | pending | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
+| T17 — Set up GitHub Actions CI (run `--tag ci` tests) + update `README.md` | pending | [ci-and-readme.md](test-quality-and-cleanup/ci-and-readme.md) |
 
 ---
 
@@ -261,7 +262,7 @@ T1 ──► T2 ──► T2.5
                                 T8 ──┼──► T9
                                      ├──► T10
                                      ├──► T11
-                                     └──► T12 ──► PB1..PB3 ──► T13 ──► PB4 ──► PB5 ──► T14 ──► T15 ──► T16
+                                     └──► T12 ──► PB1..PB3 ──► T13 ──► PB5 ──► PB4 ──► T14 ──► T15 ──► T16 ──► T17
 ```
 
 Phase 3 was inserted between T12 and T13 on 2026-05-28: T13 (IT-7) could not pass until the broken

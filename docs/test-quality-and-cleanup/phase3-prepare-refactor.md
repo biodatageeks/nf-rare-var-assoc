@@ -308,14 +308,32 @@ Tasks:
 
 ### PB5 — Migrate `prepare__to_delete/tests` upstream, then delete the dir
 
-The renamed `subworkflows/local/prepare__to_delete/` dir is kept **only** to preserve its test
-fixtures and assertions (`tests/main.nf.test`, `tests/skip_prep_skip_reporting.nf.test`,
-`tests/fixtures/`) for reuse — the NORM/ANNOTATE/VEP invariants they encode belong to
-`../nf-prepare-vcf`, which currently lacks equivalent integration coverage.
-- Port the still-relevant assertions/fixtures into a `nf-prepare-vcf` integration test
-  (sibling repo; the AI does not commit there — hand back the edits).
-- Then delete `subworkflows/local/prepare__to_delete/` entirely (coordinate with T14).
-- **Done-when**: the dir is gone; equivalent coverage lives in `../nf-prepare-vcf`.
+**Status: Done 2026-05-29** (done before PB4). As built:
+- Only the **IT-1 NORM/ANNOTATE/VEP/dosage invariants** were portable upstream. By PB2 the
+  `prepare__to_delete/main.nf` body was already thin (REPLACE_SAMPLE_NAMES -> INDEX ->
+  VIEW_AND_FILTER2), and the IT-1b assertions cover **VIEW_AND_FILTER2** (this repo's quality
+  gate) — already exercised by IT-6/IT-7, so they did **not** move upstream.
+- New native integration test in the sibling repo:
+  **`../nf-prepare-vcf/tests/prepare_invariants.nf.test`** (`nextflow_pipeline` on `../main.nf`).
+  Runs the whole prep pipeline on the messy fixture and asserts: multiallelic split (no comma
+  ALT), `chr`-prefix stripped + CHROM in {12,22,X}, unique `CHROM_POS_REF_ALT` IDs, non-empty
+  CSQ on annotatable records + star alleles present, **spec-recomputed DS dosage** (DS rebuilt
+  from each PL; mean |diff|<1e-3, >0.01-violation frac <5e-4), and a NORM-tracking count
+  cross-check (inputs 500/3202; output == body count). Reads the published
+  `bcftools_reheader/*_reheader.vcf.gz` and `bcftools_norm/*_norm_tracking.json`
+  (`publish_intermediate=true`, `skip_ld_report=true`). Mirrors the PB1 wrapper test but runs
+  `nf-prepare-vcf` natively (no nested run), so the upstream repo is self-covered.
+- Fixture copied to **`../nf-prepare-vcf/tests/fixtures/unprepared_rand_500.vcf.gz`** (+ a
+  provenance `README.md`); the repo's own `-profile test` `sim_chr22` dataset is too clean
+  (biallelic, single chr, IDs preset) to exercise these transforms.
+- `../nf-prepare-vcf/nf-test.config` set to `profile "test,podman,low_resources"` so all its
+  tests cap `process_high` at 7 GB (dev-machine fit; replaces the old per-test cap).
+- Deleted `subworkflows/local/prepare__to_delete/` entirely and removed the now-obsolete
+  `ignore "subworkflows/local/prepare__to_delete/**"` from this repo's `nf-test.config`.
+- **Sibling-repo edits handed back** (the AI does not commit to `../nf-prepare-vcf`): new test,
+  fixture + README, nf-test.config profile change. Verified green:
+  `nf-test test tests/prepare_invariants.nf.test` PASSED (59.6s).
+- **Done-when**: met — the dir is gone; equivalent coverage lives in `../nf-prepare-vcf`.
 
 ### PB4 — Delete prep modules orphaned by the refactor
 
