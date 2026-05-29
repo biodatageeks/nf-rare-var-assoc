@@ -246,7 +246,7 @@ command, done-when). Conventions in §0 are assumed throughout.
 | T14 — Phase 2 dead-code removal | ✅ Done 2026-05-29 | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
 | T15 — Update `nextflow_schema.json` | ✅ Done 2026-05-29 | [schema-and-config.md](test-quality-and-cleanup/schema-and-config.md) |
 | T16 — Remove nf-core template comments | ✅ Done 2026-05-29 | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
-| T17 — Set up GitHub Actions CI (run `--tag ci` tests) + update `README.md` | pending | [ci-and-readme.md](test-quality-and-cleanup/ci-and-readme.md) |
+| T17 — Set up GitHub Actions CI (run `--tag ci` tests) + update `README.md` | ✅ Done 2026-05-29 | [ci-and-readme.md](test-quality-and-cleanup/ci-and-readme.md) |
 
 ---
 

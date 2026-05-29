@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nextflow
+        uses: nf-core/setup-nextflow@v2
+        with:
+          version: "25.10.2"
+
+      - name: Cache nf-test
+        id: cache-nf-test
+        uses: actions/cache@v4
+        with:
+          path: ~/.nf-test
+          key: nf-test-0.9.3-${{ runner.os }}
+
+      - name: Install nf-test
+        if: steps.cache-nf-test.outputs.cache-hit != 'true'
+        run: curl -fsSL https://get.nf-test.com | bash -s 0.9.3
+
+      - name: Add nf-test to PATH
+        run: echo "$HOME/.nf-test/bin" >> $GITHUB_PATH
+
+      - name: Run CI tests
+        run: nf-test test --profile podman,low_resources --tag ci

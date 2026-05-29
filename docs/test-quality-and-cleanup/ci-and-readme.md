@@ -1,8 +1,18 @@
-# T17 — GitHub Actions CI + README update
+# T17 — GitHub Actions CI + README update — ✅ Done 2026-05-29
 
 See [../test-quality-and-cleanup-plan.md](../test-quality-and-cleanup-plan.md) for goals and
 conventions. T17 runs after the test work is stable (logically near T16); it is independent of
 PB4/PB5 and the schema task and can be done at any point once the `--tag ci` suite is green.
+
+## What was done
+
+- Created `.github/workflows/ci.yml`: triggers on push/PR to master + `workflow_dispatch`;
+  installs Nextflow 25.10.2 via `nf-core/setup-nextflow@v2`; caches and installs nf-test
+  0.9.3 via `https://get.nf-test.com`; runs `nf-test test --profile podman,low_resources --tag ci`.
+- Rewrote `README.md`: real pipeline description, required params table, key toggles, two
+  production modes, Testing section with `--tag ci` / full commands. Dropped dead badges
+  (Zenodo, Seqera launch, linting). Updated Nextflow badge to >=25.10.2. CI badge now
+  points at the real workflow.
 
 ## Why
 
