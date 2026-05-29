@@ -134,10 +134,8 @@ next to each `.nf.test`, pointing at the canonical `assets/three_chr_unprepared/
 prep modules from PB4 (see phase3-prepare-refactor.md §PB4).
 `find . -name '*__to_delete*'` returns empty; 3 dead params removed from `nextflow.config`.
 
-### T16 — Remove nf-core template comments
+### T16 — Remove nf-core template comments (✅ Done 2026-05-29)
 
-- **Targets**: every `// TODO nf-core:` block in `modules/local/`. Search:
-  `rg -n '// TODO nf-core:' modules/local/`.
-- **Action**: delete the comment line(s). Do not touch any non-template TODO.
-- **Verify**: `rg -n '// TODO nf-core:' modules/local/` returns no results.
-- **Done-when**: no nf-core TODO blocks remain in `modules/local/`.
+All 15 `// TODO nf-core:` comment lines (and their continuation lines) removed from
+`modules/local/rscript/buildreports/main.nf` — the only file that contained them.
+Verified: `rg -n '// TODO nf-core:' modules/local/` returns no results.
