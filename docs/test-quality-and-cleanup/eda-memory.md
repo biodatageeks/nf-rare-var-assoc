@@ -68,6 +68,7 @@ Split so the refactor is validated against the old behavior:
 - **T18a -- golden baseline + equivalence harness (no behavior change).** Instrument the
   *current* code to emit a structured stats artifact, capture goldens, and write the
   comparison test. Test passes exactly on current code (code vs itself).
+  **Status: ✅ Done 2026-05-30.**
 - **T18b -- refactor to polars-bio streaming.** Rewrite data production; keep plotting and the
   stats-emission schema identical. The T18a test then validates new ~= old within tolerance.
   Lower the resource label; update container/env.

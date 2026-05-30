@@ -1,0 +1,208 @@
+nextflow_process {
+
+    name "Test Process EXPLORATORY_DATA_ANALYSIS (equivalence)"
+    script "../main.nf"
+    process "EXPLORATORY_DATA_ANALYSIS"
+
+    tag "full"
+    tag "modules"
+    tag "python"
+    tag "python/eda"
+
+    // Data-layer equivalence test: verifies the numeric series behind each plot against
+    // committed golden CSVs.  T18b will rewrite data production; this test validates that
+    // the new implementation reproduces the same aggregates within tolerance.
+    //
+    // Fixture: 5000 variants (chr12 + chr22 + chrX), 3202 1kGP samples.
+    // Phenotype: Y1=0 (2000 controls) / Y1=1 (1202 cases) -- binary, exercises the <=5
+    // phenotype branch throughout.  use_dosage=true exercises DS series and all four
+    // stat_vs_stat heatmaps.
+    //
+    // FIRST-RUN SETUP: goldens are not committed yet.
+    //   1. Run:  nf-test test --profile podman,low_resources modules/local/python/eda/tests/equivalence.nf.test
+    //      The test will fail at the "goldens populated" assertion -- that is expected.
+    //   2. Find the emitted eda_stats/ directory in .nf-test/.../work/ and run:
+    //        mkdir -p modules/local/python/eda/tests/fixtures/golden
+    //        cp <work>/eda_stats/*.csv modules/local/python/eda/tests/fixtures/golden/
+    //      (chrom_density.csv is already in that directory, copy it too)
+    //   3. Re-run the test -- it should pass.  Commit the golden CSVs and the auto-saved
+    //      golden_plots/ directory.
+    //   See tests/fixtures/golden/README.md for details.
+
+    test("eda equivalence - stats artifact matches goldens within tolerance (binary pheno, use_dosage=true)") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'equiv' ],
+                    file('${projectDir}/assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz', checkIfExists: true),
+                    file('${projectDir}/assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz.tbi', checkIfExists: true),
+                    file('${projectDir}/assets/three_chr_unprepared/pheno.tsv', checkIfExists: true)
+                ]
+                input[1] = true
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            assert process.out.stats != null && process.out.stats.size() > 0 :
+                "eda_stats directory was not emitted; check that stats output channel is wired"
+
+            def statsBase = process.out.stats[0]
+            def goldenDir = "${projectDir}/modules/local/python/eda/tests/fixtures/golden"
+
+            // Fail fast when goldens have not been committed yet.
+            def goldenDirFile = new File(goldenDir as String)
+            assert goldenDirFile.exists() && goldenDirFile.listFiles()?.any { it.name.endsWith('.csv') } :
+                "Golden stats not yet populated.  Run this test once to generate eda_stats/, then:\n" +
+                "  cp <nf-test-work>/eda_stats/*.csv ${goldenDir}/\n" +
+                "See tests/fixtures/golden/README.md for exact steps."
+
+            // ------------------------------------------------------------------
+            // Tolerance-tier helpers
+            // ------------------------------------------------------------------
+
+            // tight: rtol=1e-4, atol=1e-6  (float arithmetic / F32-vs-F64 only)
+            def tightCheck = { String name ->
+                def parseVal = { String s -> s.trim() == '' ? null : s.toDouble() }
+                def gold = path("${goldenDir}/${name}.csv").readLines().collect { parseVal(it) }
+                def act  = path("${statsBase}/${name}.csv").readLines().collect { parseVal(it) }
+                assert gold.size() == act.size() :
+                    "${name}.csv row count mismatch: golden=${gold.size()} actual=${act.size()}"
+                gold.eachWithIndex { g, i ->
+                    def a = act[i]
+                    if (g == null && a == null) return
+                    assert g != null && a != null :
+                        "${name}.csv[${i}]: NaN mismatch (golden=${g} actual=${a})"
+                    assert Math.abs((double)a - (double)g) <= 1e-6 + 1e-4 * Math.abs((double)g) :
+                        "${name}.csv[${i}]: golden=${g} actual=${a} diff=${Math.abs((double)a - (double)g)}"
+                }
+            }
+
+            // loose: approx-percentile series may diverge slightly in T18b
+            // acceptance: max absolute deviation <= 0.1 AND >= 99% of values within tight rtol
+            def looseCheck = { String name ->
+                def parseVal = { String s -> s.trim() == '' ? null : s.toDouble() }
+                def gold = path("${goldenDir}/${name}.csv").readLines()
+                    .collect { parseVal(it) }.findAll { it != null }
+                def act  = path("${statsBase}/${name}.csv").readLines()
+                    .collect { parseVal(it) }.findAll { it != null }
+                assert gold.size() == act.size() :
+                    "${name}.csv size mismatch: golden=${gold.size()} actual=${act.size()}"
+                def pairs = [gold, act].transpose()
+                def maxDev = pairs.collect { g, a -> Math.abs((double)a - (double)g) }.max()
+                def tightCount = pairs.count { g, a ->
+                    Math.abs((double)a - (double)g) <= 1e-6 + 1e-4 * Math.abs((double)g)
+                }
+                assert (double)maxDev <= 0.1 :
+                    "${name}.csv loose tier: maxDev=${maxDev} > 0.1"
+                assert tightCount / (double)gold.size() >= 0.99 :
+                    "${name}.csv loose tier: ${tightCount}/${gold.size()} within tight tolerance (need >= 99%)"
+            }
+
+            // exact: integer counts (heatmap bins, variant-type counts)
+            def exactCheck1d = { String name ->
+                def gold = path("${goldenDir}/${name}.csv").readLines()
+                    .collect { it.trim().toDouble().toLong() }
+                def act  = path("${statsBase}/${name}.csv").readLines()
+                    .collect { it.trim().toDouble().toLong() }
+                assert gold == act : "${name}.csv exact mismatch: golden=${gold} actual=${act}"
+            }
+            def exactCheck2d = { String name ->
+                def gold = path("${goldenDir}/${name}.csv").readLines()
+                    .collect { row -> row.split(',').collect { v -> v.trim().toDouble().toLong() } }
+                def act  = path("${statsBase}/${name}.csv").readLines()
+                    .collect { row -> row.split(',').collect { v -> v.trim().toDouble().toLong() } }
+                assert gold.size() == act.size() :
+                    "${name}.csv row count: golden=${gold.size()} actual=${act.size()}"
+                gold.eachWithIndex { gr, i ->
+                    assert gr == act[i] : "${name}.csv row ${i} mismatch"
+                }
+            }
+
+            // ------------------------------------------------------------------
+            // Per-stat, per-phenotype series (binary: Y1=0 controls, Y1=1 cases)
+            // ------------------------------------------------------------------
+            def statsForPlots = ['DP', 'GQ', 'DS']  // use_dosage=true adds DS
+            def phenoVals = [0, 1]
+
+            statsForPlots.each { stat ->
+                phenoVals.each { pheno ->
+                    looseCheck("variant_stats_${stat}_p1_pheno${pheno}")
+                    looseCheck("variant_stats_${stat}_p50_pheno${pheno}")
+                    tightCheck("variant_stats_${stat}_pmean_pheno${pheno}")
+                    tightCheck("sample_stats_${stat}_pheno${pheno}")
+                    tightCheck("boxplot_${stat}_pheno${pheno}")
+                }
+            }
+
+            // ------------------------------------------------------------------
+            // Missingness, heterozygosity, DP diff, allele frequency
+            // ------------------------------------------------------------------
+            phenoVals.each { pheno ->
+                tightCheck("missingness_variants_pheno${pheno}")
+                tightCheck("missingness_samples_pheno${pheno}")
+                tightCheck("het_pheno${pheno}")
+            }
+            tightCheck('dp_diff')
+            tightCheck('allele_freq')
+
+            // ------------------------------------------------------------------
+            // Exact-tier: variant-type counts and chromosome density
+            // ------------------------------------------------------------------
+            exactCheck1d('variant_types')
+
+            def goldChromLines = path("${goldenDir}/chrom_density.csv").readLines()
+            def actChromLines  = path("${statsBase}/chrom_density.csv").readLines()
+            assert goldChromLines[0] == actChromLines[0] : "chrom_density.csv header mismatch"
+            assert goldChromLines.size() == actChromLines.size() :
+                "chrom_density.csv row count: golden=${goldChromLines.size()} actual=${actChromLines.size()}"
+            goldChromLines.tail().eachWithIndex { gl, i ->
+                def al = actChromLines.tail()[i]
+                def gp = gl.split(',')
+                def ap = al.split(',')
+                assert gp[0] == ap[0] : "chrom_density.csv row ${i} CHROM mismatch"
+                assert gp[1].trim().toLong() == ap[1].trim().toLong() :
+                    "chrom_density.csv row ${i} count mismatch"
+            }
+
+            // ------------------------------------------------------------------
+            // Exact-tier: 2D heatmaps (use_dosage=true produces 4 stat pairs)
+            // ------------------------------------------------------------------
+            [['GQ','DS'], ['DP','DS'], ['GQ','DP'], ['GT','DS']].each { s1, s2 ->
+                exactCheck2d("heatmap_${s2}_vs_${s1}")
+                phenoVals.each { pheno ->
+                    exactCheck2d("heatmap_${s2}_vs_${s1}_pheno${pheno}")
+                }
+            }
+
+            // ------------------------------------------------------------------
+            // Save plots to golden_plots/ on first successful run for visual
+            // comparison in T18b.  Skipped when golden_plots/ already has PNGs.
+            // ------------------------------------------------------------------
+            def goldenPlotsDir = new File(
+                "${projectDir}/modules/local/python/eda/tests/fixtures/golden_plots" as String)
+            def alreadyPopulated = goldenPlotsDir.exists() &&
+                goldenPlotsDir.listFiles()?.any { it.name.endsWith('.png') }
+            if (!alreadyPopulated) {
+                goldenPlotsDir.mkdirs()
+                def pngs = process.out.plots[0][1] instanceof List ?
+                    process.out.plots[0][1] : [process.out.plots[0][1]]
+                def svgs = process.out.plots_svg[0][1] instanceof List ?
+                    process.out.plots_svg[0][1] : [process.out.plots_svg[0][1]]
+                (pngs + svgs).each { p ->
+                    def src = new File(p.toString())
+                    new File(goldenPlotsDir, src.name).bytes = src.bytes
+                }
+                println "INFO: Plots saved to ${goldenPlotsDir} for visual comparison in T18b."
+            }
+
+            assert snapshot(process.out.versions).match()
+        }
+
+    }
+
+}

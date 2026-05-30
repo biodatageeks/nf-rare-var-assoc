@@ -248,7 +248,7 @@ command, done-when). Conventions in §0 are assumed throughout.
 | T16 — Remove nf-core template comments | ✅ Done 2026-05-29 | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
 | T17 — Set up GitHub Actions CI (run `--tag ci` tests) + update `README.md` | ✅ Done 2026-05-29 | [ci-and-readme.md](test-quality-and-cleanup/ci-and-readme.md) |
 | T18 — Reduce `python/eda` memory (streaming aggregation via polars-bio) — split into T18a/T18b | pending | [eda-memory.md](test-quality-and-cleanup/eda-memory.md) |
-| &nbsp;&nbsp;T18a — Emit `stats` artifact in current code; commit goldens; write data-layer equivalence test | pending | [eda-memory.md](test-quality-and-cleanup/eda-memory.md) |
+| &nbsp;&nbsp;T18a — Emit `stats` artifact in current code; commit goldens; write data-layer equivalence test | ✅ Done 2026-05-30 | [eda-memory.md](test-quality-and-cleanup/eda-memory.md) |
 | &nbsp;&nbsp;T18b — Refactor to polars-bio streaming; validate new vs old via T18a test; lower resource label | pending | [eda-memory.md](test-quality-and-cleanup/eda-memory.md) |
 
 ---

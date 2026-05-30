@@ -14,6 +14,7 @@ process EXPLORATORY_DATA_ANALYSIS {
     tuple val(meta), path("plots/*.png"), emit: plots
     tuple val(meta), path("plots/*.svg"), emit: plots_svg
     path "versions.yml", emit: versions
+    path "eda_stats", emit: stats, optional: true
 
     script:
     def args = task.ext.args ?: ''
@@ -32,9 +33,24 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pysam
 import time
+import csv as _csv
 
 
 plt.rcParams.update({'font.size': 20})
+
+stats_dir = "eda_stats"
+Path(stats_dir).mkdir(exist_ok=True)
+
+def emit_stat(name, data):
+    arr = np.asarray(data, dtype=float)
+    with open(str(Path(stats_dir) / f"{name}.csv"), 'w', newline='') as fh:
+        w = _csv.writer(fh)
+        if arr.ndim == 1:
+            for v in arr:
+                w.writerow(['' if np.isnan(v) else v])
+        else:
+            for row in arr:
+                w.writerow(['' if np.isnan(v) else v for v in row])
 
 
 def current_milli_time():
@@ -178,6 +194,7 @@ def plot_variant_stats(df, pheno_df, samples, stat, percentiles=[1, 10, 50], sta
                         pheno_values = df.select(pheno_cols).mean_horizontal().to_numpy()
                     else:
                         pheno_values = np.quantile(df.select(pheno_cols).to_numpy(), perc / 100, axis=1)
+                    emit_stat(f'variant_stats_{stat}_p{perc}_pheno{pheno}', pheno_values[~np.isnan(pheno_values)])
                     sns.histplot(pheno_values[~np.isnan(pheno_values)], bins=50, label=f'{pheno} ({perc})', alpha=0.5)
             plt.title(f'Mean {stat} by Phenotype' if perc == 'mean' else f'{stat} ({perc}th Percentile) by Phenotype')
             plt.xlabel(stat_label)
@@ -230,6 +247,7 @@ def plot_sample_stats(df, pheno_df, samples, stat, stat_label='Statistic'):
         for pheno in phenotypes:
             pheno_data = sample_stats.filter(pl.col('Y1') == pheno)['value'].drop_nulls().to_numpy()
             if len(pheno_data) > 0:
+                emit_stat(f'sample_stats_{stat}_pheno{pheno}', pheno_data)
                 sns.histplot(pheno_data, bins=50, label=pheno, alpha=0.5)
         plt.title(f'Mean {stat} by Phenotype (Samples)')
         plt.xlabel(stat_label)
@@ -271,6 +289,7 @@ def plot_missingness(df, pheno_df, samples):
             pheno_cols = [f'GT_{sample}' for sample in pheno_samples if f'GT_{sample}' in df]
             if pheno_cols:
                 pheno_missing = df.select(pl.mean_horizontal(pl.col(pheno_cols).is_null())).to_series().to_numpy()
+                emit_stat(f'missingness_variants_pheno{pheno}', pheno_missing)
                 sns.histplot(pheno_missing, bins=50, label=pheno, alpha=0.5)
         plt.title('Missingness Rate by Phenotype (Variants)')
         plt.xlabel('Missingness Rate')
@@ -294,6 +313,7 @@ def plot_missingness(df, pheno_df, samples):
         for pheno in phenotypes:
             pheno_data = missingness_samples[missingness_samples['Y1'] == pheno]['missing_rate']
             if not pheno_data.empty:
+                emit_stat(f'missingness_samples_pheno{pheno}', pheno_data.to_numpy())
                 sns.histplot(pheno_data, bins=50, label=pheno, alpha=0.5)
         plt.title('Missingness Rate by Phenotype (Samples)')
         plt.xlabel('Missingness Rate')
@@ -317,6 +337,7 @@ def plot_dp_differences(df, pheno_df, samples):
             case_dp = df.select(case_cols).mean_horizontal().to_numpy()
             control_dp = df.select(control_cols).mean_horizontal().to_numpy()
             abs_diff = np.abs(case_dp - control_dp)
+            emit_stat('dp_diff', abs_diff[~np.isnan(abs_diff)])
             plt.figure(figsize=(9, 6))
             sns.histplot(abs_diff[~np.isnan(abs_diff)], bins=50)
             plt.title('Absolute DP Differences (Cases vs Controls)')
@@ -338,6 +359,7 @@ def plot_dp_differences(df, pheno_df, samples):
 def plot_allele_frequency(vcf_df):
     print(f"plot_allele_frequency()  ts = {current_milli_time()}")
     af = vcf_df['AF'].to_numpy()
+    emit_stat('allele_freq', af[~np.isnan(af)])
     plt.figure(figsize=(9, 6))
     sns.histplot(af[~np.isnan(af)], bins=100, log_scale=True)
     plt.title('Alternate Allele Frequency Distribution - log scale')
@@ -349,6 +371,9 @@ def plot_allele_frequency(vcf_df):
 
 def plot_variant_types(vcf_df, samples):
     print(f"plot_variant_types()  ts = {current_milli_time()}")
+    snp_count = int((vcf_df['Variant_Type'] == 0).sum())
+    indel_count = int((vcf_df['Variant_Type'] == 1).sum())
+    emit_stat('variant_types', np.array([snp_count, indel_count]))
     plt.figure(figsize=(9, 6))
     sns.countplot(data=vcf_df.to_pandas(), x='Variant_Type')
     plt.title('Variant Type Distribution')
@@ -360,6 +385,7 @@ def plot_variant_types(vcf_df, samples):
 def plot_chrom_density(vcf_df):
     print(f"plot_chrom_density()  ts = {current_milli_time()}")
     chrom_counts = vcf_df.group_by('CHROM').len().sort('CHROM').to_pandas()
+    chrom_counts[['CHROM', 'len']].to_csv(str(Path(stats_dir) / 'chrom_density.csv'), index=False)
     plt.figure(figsize=(12, 6))
     sns.barplot(x='CHROM', y='len', data=chrom_counts)
     plt.title('Variant Count by Chromosome')
@@ -399,6 +425,7 @@ def plot_heterozygosity(vcf_df, pheno_df, samples):
         for pheno in phenotypes:
             pheno_data = het_df.filter(pl.col('Y1') == pheno)['Heterozygosity'].to_numpy()
             if len(pheno_data) > 0:
+                emit_stat(f'het_pheno{pheno}', pheno_data)
                 sns.histplot(pheno_data, bins=50, label=pheno, alpha=0.5)
         plt.title('Heterozygosity Rate by Phenotype')
         plt.xlabel('Heterozygosity Rate')
@@ -416,6 +443,8 @@ def plot_boxplots(vcf_df, pheno_df, samples, stat, stat_label):
     sample_stats['value'] = sample_stats[0].astype(float)
     sample_stats = pl.from_pandas(sample_stats[['IID', 'value']]).join(pheno_df.select(['IID', 'Y1']), on='IID', how='left').to_pandas()
     
+    for _pheno in sorted(sample_stats['Y1'].dropna().unique()):
+        emit_stat(f'boxplot_{stat}_pheno{_pheno}', sample_stats[sample_stats['Y1'] == _pheno]['value'].to_numpy())
     plt.figure(figsize=(10, 6))
     try:
         sns.boxplot(data=sample_stats, x='Y1', y='value')
@@ -444,6 +473,7 @@ def plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1, stat2):
 
         # Create 2D histogram for heatmap
         heatmap, xedges, yedges = np.histogram2d(stat1_values, stat2_values, bins=[stat1_bins, stat2_bins])
+        emit_stat(f'heatmap_{stat2}_vs_{stat1}', heatmap)
 
         plt.figure(figsize=(12, 10))
         sns.heatmap(heatmap.T, cmap='viridis', norm='log', cbar_kws={'label': 'Count (log scale)'})
@@ -470,6 +500,7 @@ def plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1, stat2):
 
                 # Create 2D histogram for heatmap
                 heatmap, xedges, yedges = np.histogram2d(stat1_values, stat2_values, bins=[stat1_bins, stat2_bins])
+                emit_stat(f'heatmap_{stat2}_vs_{stat1}_pheno{pheno}', heatmap)
 
                 plt.figure(figsize=(12, 10))
                 sns.heatmap(heatmap.T, cmap='viridis', norm='log', cbar_kws={'label': 'Count (log scale)'})
