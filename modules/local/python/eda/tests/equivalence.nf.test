@@ -38,7 +38,8 @@ nextflow_process {
                     [ id:'equiv' ],
                     file('${projectDir}/assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz', checkIfExists: true),
                     file('${projectDir}/assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz.tbi', checkIfExists: true),
-                    file('${projectDir}/assets/three_chr_unprepared/pheno.tsv', checkIfExists: true)
+                    file('${projectDir}/assets/three_chr_unprepared/pheno.tsv', checkIfExists: true),
+                    file('${projectDir}/modules/local/python/eda/assets/eda.py', checkIfExists: true)
                 ]
                 input[1] = true
                 """

@@ -7,3 +7,4 @@ dependencies:
   - "conda-forge::pandas=2.2.3"
   - "conda-forge::numpy=2.2.6"
   - "bioconda::pysam=0.23.0"
+  - "conda-forge::polars-bio=0.26.0"

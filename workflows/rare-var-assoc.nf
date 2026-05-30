@@ -103,10 +103,12 @@ workflow RARE_VAR_ASSOC {
     ch_versions = ch_versions.mix(BCFTOOLS_INDEX.out.versions.first())
 
     if (!params.skip_reporting) {
+        eda_script_ch = Channel.fromPath("${projectDir}/modules/local/python/eda/assets/eda.py", checkIfExists: true).first()
         EXPLORATORY_DATA_ANALYSIS (
             ch_vcf_with_sample_names_corrected
                 .join(ch_vcf_with_sample_names_corrected_tbi, by: 0)
-                .join(ch_phenotype, by: 0),
+                .join(ch_phenotype, by: 0)
+                .combine(eda_script_ch),
             Channel.value(params.use_dosage)
         )
         ch_eda_plots = EXPLORATORY_DATA_ANALYSIS.out.plots

@@ -72,6 +72,117 @@ Split so the refactor is validated against the old behavior:
 - **T18b -- refactor to polars-bio streaming.** Rewrite data production; keep plotting and the
   stats-emission schema identical. The T18a test then validates new ~= old within tolerance.
   Lower the resource label; update container/env.
+  **Status: IN PROGRESS. v1 written but rejected for speed (see below) before its correctness was
+  confirmed; v3 redesign pending.**
+
+## T18b v1 outcome + v3 redesign (2026-05-31)
+
+### What happened with v1
+The data layer was rewritten from inline `main.nf` Python into an external script
+[modules/local/python/eda/assets/eda.py](../../modules/local/python/eda/assets/eda.py)
+(decision: external for testability / SQL escaping; matches the `calc_dosage.py` reference).
+It uses polars-bio `register_vcf` + per-plot SQL `GROUP BY` reductions. **Its correctness is
+UNCONFIRMED** -- the equivalence test was never run to completion against it (individual SQL
+queries were spot-checked against goldens during development, but the full per-series diff never
+passed). It was abandoned purely on speed: the old code did **one** VCF scan; v1 issues a separate
+`pb.sql(...).collect()` for
+nearly every plot, and *each `collect()` re-decompresses and re-parses the whole VCF* (DataFusion
+does not cache the registered VCF across queries). The binary/`use_dosage=true` path runs **~26
+scans**: 3 variant-stats (DP/GQ/DS) + 6 sample-means (recomputed for boxplots) + missingness x2 +
+het + dp_diff + variant_level + **12 heatmap cell-pair collects**. Old equivalence run ~112 s;
+v1 is substantially slower.
+
+**Hard rule for v3 (user, LOCKED): one VCF scan; two only if it demonstrably helps.** Compute
+every aggregate needed by every plot during that pass, then plot from the small results.
+
+### Cold-start state (files already changed this session)
+- `assets/eda.py` -- v1 (slow; correctness unconfirmed). To be replaced by v3.
+- `assets/eda__old.py` -- reference copy of the previous (T18a-instrumented) inline script,
+  extracted from `main.nf` git HEAD. **Delete once v3 passes the equivalence test.**
+- `main.nf` -- now invokes the external script: input tuple gained `path(python_script)`;
+  `script:` is just `python3 ${python_script} --vcf .. --phenotype .. --use-dosage .. --process-name ..`;
+  container `1.0.4`->`1.0.11`; label `process_9`->`process_2`; real `stub:` retained.
+- `environment.yml` -- added `conda-forge::polars-bio=0.26.0`.
+- Caller [workflows/rare-var-assoc.nf](../../workflows/rare-var-assoc.nf): `eda_script_ch =
+  Channel.fromPath(".../assets/eda.py").first()` `.combine`d into the EDA input.
+- Both tests ([main.nf.test](../../modules/local/python/eda/tests/main.nf.test) T7d smoke,
+  [equivalence.nf.test](../../modules/local/python/eda/tests/equivalence.nf.test) T18b) pass the
+  `eda.py` path as the 4th tuple element. v3 keeps the same module/test wiring -- only the script
+  body changes.
+
+### Verified polars-bio / SQL facts (reuse in v3; do not re-derive)
+- Container `python_tools:1.0.11` has polars-bio 0.26.0, polars 1.39.3, pysam 0.23.3,
+  matplotlib 3.10.8, seaborn 0.13.2.
+- `register_vcf(path, name=, format_fields=['GT','DP','GQ','DS'], info_fields=['AF'])`. Schema:
+  `chrom, start, end, id, ref, alt, qual, filter, AF (List), genotypes (Struct)`.
+- Access struct fields as `genotypes."GT"` etc.; INFO `AF` is a List -> `"AF"[1]` (1-based);
+  **`AF` must be double-quoted** in SQL (bare `af` fails).
+- `start` is off by one (polars-bio quirk) -> POS = `start + 1`.
+- Unnest pattern: `CROSS JOIN generate_series(0, N-1) AS s` (yields column `value`) with
+  `arr[CAST(s.value AS BIGINT)+1]`. Gives deterministic `sample_idx` in VCF header order.
+- GT arrives as strings: `'0/0'`, `'0|1'`, `'0'`, `'1'`, `'./.'`, `'.'` (haploid present on chrX).
+  Encode f(j,k)=k(k+1)/2+j via `split_part`; missing (any `.`) -> NULL; het = two alleles differ
+  (haploid -> 0). See `_gt_encode_sql` / `_gt_is_het_sql` in v1 -- carry them over.
+- `approx_percentile_cont(col, p)` and `AGG(...) FILTER (WHERE ...)` both work. Per-variant
+  percentile NULL-guard (NULL if any group value is NULL) reproduces golden row counts exactly
+  (DP p1 pheno0 = 4860, mean = 4955). Old code used exact `np.quantile`; approx lives in the
+  **loose** tolerance tier (see tiers table). A chunked-numpy v3 (Option 2) could use exact
+  `np.quantile` and move percentiles back to tight.
+- Heatmap binning exactness is fragile: replicating `np.histogram2d` edges with SQL `floor(v/bw)`
+  mismatches at exact internal edges (e.g. DS=1.0 -> `1.0/0.01`=99.9999 floors to 99, np puts it
+  in bin 100). **numpy binning (Option 2) is exact by construction.** Also note the OLD overall
+  heatmap hardcodes `stat2_bins = linspace(0,2,201)` (so for GQ-vs-DP, DP>2 cells are dropped) --
+  a quirk that MUST be preserved to match goldens; per-pheno uses `linspace(0, nanmax, 201)`.
+- Goldens are **binary-pheno only**; the equivalence test runs only that path with
+  `use_dosage=true`. The `>5`-pheno branch is untested but must keep working (don't break it).
+
+### Memory reality (drives the design)
+Both a **wide** matrix (old) and a **full long frame** (one row per cell) are O(variants x samples):
+~250 MB-1 GB at the 5000-variant fixture, but ~25-40 GB at WGS scale (500k variants x 3202). So
+"scan once, collect all cells, do everything in pandas/polars" is fast and simple **but fails at
+WGS** -- it is NOT an acceptable v3 on its own. v3 memory must be O(variants + samples + bins),
+i.e. only aggregated results (and at most one bounded chunk of cells) ever resident.
+
+### v3 design options
+
+**Option 1 -- consolidated GROUP BY scans (closest to LOCKED approach; ~3 scans).**
+Merge v1's many queries by grouping key:
+- Scan A: one `GROUP BY variant_idx` over the unnested stream computing **all** per-variant series
+  (DP/GQ/DS mean+p1+p50 per pheno + 'all', missingness, dp_diff) plus per-variant `MAX(stat)` and
+  the per-variant scalars (AF, variant_type via `MAX`/`ANY_VALUE`; chrom). Global/per-pheno maxes =
+  max over this 5000-row result (no extra scan).
+- Scan B: one `GROUP BY sample_idx` computing all per-sample series (DP/GQ/DS means, missingness,
+  het). Feeds both sample-stat and boxplot plots (compute once, not 6x).
+- Scan C (`use_dosage` only): all 12 heatmaps in one scan by expanding each cell into the relevant
+  (pair_id, group_label, bin_x, bin_y) rows (array-of-structs `UNNEST`) then `GROUP BY` -> COUNT;
+  edges precomputed from Scan A maxes. State O(bins); cells never materialized.
+- Pros: pure polars-bio streaming, lowest memory, scales to WGS, smallest conceptual delta from v1.
+- Cons: 3 scans (3x decompress); heatmap row-expansion SQL is intricate; **SQL binning vs
+  np.histogram2d exactness risk** on the exact tier (may force relaxing the heatmap tolerance, which
+  the reporting carve-out permits).
+
+**Option 2 -- single (or double) chunked pass in Python (recommended).**
+Loop over genomic chunks (per-chromosome, or fixed N-variant windows via region predicate /
+`pysam.fetch`). Per chunk build a *small* typed frame (chunk_variants x samples; e.g. 500 variants
+-> ~26 MB) and reuse the OLD per-chunk reductions:
+- per-variant series: complete within the chunk (a variant never spans chunks) -> append; exact
+  `np.quantile` percentiles (back to tight tier).
+- per-sample series: accumulate running sum/count (means), null counts (missingness), het counts.
+- heatmaps: accumulate `np.histogram2d` counts per chunk and sum (additive) -> **exact**.
+Heatmap edges need global/per-pheno maxes first; track them as running maxes in the pass and do
+heatmap binning in a **second** chunked pass (so `use_dosage=false` => 1 pass, `true` => 2 passes).
+- Pros: effectively one VCF traversal; memory bounded by chunk; **heatmaps and percentiles exact**
+  (can tighten test tiers); large code reuse from `eda__old.py`; scales to WGS.
+- Cons: manual chunk orchestration; two passes when `use_dosage`; must verify region-predicate
+  reads in polars-bio (or fall back to `pysam.fetch` per region).
+
+**Option 3 -- one scan, collect full long frame, aggregate in-memory. REJECTED** (O(cells) =
+25-40 GB at WGS). Fine only as a throwaway correctness oracle at fixture scale.
+
+**Recommendation:** Option 2. It satisfies the one-pass rule most literally, is the only option that
+makes heatmaps and percentiles *exact* (tightening the equivalence test rather than loosening it),
+and reuses the validated old reduction logic. Option 1 stays as fallback if chunk orchestration
+proves awkward. Decide before writing v3.
 
 ## Equivalence test design (data layer, not pixels)
 
