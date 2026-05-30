@@ -247,6 +247,9 @@ command, done-when). Conventions in §0 are assumed throughout.
 | T15 — Update `nextflow_schema.json` | ✅ Done 2026-05-29 | [schema-and-config.md](test-quality-and-cleanup/schema-and-config.md) |
 | T16 — Remove nf-core template comments | ✅ Done 2026-05-29 | [dead-code.md](test-quality-and-cleanup/dead-code.md) |
 | T17 — Set up GitHub Actions CI (run `--tag ci` tests) + update `README.md` | ✅ Done 2026-05-29 | [ci-and-readme.md](test-quality-and-cleanup/ci-and-readme.md) |
+| T18 — Reduce `python/eda` memory (streaming aggregation via polars-bio) — split into T18a/T18b | pending | [eda-memory.md](test-quality-and-cleanup/eda-memory.md) |
+| &nbsp;&nbsp;T18a — Emit `stats` artifact in current code; commit goldens; write data-layer equivalence test | pending | [eda-memory.md](test-quality-and-cleanup/eda-memory.md) |
+| &nbsp;&nbsp;T18b — Refactor to polars-bio streaming; validate new vs old via T18a test; lower resource label | pending | [eda-memory.md](test-quality-and-cleanup/eda-memory.md) |
 
 ---
 
@@ -263,6 +266,8 @@ T1 ──► T2 ──► T2.5
                                      ├──► T10
                                      ├──► T11
                                      └──► T12 ──► PB1..PB3 ──► T13 ──► PB5 ──► PB4 ──► T14 ──► T15 ──► T16 ──► T17
+
+T18 (T18a ──► T18b)  [independent of the chain above]
 ```
 
 Phase 3 was inserted between T12 and T13 on 2026-05-28: T13 (IT-7) could not pass until the broken
