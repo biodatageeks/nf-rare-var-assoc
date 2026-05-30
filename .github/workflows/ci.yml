@@ -25,15 +25,14 @@ jobs:
         id: cache-nf-test
         uses: actions/cache@v4
         with:
-          path: ~/.nf-test
+          path: /usr/local/bin/nf-test
           key: nf-test-0.9.3-${{ runner.os }}
 
       - name: Install nf-test
         if: steps.cache-nf-test.outputs.cache-hit != 'true'
-        run: curl -fsSL https://get.nf-test.com | bash -s 0.9.3
-
-      - name: Add nf-test to PATH
-        run: echo "$HOME/.nf-test/bin" >> $GITHUB_PATH
+        run: |
+          curl -fsSL https://get.nf-test.com | bash -s 0.9.3
+          mv nf-test /usr/local/bin/nf-test
 
       - name: Run CI tests
         run: nf-test test --profile podman,low_resources --tag ci
