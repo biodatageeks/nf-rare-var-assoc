@@ -25,7 +25,9 @@ jobs:
         id: cache-nf-test
         uses: actions/cache@v4
         with:
-          path: /usr/local/bin/nf-test
+          path: |
+            /usr/local/bin/nf-test
+            /home/runner/.nf-test
           key: nf-test-0.9.3-${{ runner.os }}
 
       - name: Install nf-test
