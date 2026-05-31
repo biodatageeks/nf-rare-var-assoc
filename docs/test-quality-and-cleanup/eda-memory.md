@@ -63,14 +63,47 @@ Split so the refactor is validated against the old behavior:
   **Status: ✅ Done 2026-05-30.**
 - **T18b -- refactor to v5 (pysam two-pass chunking).** Rewrite data production; keep plotting
   and the stats-emission schema identical. The T18a test then validates new ~= old within
-  tolerance. Lower the resource label once memory improves. **Status: IN PROGRESS. v4
-  (chunked load + narrower dtypes) implemented; v5 design approved (two-pass, pysam).**
+  tolerance. Lower the resource label once memory improves. **Status: DONE 2026-05-31. v5
+  (two-pass pysam, O(variants + samples + bins + chunk)) is the active script; passes the
+  T18a equivalence test and the T7d smoke test against the committed goldens. Resource label
+  is `process_2`.**
 
-## T18b v1 outcome + v5 redesign (2026-05-31)
+## v5 outcome (2026-05-31)
+
+v5 ([assets/eda_v5.py](../../modules/local/python/eda/assets/eda_v5.py)) implements Option 2
+(two-pass chunked pysam) and is wired into both tests. Verified facts:
+
+- **Equivalence + smoke both pass** with the script path pointing at v5; spot-checked that they
+  also pass against v1 (the de-escaped baseline) so the goldens are reproducible from either.
+- **Pass 1 streams** per-variant series (O(variants)) and per-sample running sums (O(samples));
+  no variants x samples matrix is ever resident. **Pass 2** (only when `use_dosage=true`) refills
+  `np.histogram2d` bins from bounded chunks (`--chunk-size`, default 500) using the per-group
+  maxima recorded in pass 1, so percentiles and heatmaps stay exact.
+- **`mean_horizontal` vs `nanmean`:** missing FORMAT values arrive as pysam `None` -> polars
+  `null`, which `mean_horizontal` skips -- equal to v5's `np.nanmean`. Percentiles propagate NaN
+  in both. v5 reproduces v1's mean-kept / percentile-dropped asymmetry per variant.
+- **Plots 1_/1b_ ("Mean {stat} Across Variants") are emitted unconditionally** (overall mean over
+  all samples), matching v1. Earlier v5 dropped them in the <=5 branch; fixed via a dedicated
+  `overall_means` accumulator (avoids computing unused `'all'`-group percentiles in the <=5 path).
+- **Smoke test now asserts the full expected file set** (28 PNG + 28 SVG stems for the
+  use_dosage=false binary scenario), not just `count >= 1`.
+
+### File state
+- `assets/eda_v5.py` -- **active** (two-pass pysam). Used by both tests.
+- `assets/eda_v1.py` -- de-escaped + argparse'd baseline kept **only** for v1-vs-v5 comparison
+  (same CLI as v5). Delete once comparison is no longer needed.
+- `assets/eda_v2.py` (polars-bio, slow), `assets/eda_v4.py` (chunked load, full matrix) --
+  **superseded by v5; safe to delete.**
+- `main.nf` invokes `python3 ${python_script} --vcf .. --phenotype .. --use-dosage ..
+  --process-name ..`; input tuple's 4th element is the script path. Caller
+  [workflows/rare-var-assoc.nf](../../workflows/rare-var-assoc.nf) must point `eda_script_ch` at
+  `eda_v5.py`.
+
+## Historical: v1 outcome + v5 redesign (superseded by the v5 outcome above)
 
 ### What happened with v1
 The data layer was rewritten from inline `main.nf` Python into an external script
-[modules/local/python/eda/assets/eda.py](../../modules/local/python/eda/assets/eda.py)
+[modules/local/python/eda/assets/eda_v2.py](../../modules/local/python/eda/assets/eda_v2.py)
 (decision: external for testability / SQL escaping; matches the `calc_dosage.py` reference).
 It uses polars-bio `register_vcf` + per-plot SQL `GROUP BY` reductions. **Its correctness is
 UNCONFIRMED** -- the equivalence test was never run to completion against it (individual SQL
@@ -85,20 +118,6 @@ v1 is substantially slower.
 
 **Hard rule for v3 (user, LOCKED): one VCF scan; two only if it demonstrably helps.** Compute
 every aggregate needed by every plot during that pass, then plot from the small results.
-
-### Cold-start state (files already changed this session)
-- `assets/eda.py` -- v1 (slow; correctness unconfirmed). To be superseded by v5.
-- `assets/eda__old.py` -- reference copy of the previous (T18a-instrumented) inline script,
-  extracted from `main.nf` git HEAD. **Delete once v5 passes the equivalence test.**
-- `assets/eda_v4.py` -- v4 (chunked load + Float16/Int8). Used by tests now; preserves exact
-  numpy percentiles and heatmaps but still materializes the full matrix after load.
-- `main.nf` -- invokes external script; input tuple includes `path(python_script)` and the script
-  runs `python3 ${python_script} --vcf .. --phenotype .. --use-dosage .. --process-name ..`.
-- Caller [workflows/rare-var-assoc.nf](../../workflows/rare-var-assoc.nf): `eda_script_ch =
-  Channel.fromPath(".../assets/eda.py").first()` `.combine`d into the EDA input (adjust as v5 lands).
-- Both tests ([main.nf.test](../../modules/local/python/eda/tests/main.nf.test) T7d smoke,
-  [equivalence.nf.test](../../modules/local/python/eda/tests/equivalence.nf.test) T18b) pass the
-  script path as the 4th tuple element; currently wired to `eda_v4.py` for exact percentiles.
 
 ### Verified v4/v5 facts (reuse in v5; do not re-derive)
 - `eda_v4.py` loads VCF in chunks and extends a Polars DataFrame; the full matrix still exists
@@ -258,9 +277,11 @@ skips `NULL` -- a divergence shows up here.
   ([modules/local/python/eda/tests/main.nf.test](../../modules/local/python/eda/tests/main.nf.test))
   still passes.
 
-**T18b**
-- `EXPLORATORY_DATA_ANALYSIS` rewritten to two-pass chunked pysam scans; no full
+**T18b -- DONE 2026-05-31**
+- [x] `EXPLORATORY_DATA_ANALYSIS` rewritten to two-pass chunked pysam scans (v5); no full
   variants x samples matrix materialized in Python; plotting fns and stats-emission schema
-  unchanged.
-- T18a equivalence test passes against the goldens within tolerance.
-- Resource label lowered (target `process_2`) and verified on the medium fixture.
+  unchanged (plots 1_/1b_ restored to emit unconditionally, matching v1).
+- [x] T18a equivalence test passes against the goldens within tolerance.
+- [x] Smoke test (T7d) asserts the full expected output-file set, not just `count >= 1`.
+- [x] Resource label lowered to `process_2` and exercised on the medium fixture via the
+  equivalence test (5000 variants, 3202 samples) under `low_resources`.

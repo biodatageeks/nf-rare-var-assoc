@@ -27,7 +27,7 @@ nextflow_process {
                     file('${projectDir}/assets/three_chr_unprepared/unprepared_rand_500.vcf.gz', checkIfExists: true),
                     file('${projectDir}/assets/three_chr_unprepared/unprepared_rand_500.vcf.gz.tbi', checkIfExists: true),
                     file('${projectDir}/modules/local/python/eda/tests/fixtures/pheno.tsv', checkIfExists: true),
-                    file('${projectDir}/modules/local/python/eda/assets/eda.py', checkIfExists: true)
+                    file('${projectDir}/modules/local/python/eda/assets/eda_v5.py', checkIfExists: true)
                 ]
                 input[1] = false
                 """
@@ -37,17 +37,54 @@ nextflow_process {
         then {
             assert process.success
 
-            // At least one PNG emitted under plots/
-            def pngs = process.out.plots[0][1]
-            def png_count = pngs instanceof List ? pngs.size() : 1
-            assert png_count >= 1 :
-                "expected at least one PNG in plots/, got ${png_count}"
+            // Reporting carve-out: assert the *expected set of output files* is produced
+            // (filenames, not content).  This scenario is use_dosage=false with a binary
+            // phenotype (the len(phenotypes)==2 / <=5 branch), so DS- and heatmap-related
+            // plots are absent and every plot is the per-phenotype variant.
+            def expectedStems = [
+                // plot_variant_stats(DP): overall mean (1/1b) + per-pheno percentiles/mean (3/3b)
+                '1_DP_mean_variants', '1b_DP_mean_variants',
+                '3_DP_percentile_1_by_phenotype_variants', '3b_DP_percentile_1_by_phenotype_variants',
+                '3_DP_percentile_50_by_phenotype_variants', '3b_DP_percentile_50_by_phenotype_variants',
+                '3_DP_percentile_mean_by_phenotype_variants', '3b_DP_percentile_mean_by_phenotype_variants',
+                // plot_sample_stats(DP)
+                '5_DP_by_phenotype_samples',
+                // plot_variant_stats(GQ)
+                '1_GQ_mean_variants', '1b_GQ_mean_variants',
+                '3_GQ_percentile_1_by_phenotype_variants', '3b_GQ_percentile_1_by_phenotype_variants',
+                '3_GQ_percentile_50_by_phenotype_variants', '3b_GQ_percentile_50_by_phenotype_variants',
+                '3_GQ_percentile_mean_by_phenotype_variants', '3b_GQ_percentile_mean_by_phenotype_variants',
+                // plot_sample_stats(GQ)
+                '5_GQ_by_phenotype_samples',
+                // plot_missingness (per-pheno variant + sample)
+                '7_missingness_by_phenotype_variants', '9_missingness_by_phenotype_samples',
+                // plot_dp_differences (binary -> cases vs controls)
+                '10_dp_abs_diff_cases_controls', '10b_dp_abs_diff_cases_controls',
+                // plot_allele_frequency / variant_types / chrom_density / heterozygosity
+                '11_allele_frequency', '12_variant_types', '13_chrom_variant_density',
+                '15_heterozygosity_by_phenotype_samples',
+                // plot_boxplots(DP), plot_boxplots(GQ)
+                '16_DP_boxplot_by_phenotype', '16_GQ_boxplot_by_phenotype',
+            ]
 
-            // At least one SVG emitted under plots/
-            def svgs = process.out.plots_svg[0][1]
-            def svg_count = svgs instanceof List ? svgs.size() : 1
-            assert svg_count >= 1 :
-                "expected at least one SVG in plots/, got ${svg_count}"
+            def toNames = { out ->
+                def files = out instanceof List ? out : [out]
+                files.collect { new File(it.toString()).name }.toSet()
+            }
+            def pngNames = toNames(process.out.plots[0][1])
+            def svgNames = toNames(process.out.plots_svg[0][1])
+
+            expectedStems.each { stem ->
+                assert pngNames.contains("${stem}.png" as String) :
+                    "missing PNG ${stem}.png; produced: ${pngNames.sort()}"
+                assert svgNames.contains("${stem}.svg" as String) :
+                    "missing SVG ${stem}.svg; produced: ${svgNames.sort()}"
+            }
+            // No unexpected extras (catches dropped/added plots in either direction).
+            assert pngNames.size() == expectedStems.size() :
+                "unexpected PNG set; produced: ${pngNames.sort()}"
+            assert svgNames.size() == expectedStems.size() :
+                "unexpected SVG set; produced: ${svgNames.sort()}"
 
             // versions.yml must name the process (not a generic 'python:' key alone)
             assert path(process.out.versions[0]).text.contains('EXPLORATORY_DATA_ANALYSIS:') :

@@ -1,7 +1,9 @@
-# REFERENCE ONLY -- previous (T18a) inline EDA script, extracted from main.nf's
-# heredoc. Groovy escapes (\\n, ${task.process}) are left as-is; this file is NOT
-# executed. Delete once eda.py passes the T18b equivalence test.
+# Previous (T18a) inline EDA script, extracted from main.nf's heredoc and made
+# runnable (argparse + de-escaped) so it can be wired into the tests as the
+# `python_script` path to compare v5 against the v1 baseline.
+# Delete once v5 passes the T18b equivalence test.
 import os
+import argparse
 from pathlib import Path
 tmp_matplotlib_dir = Path("matplotlib_tmp")
 tmp_matplotlib_dir.mkdir(exist_ok=True)
@@ -109,7 +111,7 @@ def load_vcf(vcf_file):
 # Load phenotype file
 def load_phenotype(phenotype_file):
     print(f"load_phenotype({phenotype_file})  ts = {current_milli_time()}")
-    pheno_df = pl.read_csv(phenotype_file, separator='\\t')
+    pheno_df = pl.read_csv(phenotype_file, separator='\t')
     return pheno_df
 
 # Plotting function for variant-level statistics
@@ -429,7 +431,7 @@ def plot_boxplots(vcf_df, pheno_df, samples, stat, stat_label):
     try:
         sns.boxplot(data=sample_stats, x='Y1', y='value')
     except ValueError as e:
-        print(f"ValueError {e}   sample_stats:\\n{sample_stats}")
+        print(f"ValueError {e}   sample_stats:\n{sample_stats}")
     plt.title(f'{stat_label} by Phenotype (Samples)')
     plt.xlabel('Phenotype')
     plt.ylabel(stat_label)
@@ -527,16 +529,21 @@ def main(vcf_file, phenotype_file, percentiles, use_dosage):
         plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1='GQ', stat2='DP')
         plot_stat_vs_stat(vcf_df, pheno_df, samples, stat1='GT', stat2='DS')
 
-# Run the analysis
-vcf_file = "${vcf}"
-phenotype_file = "${phenotype_file}"
-percentiles = [1, 50]
-use_dosage = "${use_dosage}" == "true"
-main(vcf_file, phenotype_file, percentiles, use_dosage)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--vcf", required=True)
+    parser.add_argument("--phenotype", required=True)
+    parser.add_argument("--use-dosage", required=True)
+    parser.add_argument("--process-name", required=True)
+    parser.add_argument("--chunk-size", type=int, default=500)  # accepted but unused (v1 has no chunking)
+    args = parser.parse_args()
 
+    percentiles = [1, 50]
+    use_dosage = str(args.use_dosage).lower() == "true"
+    main(args.vcf, args.phenotype, percentiles, use_dosage)
 
-# Write versions.yml
-with open('versions.yml', 'w') as f:
-    f.write('${task.process}:\\n')
-    f.write(f'    python: {sys.version.split()[0]}\\n')
-    f.write(f'    d3js: v7\\n')
+    # Write versions.yml
+    with open('versions.yml', 'w') as f:
+        f.write(f"{args.process_name}:\n")
+        f.write(f"    python: {sys.version.split()[0]}\n")
+        f.write("    d3js: v7\n")
