@@ -21,29 +21,21 @@ matrix has to go.
 
 ## Decision (LOCKED)
 
-**Approach: polars-bio SQL `UNNEST` + standard `GROUP BY` reductions in DataFusion.** Never
-materialize the matrix in Python. polars-bio reads the multisample VCF as a nested `genotypes`
-struct of per-FORMAT-field lists; `scan_vcf` is itself a DataFusion streaming source, so the
-engine streams the scan through the aggregate -- no Python-side batch/record iteration needed.
-We `UNNEST` to a long table `(variant_idx, sample_idx, GT, DP, GQ, DS)` and express each plot's
-reduction as a streaming hash-aggregate. Python only receives the small aggregated result
-frames. Memory target O(variants + samples + bins). Consistent with `nf-prepare-vcf`'s
-`calc_dosage_polarsbio` module. Reference usage:
-[../nf-prepare-vcf/.../calc_dosage.py](../../../nf-prepare-vcf/modules/local/python/calc_dosage_polarsbio/assets/calc_dosage.py).
+**Approach: two-pass, chunked pysam scan (v5).** Do not materialize the full
+variants x samples matrix in memory. Use pysam to iterate VCF records in chunks
+of N variants (or per-contig windows), compute per-variant statistics within
+each chunk, and accumulate per-sample running sums/counters. A second pass is
+used only for heatmaps to preserve exact `np.histogram2d` binning (global or
+per-phenotype max values must be known to set bin edges). Memory target
+O(variants + samples + bins), plus one bounded chunk.
 
-**Why standard GROUP BY is fine here (and why the FusedArrayTransform optimizer is irrelevant).**
-That optimizer ([datafusion-bio-functions optimizer_rule.rs](https://github.com/biodatageeks/datafusion-bio-functions/tree/feature/optimize_unnest_groupby/datafusion/bio-function-vcftools),
-authored for `calc_dosage.py`) fires *only* for the `UNNEST -> transform -> array_agg`-back
-pattern that reconstructs per-variant lists -- that round-trip is what blows up memory, hence
-the fused operator. Our queries are plain reductions (`AVG`/`COUNT`/`approx_percentile_cont`),
-so they ride DataFusion's default streaming hash-aggregate: state is bounded by group count
-(O(samples) or O(variants)), input rows flow through in batches and are never all buffered. We
-do **not** need and will not trigger FusedArrayTransform.
+**Why two passes are needed:** per-variant percentiles are local to a variant
+and can be computed in the first pass, but the heatmap bins depend on global
+maxima. Exact binning requires those maxima before computing the histogram.
 
-**Implementation stance:** implement directly against this design; do not benchmark first. If
-peak memory turns out bad in practice, the fallback is region-chunked reads (loop genomic
-windows via predicate pushdown on the TBI index, reduce each window in polars/numpy, accumulate)
--- but only refactor to that if the straightforward GROUP BY approach proves insufficient.
+**Implementation stance:** keep logic aligned with the previous numpy
+computations (exact `np.quantile`, exact heatmaps). Avoid polars-bio and SQL
+aggregation for v5.
 
 ## Plot -> SQL aggregation map
 
@@ -69,13 +61,12 @@ Split so the refactor is validated against the old behavior:
   *current* code to emit a structured stats artifact, capture goldens, and write the
   comparison test. Test passes exactly on current code (code vs itself).
   **Status: ✅ Done 2026-05-30.**
-- **T18b -- refactor to polars-bio streaming.** Rewrite data production; keep plotting and the
-  stats-emission schema identical. The T18a test then validates new ~= old within tolerance.
-  Lower the resource label; update container/env.
-  **Status: IN PROGRESS. v1 written but rejected for speed (see below) before its correctness was
-  confirmed; v3 redesign pending.**
+- **T18b -- refactor to v5 (pysam two-pass chunking).** Rewrite data production; keep plotting
+  and the stats-emission schema identical. The T18a test then validates new ~= old within
+  tolerance. Lower the resource label once memory improves. **Status: IN PROGRESS. v4
+  (chunked load + narrower dtypes) implemented; v5 design approved (two-pass, pysam).**
 
-## T18b v1 outcome + v3 redesign (2026-05-31)
+## T18b v1 outcome + v5 redesign (2026-05-31)
 
 ### What happened with v1
 The data layer was rewritten from inline `main.nf` Python into an external script
@@ -96,21 +87,30 @@ v1 is substantially slower.
 every aggregate needed by every plot during that pass, then plot from the small results.
 
 ### Cold-start state (files already changed this session)
-- `assets/eda.py` -- v1 (slow; correctness unconfirmed). To be replaced by v3.
+- `assets/eda.py` -- v1 (slow; correctness unconfirmed). To be superseded by v5.
 - `assets/eda__old.py` -- reference copy of the previous (T18a-instrumented) inline script,
-  extracted from `main.nf` git HEAD. **Delete once v3 passes the equivalence test.**
-- `main.nf` -- now invokes the external script: input tuple gained `path(python_script)`;
-  `script:` is just `python3 ${python_script} --vcf .. --phenotype .. --use-dosage .. --process-name ..`;
-  container `1.0.4`->`1.0.11`; label `process_9`->`process_2`; real `stub:` retained.
-- `environment.yml` -- added `conda-forge::polars-bio=0.26.0`.
+  extracted from `main.nf` git HEAD. **Delete once v5 passes the equivalence test.**
+- `assets/eda_v4.py` -- v4 (chunked load + Float16/Int8). Used by tests now; preserves exact
+  numpy percentiles and heatmaps but still materializes the full matrix after load.
+- `main.nf` -- invokes external script; input tuple includes `path(python_script)` and the script
+  runs `python3 ${python_script} --vcf .. --phenotype .. --use-dosage .. --process-name ..`.
 - Caller [workflows/rare-var-assoc.nf](../../workflows/rare-var-assoc.nf): `eda_script_ch =
-  Channel.fromPath(".../assets/eda.py").first()` `.combine`d into the EDA input.
+  Channel.fromPath(".../assets/eda.py").first()` `.combine`d into the EDA input (adjust as v5 lands).
 - Both tests ([main.nf.test](../../modules/local/python/eda/tests/main.nf.test) T7d smoke,
   [equivalence.nf.test](../../modules/local/python/eda/tests/equivalence.nf.test) T18b) pass the
-  `eda.py` path as the 4th tuple element. v3 keeps the same module/test wiring -- only the script
-  body changes.
+  script path as the 4th tuple element; currently wired to `eda_v4.py` for exact percentiles.
 
-### Verified polars-bio / SQL facts (reuse in v3; do not re-derive)
+### Verified v4/v5 facts (reuse in v5; do not re-derive)
+- `eda_v4.py` loads VCF in chunks and extends a Polars DataFrame; the full matrix still exists
+  after load, but peak memory during construction is lower and dtypes are narrower.
+- Percentiles and heatmaps remain **exact** in v4 because it still uses `np.quantile` and
+  `np.histogram2d` on numpy arrays.
+- The equivalence test is currently wired to `eda_v4.py` to avoid the approximate percentile
+  drift seen in the polars-bio v1 path.
+- The `>5`-phenotype branch is not asserted by the equivalence test, but it must remain
+  implemented and functional.
+
+### Verified polars-bio / SQL facts (archived; reuse if we revisit that path)
 - Container `python_tools:1.0.11` has polars-bio 0.26.0, polars 1.39.3, pysam 0.23.3,
   matplotlib 3.10.8, seaborn 0.13.2.
 - `register_vcf(path, name=, format_fields=['GT','DP','GQ','DS'], info_fields=['AF'])`. Schema:
@@ -126,15 +126,14 @@ every aggregate needed by every plot during that pass, then plot from the small 
 - `approx_percentile_cont(col, p)` and `AGG(...) FILTER (WHERE ...)` both work. Per-variant
   percentile NULL-guard (NULL if any group value is NULL) reproduces golden row counts exactly
   (DP p1 pheno0 = 4860, mean = 4955). Old code used exact `np.quantile`; approx lives in the
-  **loose** tolerance tier (see tiers table). A chunked-numpy v3 (Option 2) could use exact
-  `np.quantile` and move percentiles back to tight.
+  **loose** tolerance tier (see tiers table).
 - Heatmap binning exactness is fragile: replicating `np.histogram2d` edges with SQL `floor(v/bw)`
   mismatches at exact internal edges (e.g. DS=1.0 -> `1.0/0.01`=99.9999 floors to 99, np puts it
-  in bin 100). **numpy binning (Option 2) is exact by construction.** Also note the OLD overall
+  in bin 100). **numpy binning is exact by construction.** Also note the OLD overall
   heatmap hardcodes `stat2_bins = linspace(0,2,201)` (so for GQ-vs-DP, DP>2 cells are dropped) --
   a quirk that MUST be preserved to match goldens; per-pheno uses `linspace(0, nanmax, 201)`.
 - Goldens are **binary-pheno only**; the equivalence test runs only that path with
-  `use_dosage=true`. The `>5`-pheno branch is untested but must keep working (don't break it).
+  `use_dosage=true`.
 
 ### Memory reality (drives the design)
 Both a **wide** matrix (old) and a **full long frame** (one row per cell) are O(variants x samples):
@@ -143,9 +142,24 @@ Both a **wide** matrix (old) and a **full long frame** (one row per cell) are O(
 WGS** -- it is NOT an acceptable v3 on its own. v3 memory must be O(variants + samples + bins),
 i.e. only aggregated results (and at most one bounded chunk of cells) ever resident.
 
-### v3 design options
+### v5 design options
 
-**Option 1 -- consolidated GROUP BY scans (closest to LOCKED approach; ~3 scans).**
+**Option 1 -- single pass with fixed bins.**
+Use hard-coded heatmap edges and compute all stats in one pass. Fast, but binning is only
+approximate to the old code, so exact-tier heatmap comparisons may fail.
+
+**Option 2 -- two-pass chunked pysam (selected).**
+Pass 1: iterate records in chunks; compute per-variant arrays (means/percentiles), accumulate
+per-sample running sums/counts, missingness, het; track global and per-phenotype maxima for
+heatmap edges. Pass 2 (only when `use_dosage=true`): re-scan and fill `np.histogram2d` bins
+exactly with the correct edges, accumulating bin counts per chunk. This preserves exact
+percentiles and heatmaps while bounding memory by chunk size.
+
+**Option 3 -- full matrix in memory. REJECTED** (O(cells) = 25-40 GB at WGS).
+
+### Prior v3 design options (polars-bio path, archived)
+
+**Option 1 -- consolidated GROUP BY scans (closest to original LOCKED approach; ~3 scans).**
 Merge v1's many queries by grouping key:
 - Scan A: one `GROUP BY variant_idx` over the unnested stream computing **all** per-variant series
   (DP/GQ/DS mean+p1+p50 per pheno + 'all', missingness, dp_diff) plus per-variant `MAX(stat)` and
@@ -158,10 +172,9 @@ Merge v1's many queries by grouping key:
   edges precomputed from Scan A maxes. State O(bins); cells never materialized.
 - Pros: pure polars-bio streaming, lowest memory, scales to WGS, smallest conceptual delta from v1.
 - Cons: 3 scans (3x decompress); heatmap row-expansion SQL is intricate; **SQL binning vs
-  np.histogram2d exactness risk** on the exact tier (may force relaxing the heatmap tolerance, which
-  the reporting carve-out permits).
+  `np.histogram2d` exactness risk** on the exact tier (may force relaxing the heatmap tolerance).
 
-**Option 2 -- single (or double) chunked pass in Python (recommended).**
+**Option 2 -- single (or double) chunked pass in Python (pre-v5 recommendation).**
 Loop over genomic chunks (per-chromosome, or fixed N-variant windows via region predicate /
 `pysam.fetch`). Per chunk build a *small* typed frame (chunk_variants x samples; e.g. 500 variants
 -> ~26 MB) and reuse the OLD per-chunk reductions:
@@ -173,16 +186,10 @@ Heatmap edges need global/per-pheno maxes first; track them as running maxes in 
 heatmap binning in a **second** chunked pass (so `use_dosage=false` => 1 pass, `true` => 2 passes).
 - Pros: effectively one VCF traversal; memory bounded by chunk; **heatmaps and percentiles exact**
   (can tighten test tiers); large code reuse from `eda__old.py`; scales to WGS.
-- Cons: manual chunk orchestration; two passes when `use_dosage`; must verify region-predicate
-  reads in polars-bio (or fall back to `pysam.fetch` per region).
+- Cons: manual chunk orchestration; two passes when `use_dosage`.
 
 **Option 3 -- one scan, collect full long frame, aggregate in-memory. REJECTED** (O(cells) =
 25-40 GB at WGS). Fine only as a throwaway correctness oracle at fixture scale.
-
-**Recommendation:** Option 2. It satisfies the one-pass rule most literally, is the only option that
-makes heatmaps and percentiles *exact* (tightening the equivalence test rather than loosening it),
-and reuses the validated old reduction logic. Option 1 stays as fallback if chunk orchestration
-proves awkward. Decide before writing v3.
 
 ## Equivalence test design (data layer, not pixels)
 
@@ -230,21 +237,13 @@ skips `NULL` -- a divergence shows up here.
 
 ## Watch list
 
-1. **Container.** Bump from `python_tools:1.0.4` to an image with polars-bio
-   (`1.0.11` ships polars-bio 0.26.1). **Verify the image still has matplotlib + seaborn +
-   polars + pysam** that EDA needs; update `environment.yml`.
-2. **Approx percentiles.** `approx_percentile_cont` replaces exact `np.quantile` -- acceptable
-   for EDA histograms; state it as an intentional behavior change.
-3. **`start` -1 quirk.** Apply the same `+1` workaround as the reference module if POS is used.
-4. **GT / het.** GT arrives as strings (`'0/1'`, `'0|0'`, `'0'`). Replace the
-   integer-encode-then-`is_in([0,2,5,9])` het test with a direct two-differing-alleles check.
-   The one numeric use of GT (`plot_stat_vs_stat` GT-vs-DS) needs a deliberate encoding choice.
-5. **`datafusion.execution.target_partitions`** defaults to 1; bump for parallelism (trades
-   memory for speed).
-6. **2-D histogram bins** need a global `MAX(stat)` first (one cheap aggregate), as the numpy
-   code does today.
-7. **Resource label.** After the rewrite, drop `process_9` to a lower tier (target `process_2`
-   / 16 GB) and confirm against the medium fixture.
+1. **Chunk size.** Pick a default chunk size that keeps peak memory under the target tier
+  (start with 500-1000 variants). Make it easy to tune if needed.
+2. **Heatmap edges.** Pass 1 must record max values per stat (overall + per-pheno) so pass 2
+  uses the exact edges from the old code.
+3. **GT / het.** Preserve the old integer encoding and het logic; haploid calls on chrX must
+  keep working.
+4. **Resource label.** After v5, confirm the lower tier (`process_2`) on the medium fixture.
 
 ## Done when
 
@@ -260,9 +259,8 @@ skips `NULL` -- a divergence shows up here.
   still passes.
 
 **T18b**
-- `EXPLORATORY_DATA_ANALYSIS` rewritten to polars-bio streaming aggregation; no full
+- `EXPLORATORY_DATA_ANALYSIS` rewritten to two-pass chunked pysam scans; no full
   variants x samples matrix materialized in Python; plotting fns and stats-emission schema
   unchanged.
 - T18a equivalence test passes against the goldens within tolerance.
-- Container/env updated (polars-bio present; matplotlib/seaborn/polars/pysam still present).
 - Resource label lowered (target `process_2`) and verified on the medium fixture.
