@@ -1,0 +1,2 @@
+Mask_Mod	missense_variant,missense_variant&splice_region_variant,inframe_insertion,inframe_deletion
+Mask_High	stop_gained,stop_lost,frameshift_variant,splice_donor_variant,splice_acceptor_variant

@@ -1,0 +1,82 @@
+nextflow_process {
+
+    name "Test Process PYTHON_VCFTOAAF"
+    script "../main.nf"
+    process "PYTHON_VCFTOAAF"
+
+    tag "ci"
+    tag "modules"
+    tag "python"
+    tag "python/vcf2aaf"
+
+    // Fixture design is documented in tests/fixtures/README.md.
+    // 10 variants on distinct chromosomes to enable per-variant row identification
+    // without relying on the exact coordinate polars_bio assigns (0-based vs 1-based).
+    // Both AF and AF_nfe are declared in the header; per-variant INFO fields control
+    // which fallback branch fires.
+
+    test("vcf2aaf - row count, chr-prefix stripping, AF fallback logic") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test' ],
+                    file('${projectDir}/modules/local/python/vcf2aaf/tests/fixtures/test_vcf2aaf.vcf', checkIfExists: true),
+                    file('${projectDir}/modules/local/python/vcf2aaf/assets/vcf2aaf.py', checkIfExists: true)
+                ]
+                input[1] = 'AF_nfe'
+                input[2] = 'AF'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def lines = path(process.out.aaf[0][1]).readLines()
+
+            // Row count equals input variant count (10 variants in fixture)
+            assert lines.size() == 10 :
+                "expected 10 output rows (one per input variant), got ${lines.size()}"
+
+            // chr-prefix stripping: CHROM=chr5 must appear as 5_... not chr5_...
+            // (vcf2aaf.py:107 strips leading [Cc][Hh][Rr] from chromosome names)
+            assert !lines.any { it.startsWith("chr5_") } :
+                "chr prefix should be stripped; a line still starts with 'chr5_'"
+            assert lines.any { it.startsWith("5_") } :
+                "chr5 variant should appear with numeric chromosome after prefix stripping"
+
+            // Verify the format of the chr5 line: 5_<pos>_A_C<TAB><af>
+            def chr5_line = lines.find { it =~ /^5_\d+_A_C\t/ }
+            assert chr5_line != null :
+                "chr5 variant (ref=A, alt=C) should produce a pos_id matching 5_<pos>_A_C"
+
+            // AF fallback: var03 on chr2 has AF_nfe=0.25 only — must use primary tag
+            // (vcf2aaf.py:122-138 coalesce: primary_af first, default_af second)
+            def chr2_line = lines.find { it.startsWith("2_") }
+            assert chr2_line != null : "expected a variant row for chromosome 2"
+            def chr2_af = chr2_line.split('\t')[1]
+            assert chr2_af == "0.25" :
+                "AF_nfe-only variant (chr2) should use AF_nfe=0.25, got '${chr2_af}'"
+
+            // AF fallback: var04 on chr3 has AF=0.10 only — must fall through to default tag
+            // (vcf2aaf.py:132-137: primary_af is null, default_af used instead)
+            def chr3_line = lines.find { it.startsWith("3_") }
+            assert chr3_line != null : "expected a variant row for chromosome 3"
+            def chr3_af = chr3_line.split('\t')[1]
+            assert chr3_af == "0.1" :
+                "AF-only variant (chr3) should use AF=0.1, got '${chr3_af}'"
+
+            // AF fallback: var05 on chr4 has neither tag — must produce literal "0"
+            // (vcf2aaf.py:135-137: both null, otherwise clause emits pl.lit("0"))
+            def chr4_line = lines.find { it.startsWith("4_") }
+            assert chr4_line != null : "expected a variant row for chromosome 4"
+            def chr4_af = chr4_line.split('\t')[1]
+            assert chr4_af == "0" :
+                "neither-tag variant (chr4) should get AF=0, got '${chr4_af}'"
+        }
+
+    }
+
+}

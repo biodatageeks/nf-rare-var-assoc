@@ -1,0 +1,48 @@
+nextflow_process {
+
+    name "Test Process DRAW_PC_PLOT"
+    script "../main.nf"
+    process "DRAW_PC_PLOT"
+
+    tag "ci"
+    tag "modules"
+    tag "python"
+    tag "python/draw_pc_plot"
+
+    // Reporting carve-out: only smoke assertions (see main plan -- Reporting carve-out).
+    // Fixture: 10 samples in two ancestry clusters (PC1/PC2 naturally separated),
+    // phenotype Y1 split 5/5 matching the clusters.
+    // out_name_part="pca" -> expected output files: test_pca.png and test_pca.svg.
+
+    test("draw_pc_plot smoke - process succeeds, PNG and SVG plot files emitted with expected names") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test' ],
+                    file('${projectDir}/modules/local/python/draw_pc_plot/tests/fixtures/samples.sscore', checkIfExists: true),
+                    file('${projectDir}/modules/local/python/draw_pc_plot/tests/fixtures/pheno.tsv', checkIfExists: true)
+                ]
+                input[1] = "pca"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // plot_file: a single PNG named <prefix>_pca.png
+            def png_path = process.out.plot_file[0][1]
+            assert png_path.toString().endsWith("_pca.png") :
+                "expected PNG name ending in '_pca.png', got: ${png_path}"
+
+            // plot_file_svg: a single SVG named <prefix>_pca.svg
+            def svg_path = process.out.plot_file_svg[0][1]
+            assert svg_path.toString().endsWith("_pca.svg") :
+                "expected SVG name ending in '_pca.svg', got: ${svg_path}"
+        }
+
+    }
+
+}

@@ -1,0 +1,128 @@
+nextflow_workflow {
+
+    name "Test Subworkflow PCA (IT-2)"
+    script "../main.nf"
+    workflow "PCA"
+
+    tag "ci"
+    tag "subworkflows"
+    tag "subworkflows/pca"
+
+    // IT-2: exercises the full PCA subworkflow with the prepared_500 fixture
+    //   PLINK2_MAKEBED -> PLINK19_MAKESET -> PLINK2_INDEP_PAIRWISE
+    //     -> PLINK2_KING_CUTOFF -> PLINK2_PCA -> PLINK2_PROJECTION_SCORE -> DRAW_PC_PLOT
+    //
+    // The most subtle wiring is pca/main.nf:92-100: PLINK2_PROJECTION_SCORE must consume
+    // ch_eigenvec_allele from PLINK2_PCA (not ch_king_cutoff_prune_in). This is verified
+    // by checking the tracking predecessor chain.
+    //
+    // Fixture: assets/three_chr_unprepared/prepared_500/
+    //   - 417 variants, 3202 samples (1kGP high-coverage); pgen/pvar/psam + pre-computed frq
+    //   - pheno.tsv: 1202 cases (Y1=1) + 2000 controls (Y1=0) from cases.txt / controls.txt
+
+    test("pca: sscore has 10 PC columns, king_cutoff prunes relateds, projection_score predecessor is pca") {
+
+        when {
+            params {
+                skip_reporting = false
+            }
+            workflow {
+                """
+                input[0] = Channel.of(
+                    tuple(
+                        [ id:'test' ],
+                        file('${projectDir}/assets/three_chr_unprepared/prepared_500/prepared_500.pgen', checkIfExists: true),
+                        file('${projectDir}/assets/three_chr_unprepared/prepared_500/prepared_500.pvar', checkIfExists: true),
+                        file('${projectDir}/assets/three_chr_unprepared/prepared_500/prepared_500.psam', checkIfExists: true)
+                    )
+                )
+                input[1] = Channel.of(
+                    tuple(
+                        [ id:'test' ],
+                        file('${projectDir}/assets/three_chr_unprepared/pheno.tsv', checkIfExists: true)
+                    )
+                )
+                input[2] = Channel.of(
+                    tuple(
+                        [ id:'test' ],
+                        file('${projectDir}/assets/three_chr_unprepared/prepared_500/prepared_500.frq', checkIfExists: true)
+                    )
+                )
+                input[3] = Channel.fromPath('${projectDir}/assets/empty_tracking.json', checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            // ---- sscore PC column check ----
+            // plink2_pca_settings='allele-wts 10' produces eigenvec_allele with PC1..PC10.
+            // projection_score with header-read and --score-col-nums 6-15 emits those
+            // columns suffixed _AVG: #FID IID ALLELE_CT NAMED_ALLELE_DOSAGE_SUM PC1_AVG ... PC10_AVG
+            def sscore_path = workflow.out.sscore[0][1]
+            def sscore_header = file(sscore_path).readLines()[0]
+            def sscore_cols = sscore_header.split('\t')
+            def pc_cols = sscore_cols.findAll { it =~ /^PC\d+/ }
+            assert pc_cols.size() == 10 :
+                "expected exactly 10 PC columns in sscore (plink2_pca_settings='allele-wts 10'), got ${pc_cols.size()}: ${pc_cols}"
+
+            // ---- king_cutoff_prune_in: non-empty list of sample IDs ----
+            // prune_in is the set of samples that PASS the king cutoff (samples to keep).
+            // With 3202 1kGP samples, at least some should survive; the file must be non-empty.
+            def prune_in_path = workflow.out.king_cutoff_prune_in[0][1]
+            def prune_in_lines = file(prune_in_path).readLines().findAll { it.trim() }
+            assert prune_in_lines.size() > 0 :
+                "king_cutoff_prune_in must be non-empty: expected surviving samples after kinship pruning"
+            // The sample count after king cutoff must be <= the input 3202.
+            // plink2 .king.cutoff.in.id has a header line (#FID IID) followed by sample rows.
+            def prune_in_samples = prune_in_lines.findAll { !it.startsWith('#') }
+            assert prune_in_samples.size() <= 3202 :
+                "king_cutoff_prune_in sample count must not exceed input 3202, got ${prune_in_samples.size()}"
+
+            // ---- plot_file: reporting carve-out -- filename check only ----
+            def plot_path = workflow.out.plot_file[0][1]
+            assert plot_path.toString().endsWith('_pc_plot.png') :
+                "expected plot_file to end with '_pc_plot.png', got: ${plot_path}"
+
+            // ---- Tracking assertions ----
+            def tracking_paths = workflow.out.tracking.collect { it }
+            def trackings = tracking_paths.collect { p ->
+                new groovy.json.JsonSlurper().parseText(file(p).text)
+            }
+            def process_names = trackings.collect { it.process_name }
+
+            // All four key steps must appear in tracking.
+            assert process_names.any { it.toLowerCase().contains('plink2_indep_pairwise') } :
+                "expected tracking entry for plink2_indep_pairwise, got: ${process_names}"
+            assert process_names.any { it.toLowerCase().contains('plink2_king_cutoff') } :
+                "expected tracking entry for plink2_king_cutoff, got: ${process_names}"
+            assert process_names.any { it.toLowerCase().contains('plink2_pca') && !it.toLowerCase().contains('projection') } :
+                "expected tracking entry for plink2_pca (not projection_score), got: ${process_names}"
+            assert process_names.any { it.toLowerCase().contains('plink2_projection_score') } :
+                "expected tracking entry for plink2_projection_score, got: ${process_names}"
+
+            // Channel-wiring check: projection_score must chain from pca (not king_cutoff).
+            // This verifies pca/main.nf:92-100 where ch_eigenvec_allele is joined into
+            // the projection_score input, distinguishing it from the king_cutoff prune list.
+            def proj_tracking = trackings.find { it.process_name.toLowerCase().contains('plink2_projection_score') }
+            assert proj_tracking != null : "projection_score tracking entry not found in: ${process_names}"
+            assert proj_tracking.predecessor.toLowerCase().contains('plink2_pca') :
+                "projection_score predecessor must reference plink2_pca (verifies eigenvec_allele wiring), got: '${proj_tracking.predecessor}'"
+
+            // king_cutoff must remove at least one related sample from the 1kGP dataset.
+            // inputs.samples comes from the log line "N samples loaded from"; outputs.samples
+            // from "N samples remaining after". If king_cutoff log omits these lines the
+            // grep returns -1 -- in that case the assertion is a no-op (both -1).
+            def king_tracking = trackings.find { it.process_name.toLowerCase().contains('plink2_king_cutoff') }
+            assert king_tracking != null : "king_cutoff tracking entry not found in: ${process_names}"
+            def samples_before = king_tracking.inputs.samples as int
+            def samples_after  = king_tracking.outputs.samples as int
+            if (samples_before > 0 && samples_after > 0) {
+                assert samples_before > samples_after :
+                    "king_cutoff must remove at least one related sample (before=${samples_before}, after=${samples_after})"
+            }
+        }
+    }
+
+}

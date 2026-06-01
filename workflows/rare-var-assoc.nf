@@ -3,14 +3,12 @@
     IMPORT MODULES / SUBWORKFLOWS / FUNCTIONS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
-include { DOWNLOAD_FILE          } from '../modules/local/cmds/download_file'
 include { MERGE_RESULTS          } from '../modules/local/cmds/merge_results'
 include { RENAME as RENAME_1     } from '../modules/local/cmds/rename'
 include { RENAME as RENAME_2     } from '../modules/local/cmds/rename'
 include { CHECK_X_CHROM_PRESENT  } from '../modules/local/cmds/check_x_chrom_present'
 include { GENERATE_TRACKING_REPORT           } from '../modules/local/python/generate_tracking_report'
 include { EXPLORATORY_DATA_ANALYSIS          } from '../modules/local/python/eda'
-include { FIX_ZERO_PL            } from '../modules/local/python/fix_zero_PL'
 include { MERGE_SEX_COVAR        } from '../modules/local/python/merge_sex_covar'
 include { RSCRIPT_BUILDREPORTS   } from '../modules/local/rscript/buildreports'
 include { REGENIE_STEP2          } from '../modules/local/regenie/step2'
@@ -18,11 +16,8 @@ include { REGENIE_STEP1          } from '../modules/local/regenie/step1'
 include { PYTHON_VCFTOAAF        } from '../modules/local/python/vcf2aaf'
 include { BCFTOOLS_ASSIGN_ANNOTATIONS        } from '../modules/local/bcftools/assign_annotations'
 include { BCFTOOLS_ASSIGN_ANNOTATIONS as BCFTOOLS_ASSIGN_ANNOTATIONS_2 } from '../modules/local/bcftools/assign_annotations'
-include { BGENIX                 } from '../modules/local/bgenix'
-include { QCTOOL                 } from '../modules/local/qctool'
 include { PLINK2_IMPORT_DOSAGE   } from '../modules/local/plink2/import_dosage'
 include { PLINK2_EXPORT_OTHER    } from '../modules/local/plink2/export_other'
-include { PLINK2_EXPORT_BGEN     } from '../modules/local/plink2/export_bgen'
 include { PLINK2_WRITE_SNPLIST as PLINK2_WRITE_SNPLIST_1 } from '../modules/local/plink2/write_snplist'
 include { PLINK2_WRITE_SNPLIST as PLINK2_WRITE_SNPLIST_2 } from '../modules/local/plink2/write_snplist'
 include { PLINK2_MAKEPGEN as PLINK2_MAKEPGEN_1 } from '../modules/local/plink2/makepgen'
@@ -30,23 +25,19 @@ include { PLINK2_MAKEPGEN as PLINK2_MAKEPGEN_2 } from '../modules/local/plink2/m
 include { PLINK2_MAKEPGEN as PLINK2_MAKEPGEN_3 } from '../modules/local/plink2/makepgen'
 include { PLINK2_MAKEPGEN as PLINK2_MAKEPGEN_4 } from '../modules/local/plink2/makepgen'
 include { PLINK2_MAKEPGEN as PLINK2_MAKEPGEN_5 } from '../modules/local/plink2/makepgen'
-include { VEP_ANNOTATE           } from '../modules/local/vep/annotate'
-include { VEP_UPDATECACHE        } from '../modules/local/vep/updatecache'
+include { PREPARE_VCF            } from '../modules/local/nextflow_run/prepare_vcf'
 include { BCFTOOLS_VCF2PSAM      } from '../modules/local/bcftools/vcf2psam'
 include { BCFTOOLS_VCF2FRQ       } from '../modules/local/bcftools/vcf2frq'
-include { BCFTOOLS_TAG2TAG       } from '../modules/local/bcftools/tag2tag'
+include { BCFTOOLS_INDEX         } from '../modules/local/bcftools/index'
 include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_2   } from '../modules/local/bcftools/view'
-include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_1   } from '../modules/local/bcftools/filter'
-include { BCFTOOLS_FILTER as BCFTOOLS_FILTER_2   } from '../modules/local/bcftools/filter'
-include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_2 } from '../modules/local/bcftools/index'
-include { BCFTOOLS_INDEX as BCFTOOLS_INDEX_3 } from '../modules/local/bcftools/index'
+include { BCFTOOLS_REPLACE_SAMPLE_NAMES      } from '../modules/local/bcftools/replace_sample_names'
+include { BCFTOOLS_VIEW_AND_FILTER2          } from '../modules/local/bcftools/view_and_filter2'
 include { MULTIQC                } from '../modules/nf-core/multiqc'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { FILTER_MISSING_PER_PHENO           } from '../subworkflows/local/filter_missing_per_pheno'
 include { F_COEFFICIENT_FILTERING            } from '../subworkflows/local/f_coefficient_filtering'
 include { PCA                    } from '../subworkflows/local/pca'
 include { REPORTING              } from '../subworkflows/local/reporting'
-include { PREPARE                } from '../subworkflows/local/prepare'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_rare-var-assoc_pipeline'
@@ -66,23 +57,10 @@ workflow RARE_VAR_ASSOC {
 
     main:
 
-    vep_cachedir = "${projectDir}/../vep_cachedir"
     ch_versions = Channel.empty()
     ch_multiqc_files = Channel.empty()
-    ch_vep_cachedir = Channel.fromPath(vep_cachedir, checkIfExists: true)
     ch_masks = Channel.fromPath(params.input_masks, checkIfExists: true).first()
     ch_meta = ch_input_vcf.map { t -> t[0] }
-
-
-    VEP_UPDATECACHE (
-        ch_meta.first().combine(ch_vep_cachedir),
-        Channel.value(params.vep_updatecache_species),
-        Channel.value(params.vep_updatecache_options),
-        Channel.value(params.vep_cache_url),
-        Channel.value(tuple(params.ref_fasta_url, params.vep_fasta_path))
-    )
-    ch_vep_cachesubdir = VEP_UPDATECACHE.out.cachesubdir.first()
-    ch_versions = ch_versions.mix(VEP_UPDATECACHE.out.versions.first())
 
 
     // call BCFTOOLS_ASSIGN_ANNOTATIONS with a dummy python script to pull the bioinf_combo image before HyperQueue provisions workers on PLGrid
@@ -94,125 +72,90 @@ workflow RARE_VAR_ASSOC {
         Channel.value(params.rscript_annotate_options)
     )
 
+    if (params.skip_preparation == false) {
+        ch_prep_params_file = Channel.fromPath("${projectDir}/conf/nf_prepare_params.yml", checkIfExists: true).first()
 
-    PREPARE (
-        ch_input_vcf,
-        ch_vep_cachesubdir,
-        ch_all_samples
+        PREPARE_VCF (
+            ch_input_vcf,
+            ch_prep_params_file
+        )
+        ch_prepared_vcf = PREPARE_VCF.out.prepared_vcf
+        ch_versions = ch_versions.mix(PREPARE_VCF.out.versions)
+        ch_tracking = PREPARE_VCF.out.tracking.first()
+    } else {
+        ch_prepared_vcf = ch_input_vcf
+    }
+
+
+    BCFTOOLS_REPLACE_SAMPLE_NAMES (
+        ch_prepared_vcf,
+        Channel.value(params.bcftools_replace_sample_names_sed_arg),
+        Channel.value('replace_sample_names')
     )
-    ch_prepared_vcf = PREPARE.out.prepared_vcf
-    ch_prepared_vcf_tbi = PREPARE.out.prepared_vcf_tbi
-    ch_versions = ch_versions.mix(PREPARE.out.versions.first())
-    ch_tracking = PREPARE.out.tracking
+    ch_vcf_with_sample_names_corrected = BCFTOOLS_REPLACE_SAMPLE_NAMES.out.vcf
+    ch_versions = ch_versions.mix(BCFTOOLS_REPLACE_SAMPLE_NAMES.out.versions.first())
+
+
+    BCFTOOLS_INDEX (
+        ch_vcf_with_sample_names_corrected
+    )
+    ch_vcf_with_sample_names_corrected_tbi = BCFTOOLS_INDEX.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_INDEX.out.versions.first())
 
     if (!params.skip_reporting) {
-        if (!params.use_dosage) {
-            // do this only to be able to produce plots
-            FIX_ZERO_PL (
-                ch_prepared_vcf,
-                Channel.value(params.filter_and_enhance_vcf_calc_ds_min_gq),
-                Channel.value('calc_dosage')
-            )
-            ch_vcf_with_pl_corrected = FIX_ZERO_PL.out.vcf
-            ch_versions = ch_versions.mix(FIX_ZERO_PL.out.versions.first())
-
-            BCFTOOLS_INDEX_2 (
-                ch_vcf_with_pl_corrected
-            )
-            ch_vcf_with_pl_corrected_tbi = BCFTOOLS_INDEX_2.out.tbi
-            ch_versions = ch_versions.mix(BCFTOOLS_INDEX_2.out.versions.first())
-        } else {
-            ch_vcf_with_pl_corrected = ch_prepared_vcf
-            ch_vcf_with_pl_corrected_tbi = ch_prepared_vcf_tbi
-        }
-
+        eda_script_ch = Channel.fromPath("${projectDir}/modules/local/python/eda/assets/eda_v5.py", checkIfExists: true).first()
         EXPLORATORY_DATA_ANALYSIS (
-            ch_vcf_with_pl_corrected
-                .join(ch_vcf_with_pl_corrected_tbi, by: 0)
-                .join(ch_phenotype, by: 0),
+            ch_vcf_with_sample_names_corrected
+                .join(ch_vcf_with_sample_names_corrected_tbi, by: 0)
+                .join(ch_phenotype, by: 0)
+                .combine(eda_script_ch),
             Channel.value(params.use_dosage)
         )
         ch_eda_plots = EXPLORATORY_DATA_ANALYSIS.out.plots
         ch_versions = ch_versions.mix(EXPLORATORY_DATA_ANALYSIS.out.versions.first())
-    }
-
-    if ((!params.skip_preparation || !params.skip_reporting) && !params.use_dosage) {
-        // turns out bcftools, even called two times, is faster than rust-htslib
-
-        bcftools_filter_1_options = "--exclude 'QUAL<${params.filter_and_enhance_vcf_qual_min} || AVG(FORMAT/GQ)<${params.filter_and_enhance_vcf_avg_gq_min} || AVG(FORMAT/DP)<${params.filter_and_enhance_vcf_avg_dp_min} || AVG(FORMAT/DP)>${params.filter_and_enhance_vcf_avg_dp_max}' --output-type z --write-index=tbi"
-        bcftools_filter_2_options = "--exclude 'FORMAT/GQ<${params.filter_and_enhance_vcf_sample_gq_min} | FORMAT/DP < ${params.filter_and_enhance_vcf_sample_dp_min} | FORMAT/DP > ${params.filter_and_enhance_vcf_sample_dp_max}' --set-GTs '.' --output-type z --write-index=tbi"
-    
-        BCFTOOLS_FILTER_1 (
-            ch_prepared_vcf
-                .join(ch_prepared_vcf_tbi, by: 0)
-                .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
-                .combine(trackingLastOrEmpty(PREPARE.out.tracking)),
-            Channel.value(bcftools_filter_1_options),
-            Channel.value("filter1")
-        )
-        ch_filter_1_vcf  = BCFTOOLS_FILTER_1.out.vcf
-        ch_filter_1_vcf_tbi  = BCFTOOLS_FILTER_1.out.tbi
-        ch_versions = ch_versions.mix(BCFTOOLS_FILTER_1.out.versions.first())
-        ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_1.out.tracking_out.first())
-
-        BCFTOOLS_FILTER_2 (
-            ch_filter_1_vcf
-                .join(ch_filter_1_vcf_tbi, by: 0)
-                .map { meta, vcf_file, tbi_file -> tuple(meta, vcf_file, tbi_file, [], [], [], []) }
-                .combine(trackingFirstOrEmpty(BCFTOOLS_FILTER_1.out.tracking_out)),
-            Channel.value(bcftools_filter_2_options),
-            Channel.value("filter2"),
-        )
-        ch_filtered_vcf  = BCFTOOLS_FILTER_2.out.vcf
-        ch_filtered_vcf_tbi  = BCFTOOLS_FILTER_2.out.tbi
-        ch_versions = ch_versions.mix(BCFTOOLS_FILTER_2.out.versions.first())
-        ch_tracking = ch_tracking.mix(BCFTOOLS_FILTER_2.out.tracking_out.first())
     } else {
-        ch_filtered_vcf = ch_prepared_vcf
-        ch_filtered_vcf_tbi = ch_prepared_vcf_tbi
+        ch_eda_plots = Channel.empty()
     }
 
-    if (params.skip_preparation == false) {
-        VEP_ANNOTATE (
-            ch_filtered_vcf
-                .join(ch_filtered_vcf_tbi, by: 0)
-                .combine(ch_vep_cachesubdir),
-            Channel.value(params.vep_annotate_species),
-            Channel.value(params.vep_fasta_path),
-            Channel.value(params.vep_annotate_options)
-        )
-        ch_vep_vcf  = VEP_ANNOTATE.out.vcf
-        ch_versions = ch_versions.mix(VEP_ANNOTATE.out.versions.first())
 
-        BCFTOOLS_INDEX_3 (
-            ch_vep_vcf
-        )
-        ch_vep_vcf_tbi = BCFTOOLS_INDEX_3.out.tbi
-        ch_versions = ch_versions.mix(BCFTOOLS_INDEX_3.out.versions.first())
-
-        ch_vep_vcf_with_index = ch_vep_vcf.join(ch_vep_vcf_tbi, by: 0)
+    bcftools_filter_1_options = "--exclude 'QUAL<${params.filter_vcf_qual_min} || AVG(FORMAT/GQ)<${params.filter_vcf_avg_gq_min} || AVG(FORMAT/DP)<${params.filter_vcf_avg_dp_min} || AVG(FORMAT/DP)>${params.filter_vcf_avg_dp_max}'"
+    bcftools_filter_2_options = "--exclude 'FORMAT/GQ<${params.filter_vcf_sample_gq_min} | FORMAT/DP < ${params.filter_vcf_sample_dp_min} | FORMAT/DP > ${params.filter_vcf_sample_dp_max}' --set-GTs '.'"
+    BCFTOOLS_VIEW_AND_FILTER2 (
+        ch_vcf_with_sample_names_corrected
+            .join(ch_vcf_with_sample_names_corrected_tbi, by: 0)
+            .join(ch_all_samples, by: 0)
+            .map { meta, vcf_file, tbi_file, samples_file -> tuple(meta, vcf_file, tbi_file, [], [], samples_file, [], []) },
+        Channel.value(bcftools_filter_1_options),
+        Channel.value(bcftools_filter_2_options),
+        Channel.value("viewfilter2")
+    )
+    ch_filtered_vcf     = BCFTOOLS_VIEW_AND_FILTER2.out.vcf
+    ch_filtered_vcf_tbi = BCFTOOLS_VIEW_AND_FILTER2.out.tbi
+    ch_versions = ch_versions.mix(BCFTOOLS_VIEW_AND_FILTER2.out.versions.first())
+    if (params.skip_preparation) {
+        ch_tracking = BCFTOOLS_VIEW_AND_FILTER2.out.tracking_out.first()
     } else {
-        ch_vep_vcf_with_index = ch_filtered_vcf.join(ch_filtered_vcf_tbi, by: 0)
+        ch_tracking = ch_tracking.mix(BCFTOOLS_VIEW_AND_FILTER2.out.tracking_out.first())
     }
+    ch_filtered_vcf_with_index = ch_filtered_vcf.join(ch_filtered_vcf_tbi, by: 0)
 
 
     BCFTOOLS_VCF2FRQ (
-        ch_vep_vcf_with_index
+        ch_filtered_vcf_with_index
     )
     ch_frq = BCFTOOLS_VCF2FRQ.out.frq
     ch_versions = ch_versions.mix(BCFTOOLS_VCF2FRQ.out.versions.first())
 
     BCFTOOLS_VCF2PSAM (
-        ch_vep_vcf_with_index
+        ch_filtered_vcf_with_index
     )
     ch_unk_sex_psam = BCFTOOLS_VCF2PSAM.out.psam
     ch_versions = ch_versions.mix(BCFTOOLS_VCF2PSAM.out.versions.first())
 
     PLINK2_MAKEPGEN_1 (
-        ch_vep_vcf_with_index
+        ch_filtered_vcf_with_index
             .join(ch_unk_sex_psam, by: 0)
-            .map { meta, vcf_file, tbi_file, unk_sex_psam_file -> tuple(meta, [], [], unk_sex_psam_file, vcf_file, tbi_file, [], [], [],   []) },  // TODO add tracking generation to FILTER_AND_ENHANCE_VCF and use here the tracking out of PREPARE
-            //.combine(BCFTOOLS_FILTER_2.out.tracking_out.first()),
+            .map { meta, vcf_file, tbi_file, unk_sex_psam_file -> tuple(meta, [], [], unk_sex_psam_file, vcf_file, tbi_file, [], [], [],   []) },  // no upstream tracking JSON to thread here: VIEW_AND_FILTER2 is the predecessor and its tracking is mixed into ch_tracking separately
         Channel.value(''),
         Channel.value(''),
         Channel.value(params.plink2_makepgen_1_vcf_input_options),
@@ -378,7 +321,7 @@ workflow RARE_VAR_ASSOC {
     ch_tracking_step2 = ch_tracking_step2.mix(PLINK2_WRITE_SNPLIST_2.out.tracking_out.first())
 
     BCFTOOLS_VIEW_2 (
-        ch_vep_vcf_with_index
+        ch_filtered_vcf_with_index
             .join(ch_step2_sample_ids, by: 0)            // Samples file
             .join(ch_step2_snplist, by: 0)               // SNPs file
             .map { meta, vcf_file, tbi_file, samples_file, snplist_file -> tuple(meta, vcf_file, tbi_file, [], [], samples_file, snplist_file) }
@@ -425,7 +368,7 @@ workflow RARE_VAR_ASSOC {
     def vcf2aaf_opt1 = vcf2aaf_opts.size() > 1 ? vcf2aaf_opts[0] : ''
     def vcf2aaf_opt2 = vcf2aaf_opts.size() > 1 ? vcf2aaf_opts[1] : vcf2aaf_opts[0]
     PYTHON_VCFTOAAF (
-        ch_vep_vcf_with_index.map { meta, vcf, tbi -> tuple(meta, vcf) }
+        ch_filtered_vcf_with_index.map { meta, vcf, tbi -> tuple(meta, vcf) }
             .combine(python_vcf2aaf_script_ch),
         Channel.value(vcf2aaf_opt1),
         Channel.value(vcf2aaf_opt2)
@@ -447,7 +390,7 @@ workflow RARE_VAR_ASSOC {
 
     if (params.use_dosage) {
         PLINK2_EXPORT_OTHER (
-            ch_vep_vcf_with_index
+            ch_filtered_vcf_with_index
                 .join(ch_pgen_pvar_psam_6.map { meta, pgen, pvar, psam -> tuple(meta, psam) }, by: 0),
             Channel.value('traw'),
             Channel.value(params.plink2_export_other_options)
@@ -590,6 +533,16 @@ workflow RARE_VAR_ASSOC {
 
     emit:multiqc_report = MULTIQC.out.report.toList() // channel: /path/to/multiqc_report.html
     versions       = ch_versions                 // channel: [ path(versions.yml) ]
+    // Exposed for integration tests (IT-6/IT-7): the regenie association results and the
+    // annotation artifacts the naive-LOG10P soundness check recomputes against.
+    regenie_step2_out       = ch_regenie_step2_regenie_out
+    regenie_step1_pred_list = ch_regenie_step1_pred_list
+    regenie_step1_loco      = ch_regenie_step1_loco
+    setlist                 = ch_setlist
+    annotations             = ch_annotations
+    vep_annotated_vcf       = ch_vcf_with_sample_names_corrected
+    vep_annotated_vcf_tbi   = ch_vcf_with_sample_names_corrected_tbi
+    eda_plots_out           = ch_eda_plots
 
 }
 

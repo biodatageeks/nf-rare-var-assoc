@@ -1,0 +1,4 @@
+selV,cases_af,controls_af,cases_ac,controls_ac,cases_na,cases_htz,cases_hmz,controls_na,controls_htz,controls_hmz
+chr22:100:A:T,0.25,0,1,0,0,S001,"",0,"",""
+chr22:200:G:C,0.75,0,3,0,0,S002,S001,0,"",""
+chr22:300:C:G,0,0.25,0,1,0,"","",0,S003,""

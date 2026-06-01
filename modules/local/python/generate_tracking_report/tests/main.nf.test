@@ -1,0 +1,57 @@
+nextflow_process {
+
+    name "Test Process GENERATE_TRACKING_REPORT"
+    script "../main.nf"
+    process "GENERATE_TRACKING_REPORT"
+
+    tag "ci"
+    tag "modules"
+    tag "python"
+    tag "python/generate_tracking_report"
+
+    // Reporting carve-out: only smoke assertions (see main plan -- Reporting carve-out).
+    // Fixture: two chained tracking JSONs (step1 predecessor="none", step2 predecessor
+    // = step1's process_name). Exercises the DAG construction and both report writers.
+    // The .txt report emits "Process: PREPARE_STEP" and "Process: FILTER_STEP"
+    // (short names derived via full_name.split(":")[-1]).
+
+    test("generate_tracking_report smoke - process succeeds, HTML and TXT emitted, TXT names both steps") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test' ],
+                    [
+                        file('${projectDir}/modules/local/python/generate_tracking_report/tests/fixtures/step1.tracking.json', checkIfExists: true),
+                        file('${projectDir}/modules/local/python/generate_tracking_report/tests/fixtures/step2.tracking.json', checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // Both output files emitted
+            def html_path = process.out.report_html_file[0][1]
+            assert html_path.toString().endsWith("_sankey_report.html") :
+                "expected HTML name ending in '_sankey_report.html', got: ${html_path}"
+
+            def txt_path = process.out.report_txt_file[0][1]
+            assert txt_path.toString().endsWith("_pipeline_report.txt") :
+                "expected TXT name ending in '_pipeline_report.txt', got: ${txt_path}"
+
+            // TXT report must mention both step short-names (business logic: both tracking
+            // records were consumed and written to the report)
+            def txt = path(process.out.report_txt_file[0][1]).text
+            assert txt.contains("PREPARE_STEP") :
+                "pipeline_report.txt should contain 'PREPARE_STEP' (step 1 short name)"
+            assert txt.contains("FILTER_STEP") :
+                "pipeline_report.txt should contain 'FILTER_STEP' (step 2 short name)"
+        }
+
+    }
+
+}

@@ -1,0 +1,96 @@
+nextflow_process {
+
+    name "Test Process EXPLORATORY_DATA_ANALYSIS"
+    script "../main.nf"
+    process "EXPLORATORY_DATA_ANALYSIS"
+
+    tag "ci"
+    tag "modules"
+    tag "python"
+    tag "python/eda"
+
+    // Reporting carve-out: only smoke assertions (see main plan -- Reporting carve-out).
+    // Fixture: 10 samples from the canonical unprepared_rand_500 VCF (3202 samples,
+    // ~500 variants, 3 chromosomes) assigned to two phenotype groups (Y1=1 and Y1=2).
+    // Unmatched VCF samples receive Y1=null via left-join; with exactly 2 distinct
+    // phenotype values the script takes the len(phenotypes)==2 code paths
+    // (per-phenotype histograms, DP difference plots between the two groups).
+    // use_dosage=false so DS-related plots are skipped.
+
+    test("eda smoke - process succeeds, PNG and SVG plots emitted, versions.yml names the process") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test' ],
+                    file('${projectDir}/assets/three_chr_unprepared/unprepared_rand_500.vcf.gz', checkIfExists: true),
+                    file('${projectDir}/assets/three_chr_unprepared/unprepared_rand_500.vcf.gz.tbi', checkIfExists: true),
+                    file('${projectDir}/modules/local/python/eda/tests/fixtures/pheno.tsv', checkIfExists: true),
+                    file('${projectDir}/modules/local/python/eda/assets/eda_v5.py', checkIfExists: true)
+                ]
+                input[1] = false
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // Reporting carve-out: assert the *expected set of output files* is produced
+            // (filenames, not content).  This scenario is use_dosage=false with a binary
+            // phenotype (the len(phenotypes)==2 / <=5 branch), so DS- and heatmap-related
+            // plots are absent and every plot is the per-phenotype variant.
+            def expectedStems = [
+                // plot_variant_stats(DP): overall mean (1/1b) + per-pheno percentiles/mean (3/3b)
+                '1_DP_mean_variants', '1b_DP_mean_variants',
+                '3_DP_percentile_1_by_phenotype_variants', '3b_DP_percentile_1_by_phenotype_variants',
+                '3_DP_percentile_50_by_phenotype_variants', '3b_DP_percentile_50_by_phenotype_variants',
+                '3_DP_percentile_mean_by_phenotype_variants', '3b_DP_percentile_mean_by_phenotype_variants',
+                // plot_sample_stats(DP)
+                '5_DP_by_phenotype_samples',
+                // plot_variant_stats(GQ)
+                '1_GQ_mean_variants', '1b_GQ_mean_variants',
+                '3_GQ_percentile_1_by_phenotype_variants', '3b_GQ_percentile_1_by_phenotype_variants',
+                '3_GQ_percentile_50_by_phenotype_variants', '3b_GQ_percentile_50_by_phenotype_variants',
+                '3_GQ_percentile_mean_by_phenotype_variants', '3b_GQ_percentile_mean_by_phenotype_variants',
+                // plot_sample_stats(GQ)
+                '5_GQ_by_phenotype_samples',
+                // plot_missingness (per-pheno variant + sample)
+                '7_missingness_by_phenotype_variants', '9_missingness_by_phenotype_samples',
+                // plot_dp_differences (binary -> cases vs controls)
+                '10_dp_abs_diff_cases_controls', '10b_dp_abs_diff_cases_controls',
+                // plot_allele_frequency / variant_types / chrom_density / heterozygosity
+                '11_allele_frequency', '12_variant_types', '13_chrom_variant_density',
+                '15_heterozygosity_by_phenotype_samples',
+                // plot_boxplots(DP), plot_boxplots(GQ)
+                '16_DP_boxplot_by_phenotype', '16_GQ_boxplot_by_phenotype',
+            ]
+
+            def toNames = { out ->
+                def files = out instanceof List ? out : [out]
+                files.collect { new File(it.toString()).name }.toSet()
+            }
+            def pngNames = toNames(process.out.plots[0][1])
+            def svgNames = toNames(process.out.plots_svg[0][1])
+
+            expectedStems.each { stem ->
+                assert pngNames.contains("${stem}.png" as String) :
+                    "missing PNG ${stem}.png; produced: ${pngNames.sort()}"
+                assert svgNames.contains("${stem}.svg" as String) :
+                    "missing SVG ${stem}.svg; produced: ${svgNames.sort()}"
+            }
+            // No unexpected extras (catches dropped/added plots in either direction).
+            assert pngNames.size() == expectedStems.size() :
+                "unexpected PNG set; produced: ${pngNames.sort()}"
+            assert svgNames.size() == expectedStems.size() :
+                "unexpected SVG set; produced: ${svgNames.sort()}"
+
+            // versions.yml must name the process (not a generic 'python:' key alone)
+            assert path(process.out.versions[0]).text.contains('EXPLORATORY_DATA_ANALYSIS:') :
+                "versions.yml should contain 'EXPLORATORY_DATA_ANALYSIS:'"
+        }
+
+    }
+
+}

@@ -4,18 +4,22 @@ nextflow_process {
     script "../main.nf"
     process "BCFTOOLS_VCF2FRQ"
 
+    tag "ci"
     tag "modules"
-    tag "modules_nfcore"
     tag "bcftools"
     tag "bcftools/vcf2frq"
 
-    test("sarscov2 - [vcf, tbi]") {
+    // Module: bcftools query extracts AF and AC from VCF INFO fields into a
+    // PLINK-style .frq file with columns CHR SNP A1 A2 MAF NCHROBS.
+    // Output feeds PLINK2_MAKEBED (--read-freq) for allele-frequency-aware analysis.
+
+    test("chr22 VCF: frq file has expected columns and variant count") {
 
         when {
             process {
                 """
-                input[0] = [ 
-                    [ id:'out' ], // meta map
+                input[0] = [
+                    [ id:'out' ],
                     file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true),
                     []
                 ]
@@ -24,13 +28,34 @@ nextflow_process {
         }
 
         then {
-            assertAll(
-                { assert process.success },
-                { assert snapshot(
-                    process.out.frq,
-                    process.out.versions
-                ).match() }
-            )
+            assert process.success
+
+            def frq_lines = path(process.out.frq.get(0).get(1)).readLines()
+
+            // Header must contain the six columns the downstream modules rely on.
+            assert frq_lines[0] == 'CHR\tSNP\tA1\tA2\tMAF\tNCHROBS' :
+                "frq header must be CHR SNP A1 A2 MAF NCHROBS (tab-separated)"
+
+            // Row count must match the number of variants in the input VCF (2593).
+            assert frq_lines.size() == 2594 :
+                "frq must have 1 header + 2593 data rows (one per variant in the input VCF)"
+
+            // All records must be on chromosome 22 (the only chromosome in the input).
+            assert frq_lines.tail().every { it.startsWith('22\t') } :
+                "all frq data rows must be on chromosome 22"
+
+            // Spot-check first variant: known values from the input VCF.
+            // 22_10935618_T_C: REF=T, ALT=C, INFO/AF=0.0390381, INFO/AC=250.
+            // The module swaps A1/A2 (A1=ALT, A2=REF) per the awk expression.
+            def first = frq_lines[1].split('\t')
+            assert first[0] == '22'           : "CHR must be 22"
+            assert first[1] == '22_10935618_T_C' : "first SNP ID must match input"
+            assert first[2] == 'C'            : "A1 must be ALT allele (C)"
+            assert first[3] == 'T'            : "A2 must be REF allele (T)"
+            assert first[4].toDouble() > 0    : "MAF must be positive"
+            assert first[5].toInteger() > 0   : "NCHROBS must be positive"
+
+            assert snapshot(process.out.versions).match()
         }
 
     }

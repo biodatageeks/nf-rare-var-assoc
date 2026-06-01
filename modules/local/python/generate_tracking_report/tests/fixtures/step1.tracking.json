@@ -1,0 +1,14 @@
+{
+    "process_name": "WORKFLOW:PREPARE_STEP",
+    "workflow_name": "RARE_VAR_ASSOC",
+    "inputs": {
+        "variants": 500,
+        "samples": 100
+    },
+    "outputs": {
+        "variants": 450,
+        "samples": 98
+    },
+    "parameters": "--filter-qual 30",
+    "predecessor": "none"
+}

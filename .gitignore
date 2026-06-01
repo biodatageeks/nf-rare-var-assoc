@@ -15,3 +15,13 @@ null/
 .nf-test
 .nf-test.log
 **/tests/*.test.snap
+
+# for now adding these files to .gitignore - when we'll figure out we need any of them we'll commit it. After we finish fixing tests we'll delete the unneeded ones
+assets/three_chr_unprepared/unprepared_rand_10k.vcf.gz
+assets/three_chr_unprepared/unprepared_rand_10k.vcf.gz.tbi
+assets/three_chr_unprepared/unprepared_rand_1k.vcf.gz
+assets/three_chr_unprepared/unprepared_rand_1k.vcf.gz.tbi
+assets/three_chr_unprepared/unprepared_rand_2k.vcf.gz
+assets/three_chr_unprepared/unprepared_rand_2k.vcf.gz.tbi
+assets/three_chr_unprepared/unprepared_rand_5k.vcf.gz
+assets/three_chr_unprepared/unprepared_rand_5k.vcf.gz.tbi

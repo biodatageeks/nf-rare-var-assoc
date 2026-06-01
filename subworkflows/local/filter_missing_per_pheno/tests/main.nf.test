@@ -1,0 +1,123 @@
+nextflow_workflow {
+
+    name "Test Subworkflow FILTER_MISSING_PER_PHENO (IT-3)"
+    script "../main.nf"
+    workflow "FILTER_MISSING_PER_PHENO"
+
+    tag "ci"
+    tag "subworkflows"
+    tag "subworkflows/filter_missing_per_pheno"
+
+    // IT-3: exercises FILTER_MISSING_PER_PHENO with two engineered phenotype groups.
+    //
+    // Fixture design (see tests/fixtures/README.md):
+    //   Variant 12_52171632_T_C has 1127/3202 total missing genotypes (35.2%).
+    //   Samples are split so that:
+    //     Group 1 (Y1=1, 1202 samples): 180 missing  -> F_MISS ~14.97%
+    //     Group 2 (Y1=2, 2000 samples): 947 missing  -> F_MISS ~47.35%
+    //   With --geno 0.30:
+    //     - 12_52171632_T_C passes Group 1 filter (14.97% < 30%)
+    //     - 12_52171632_T_C fails Group 2 filter  (47.35% > 30%)
+    //     - --extract-intersect removes it from output
+    //   Control: 12_553708_G_A has 0% missing in both groups, present in output.
+    //
+    // Code path:
+    //   EXTRACT_PHENOTYPES_AND_SAMPLES splits two_pheno.tsv into two sample files
+    //   (test_samples_1.txt = 1202, test_samples_2.txt = 2000).
+    //   PLINK2_WRITE_SNPLIST runs twice via flatMap (main.nf:33-39), once per sample file.
+    //   PLINK2_MAKEPGEN runs once with --extract-intersect of both snplists (main.nf:49-62),
+    //   producing a single pgen/pvar/psam with all 3202 samples.
+
+    test("filter_missing_per_pheno: 12_52171632_T_C absent, 12_553708_G_A present, 3202 samples preserved") {
+
+        when {
+            params {
+                plink2_missing_per_pheno_options = '--geno 0.30'
+            }
+            workflow {
+                """
+                input[0] = Channel.of(
+                    tuple(
+                        [ id:'test' ],
+                        file('${projectDir}/assets/three_chr_unprepared/prepared_500/prepared_500.pgen', checkIfExists: true),
+                        file('${projectDir}/assets/three_chr_unprepared/prepared_500/prepared_500.pvar', checkIfExists: true),
+                        file('${projectDir}/assets/three_chr_unprepared/prepared_500/prepared_500.psam', checkIfExists: true)
+                    )
+                )
+                input[1] = Channel.of(
+                    tuple(
+                        [ id:'test' ],
+                        file('${projectDir}/subworkflows/local/filter_missing_per_pheno/tests/fixtures/two_pheno.tsv', checkIfExists: true)
+                    )
+                )
+                input[2] = Channel.fromPath('${projectDir}/assets/empty_tracking.json', checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            // ---- pgen_pvar_psam_out: exactly 1 entry ----
+            // MAKEPGEN runs once with --extract-intersect of both per-phenotype snplists.
+            assert workflow.out.pgen_pvar_psam_out.size() == 1 :
+                "expected exactly 1 pgen_pvar_psam_out entry (MAKEPGEN runs once), got ${workflow.out.pgen_pvar_psam_out.size()}"
+
+            // ---- output pvar: variant presence / absence pins the intersection logic ----
+            // 12_52171632_T_C: passes Group 1 filter (14.97% < 30%) but fails Group 2 (47.35% > 30%)
+            //   -> absent from Group 2's snplist -> absent from the --extract-intersect output
+            // 12_553708_G_A: 0% missing in both groups -> present in both snplists -> in output
+            def pvar_path = workflow.out.pgen_pvar_psam_out[0][2]
+            def output_variant_ids = file(pvar_path).readLines()
+                .findAll { !it.startsWith('#') && it.trim() }
+                .collect { it.split('\t')[2] }   // column 3 = ID in PLINK2 .pvar
+
+            assert !output_variant_ids.contains('12_52171632_T_C') :
+                "12_52171632_T_C must be absent from output (47.35% missing in Group 2 > --geno 0.30 threshold)"
+
+            assert output_variant_ids.contains('12_553708_G_A') :
+                "12_553708_G_A must be present in output (0% missing in both groups)"
+
+            // ---- output psam: 3202 samples preserved ----
+            // MAKEPGEN applies no --keep; all input samples pass through.
+            def psam_path = workflow.out.pgen_pvar_psam_out[0][3]
+            def psam_sample_count = file(psam_path).readLines()
+                .findAll { !it.startsWith('#') && it.trim() }
+                .size()
+            assert psam_sample_count == 3202 :
+                "expected 3202 samples in output psam (MAKEPGEN preserves all samples), got ${psam_sample_count}"
+
+            // ---- meta.id: orig_id round-trip ----
+            // filter_missing_per_pheno/main.nf:50-53 strips orig_id and restores meta.id.
+            def out_meta = workflow.out.pgen_pvar_psam_out[0][0]
+            assert out_meta.id == 'test' :
+                "expected output meta.id == 'test' (orig_id round-trip), got '${out_meta.id}'"
+
+            // ---- tracking: per-phenotype WRITE_SNPLIST entries ----
+            // The flatMap in main.nf:33-39 splits into 2 runs; each emits a tracking file.
+            def tracking_paths = workflow.out.tracking.collect { it }
+            def trackings = tracking_paths.collect { p ->
+                new groovy.json.JsonSlurper().parseText(file(p).text)
+            }
+            def process_names = trackings.collect { it.process_name }
+
+            def write_snplist_trackings = trackings.findAll {
+                it.process_name.toLowerCase().contains('write_snplist') ||
+                it.process_name.toLowerCase().contains('identify_acceptable_variants')
+            }
+            assert write_snplist_trackings.size() >= 2 :
+                "expected >=2 WRITE_SNPLIST tracking entries (one per phenotype group), got ${write_snplist_trackings.size()} in: ${process_names}"
+
+            // Per-phenotype runs show different outputs.samples: 1202 (Group 1) and 2000 (Group 2).
+            def snplist_out_samples = write_snplist_trackings
+                .collect { (it.outputs?.samples as int) }
+                .findAll { it > 0 }
+                .sort()
+            assert snplist_out_samples.contains(1202) :
+                "expected one WRITE_SNPLIST tracking entry with outputs.samples=1202 (Group 1), got: ${snplist_out_samples}"
+            assert snplist_out_samples.contains(2000) :
+                "expected one WRITE_SNPLIST tracking entry with outputs.samples=2000 (Group 2), got: ${snplist_out_samples}"
+        }
+    }
+
+}

@@ -116,6 +116,166 @@
                 }
             }
         },
+        "pipeline_options": {
+            "title": "Pipeline options",
+            "type": "object",
+            "fa_icon": "fas fa-cogs",
+            "description": "Pipeline behaviour flags.",
+            "properties": {
+                "skip_preparation": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip VCF preparation subworkflow (assumes input is already prepared)",
+                    "fa_icon": "fas fa-forward"
+                },
+                "skip_reporting": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip HTML report generation",
+                    "fa_icon": "fas fa-forward"
+                },
+                "use_dosage": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Use dosage (DS field) instead of hard genotype calls in Regenie",
+                    "fa_icon": "fas fa-dna"
+                },
+                "publish_intermediate": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Publish intermediate files to outdir",
+                    "fa_icon": "fas fa-folder-open"
+                },
+                "regenie_step1_kinship_filtering": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable kinship-based sample filtering in Regenie step 1",
+                    "fa_icon": "fas fa-dna"
+                },
+                "tmpdir": {
+                    "type": "string",
+                    "description": "Temporary directory override",
+                    "fa_icon": "fas fa-folder"
+                },
+                "errorStrategy": {
+                    "type": "string",
+                    "description": "Override process error strategy (e.g. retryThenIgnore, terminate)",
+                    "fa_icon": "fas fa-exclamation-triangle"
+                }
+            }
+        },
+        "vcf_preparation": {
+            "title": "VCF preparation",
+            "type": "object",
+            "fa_icon": "fas fa-file-medical-alt",
+            "description": "Parameters controlling VCF filtering and sample-name normalisation.",
+            "properties": {
+                "bcftools_view_1_options": {
+                    "type": "string",
+                    "default": "--output-type z --write-index=tbi",
+                    "description": "bcftools view options for initial sample-subsetting step",
+                    "fa_icon": "fas fa-gear"
+                },
+                "bcftools_replace_sample_names_sed_arg": {
+                    "type": "string",
+                    "default": "s/_/-/g",
+                    "description": "sed expression for sample-name normalisation",
+                    "fa_icon": "fas fa-gear"
+                },
+                "filter_vcf_qual_min": {
+                    "type": "string",
+                    "default": "25",
+                    "description": "Minimum QUAL score",
+                    "fa_icon": "fas fa-gear"
+                },
+                "filter_vcf_avg_gq_min": {
+                    "type": "string",
+                    "default": "25",
+                    "description": "Minimum average GQ across samples",
+                    "fa_icon": "fas fa-gear"
+                },
+                "filter_vcf_avg_dp_min": {
+                    "type": "string",
+                    "default": "25",
+                    "description": "Minimum average DP across samples",
+                    "fa_icon": "fas fa-gear"
+                },
+                "filter_vcf_avg_dp_max": {
+                    "type": "string",
+                    "default": "200",
+                    "description": "Maximum average DP across samples",
+                    "fa_icon": "fas fa-gear"
+                },
+                "filter_vcf_sample_gq_min": {
+                    "type": "string",
+                    "default": "20",
+                    "description": "Minimum per-sample GQ (set GT to missing below threshold)",
+                    "fa_icon": "fas fa-gear"
+                },
+                "filter_vcf_sample_dp_min": {
+                    "type": "string",
+                    "default": "20",
+                    "description": "Minimum per-sample DP",
+                    "fa_icon": "fas fa-gear"
+                },
+                "filter_vcf_sample_dp_max": {
+                    "type": "string",
+                    "default": "250",
+                    "description": "Maximum per-sample DP",
+                    "fa_icon": "fas fa-gear"
+                }
+            }
+        },
+        "plink2_options": {
+            "title": "PLINK2 options",
+            "type": "object",
+            "fa_icon": "fas fa-sliders-h",
+            "description": "Options for PLINK2 pgen-import and PCA subworkflow steps.",
+            "properties": {
+                "plink2_makepgen_1_options": {
+                    "type": "string",
+                    "default": "--double-id --vcf-half-call missing --split-par b38 --1",
+                    "description": "Options for initial VCF to pgen import",
+                    "fa_icon": "fas fa-pen-to-square"
+                },
+                "plink2_makepgen_1_vcf_input_options": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Additional VCF input options for pgen import step 1",
+                    "fa_icon": "fas fa-pen-to-square"
+                },
+                "plink2_makepgen_2_options": {
+                    "type": "string",
+                    "default": "--impute-sex max-female-xf=0.2 min-male-xf=0.8",
+                    "description": "Options for sex imputation step",
+                    "fa_icon": "fas fa-pen-to-square"
+                },
+                "plink2_makepgen_3_options": {
+                    "type": "string",
+                    "default": "--geno 0.1 --hwe 1e-13 0.001 --mac 70 --maf 0.01",
+                    "description": "Options for common-variant QC filtering",
+                    "fa_icon": "fas fa-pen-to-square"
+                },
+                "plink2_makepgen_4_options": {
+                    "type": "string",
+                    "default": "--geno 0.2",
+                    "description": "Options for step-4 pgen filter",
+                    "fa_icon": "fas fa-pen-to-square"
+                },
+                "plink2_makepgen_5_options": {
+                    "type": "string",
+                    "default": "--mind 0.2",
+                    "description": "Options for per-sample missingness filter",
+                    "fa_icon": "fas fa-pen-to-square"
+                },
+                "plink19_makeset_options": {
+                    "type": "string",
+                    "default": "--allow-extra-chr",
+                    "description": "Options for PLINK1.9 makeset step in PCA subworkflow",
+                    "fa_icon": "fas fa-pen-to-square"
+                }
+            }
+        },
         "generic_options": {
             "title": "Generic options",
             "type": "object",
@@ -593,6 +753,20 @@
                     "default": true,
                     "fa_icon": "fas fa-check-square",
                     "hidden": true
+                },
+                "help_full": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Show full help including hidden params",
+                    "fa_icon": "fas fa-question-circle",
+                    "hidden": true
+                },
+                "show_hidden": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Show hidden params in help output",
+                    "fa_icon": "fas fa-eye",
+                    "hidden": true
                 }
             }
         }
@@ -603,6 +777,15 @@
         },
         {
             "$ref": "#/$defs/institutional_config_options"
+        },
+        {
+            "$ref": "#/$defs/pipeline_options"
+        },
+        {
+            "$ref": "#/$defs/vcf_preparation"
+        },
+        {
+            "$ref": "#/$defs/plink2_options"
         },
         {
             "$ref": "#/$defs/generic_options"

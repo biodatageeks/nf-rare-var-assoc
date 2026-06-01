@@ -1,49 +1,61 @@
-// TODO nf-core: Once you have added the required tests, please run the following command to build this file:
-// nf-core modules test rscriptmanhattanqqplots
 nextflow_process {
 
     name "Test Process RSCRIPT_MANHATTAN_QQ_PLOTS"
     script "../main.nf"
     process "RSCRIPT_MANHATTAN_QQ_PLOTS"
 
+    tag "ci"
     tag "modules"
-    tag "modules_"
-    tag "rscriptmanhattanqqplots"
+    tag "rscript/manhattan_qq_plots"
 
-    // TODO nf-core: Change the test name preferably indicating the test-data and file-format used
-    test("generate html report with plots") {
-
-        // TODO nf-core: If you are created a test for a chained module
-        // (the module requires running more than one process to generate the required output)
-        // add the 'setup' method here.
-        // You can find more information about how to use a 'setup' method in the docs (https://nf-co.re/docs/contributing/modules#steps-for-creating-nf-test-for-chained-modules).
+    // Smoke test per reporting carve-out (see docs/test-quality-and-cleanup-plan.md).
+    // Reuses IT-5 fixtures from subworkflows/local/reporting/tests/fixtures/.
+    //
+    // Module signature (1 input - 11-element tuple):
+    //   tuple val(meta), path(phenotype_file), path(pc_plot_file), path(eda_plots),
+    //         path(setlist_file), val(phenotype), path(regenie_merged), path(mask_file),
+    //         path(gwas_report_template), path(r_functions_file), path(rmd_pheno_stats_file)
+    //
+    // Production caller: subworkflows/local/reporting/main.nf:23
+    test("IT-5 fixtures - html report emitted with expected filename") {
 
         when {
+            params {
+                project_name                 = 'test-project'
+                project_date                 = '2026-05-28'
+                phenotypes_apply_rint        = false
+                manhattan_annotation_enabled = false
+                annotation_min_log10p        = 1
+                plot_ylimit                  = 0
+            }
             process {
                 """
-                input[0] = [
-                    'Y1', // phenotype
-                    file('${projectDir}/modules/local/cmds/merge_results/tests/assets/chr1_Y1.regenie.gz', checkIfExists: true)
-                ]
-                input[1] = file("${projectDir}/modules/local/rscript/manhattan_qq_plots/assets/gene_level_report_template.Rmd", checkIfExists: true)
-                input[2] = file("${projectDir}/modules/local/rscript/manhattan_qq_plots/assets/functions.R", checkIfExists: true)
-                input[3] = file('${projectDir}/modules/local/rscript/manhattan_qq_plots/tests/assets/masks.txt', checkIfExists: true)
-                input[4] = [
-                    [ id:'test', single_end:false ], // meta map
-                    file('${projectDir}/modules/local/rscript/manhattan_qq_plots/tests/assets/phenotype.txt', checkIfExists: true)
-                ]
-                input[5] = file("${projectDir}/modules/local/rscript/manhattan_qq_plots/assets/child_phenostatistics.Rmd", checkIfExists: true)
+                input[0] = tuple(
+                    [ id:'test' ],
+                    file('${projectDir}/subworkflows/local/reporting/tests/fixtures/pheno.tsv',     checkIfExists: true),
+                    file('${projectDir}/subworkflows/local/reporting/tests/fixtures/pc_plot.png',   checkIfExists: true),
+                    file('${projectDir}/subworkflows/local/reporting/tests/fixtures/eda_plot.png',  checkIfExists: true),
+                    file('${projectDir}/subworkflows/local/reporting/tests/fixtures/test.setlist',  checkIfExists: true),
+                    'Y1',
+                    file('${projectDir}/subworkflows/local/reporting/tests/fixtures/Y1.regenie.gz', checkIfExists: true),
+                    file('${projectDir}/subworkflows/local/reporting/tests/fixtures/masks.txt',     checkIfExists: true),
+                    file('${projectDir}/modules/local/rscript/manhattan_qq_plots/assets/gene_level_report_template.Rmd', checkIfExists: true),
+                    file('${projectDir}/modules/local/rscript/manhattan_qq_plots/assets/functions.R',                   checkIfExists: true),
+                    file('${projectDir}/modules/local/rscript/manhattan_qq_plots/assets/child_phenostatistics.Rmd',     checkIfExists: true)
+                )
                 """
             }
         }
 
         then {
-            assertAll(
-                { assert process.success },
-                // { assert snapshot(process.out).match() }
-                //TODO nf-core: Add all required assertions to verify the test output.
-                // See https://nf-co.re/docs/contributing/tutorials/nf-test_assertions for more information and examples.
-            )
+            assert process.success
+
+            // Reporting carve-out: assert the HTML report is emitted with the expected filename.
+            def html_path = process.out.plots_report[0]
+            assert html_path.toString().endsWith('_manhattan_qq_plots.html') :
+                "expected HTML filename ending in '_manhattan_qq_plots.html', got: ${html_path}"
+
+            assert snapshot(process.out.versions).match()
         }
 
     }

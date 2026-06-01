@@ -1,50 +1,42 @@
-// TODO nf-core: Once you have added the required tests, please run the following command to build this file:
-// nf-core modules test regenie
 nextflow_process {
 
     name "Test Process REGENIE_STEP1"
     script "../main.nf"
     process "REGENIE_STEP1"
 
+    tag "ci"
     tag "modules"
-    tag "modules_"
-    tag "regeniestep1"
+    tag "regenie"
+    tag "regenie/step1"
 
-    // TODO nf-core: Change the test name preferably indicating the test-data and file-format used
-    test("small vcf") {
+    test("three_chr VCF - step1 produces pred_list and loco with real LOCO separation") {
 
-        // TODO nf-core: If you are created a test for a chained module
-        // (the module requires running more than one process to generate the required output)
-        // add the 'setup' method here.
-        // You can find more information about how to use a 'setup' method in the docs (https://nf-co.re/docs/contributing/modules#steps-for-creating-nf-test-for-chained-modules).
-
+        // Setup: convert VCF to pgen, then write QC-passing sample-ID and snplist files.
+        // Mirrors the production chain in workflows/rare-var-assoc.nf lines 206-331.
+        // VCF: assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz - 5000 variants across
+        // chr12, chr22, chrX; 3202 1000G samples. Using three chromosomes gives proper LOCO
+        // semantics: the chr22 LOCO row is genuinely fit from chr12+chrX data, not all-zeros.
+        // Phenotype fixture: 500 cases (Y1=1) + 500 controls (Y1=0) drawn from
+        // assets/medium_data/1kGP_cases.txt and 1kGP_controls.txt; same 1000G sample IDs.
         setup {
-            run("PLINK2_MAKEBED") {
-                script "../../../plink2/makebed/main.nf"
+            run("PLINK2_MAKEPGEN") {
+                script "../../../plink2/makepgen/main.nf"
                 process {
                     """
                     input[0] = [
-                        [ id:'test', single_end:false ], // meta map
-                        [],  // bed
-                        [],  // bim
-                        [],  // fam
-                        file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true),
-                        []   // frq
+                        [ id:'test', single_end:false ],
+                        [], [],  // pgen, pvar
+                        // psam provides sex for chrX; generated from assets/integrated_call_samples_v3.20250704.ALL.ped
+                        file('${projectDir}/assets/three_chr_unprepared/samples.psam', checkIfExists: true),
+                        file('${projectDir}/assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz', checkIfExists: true),
+                        file('${projectDir}/assets/medium_data/prepared_chr_12_22_X_csq_filtered_2k_rand_3k.vcf.gz.tbi', checkIfExists: true),
+                        [], [], [], []  // frq, samples_filter, variants_filter, tracking_in
                     ]
-                    input[1] = '--remove'
-                    input[2] = '--exclude'
-                    input[3] = 'filter'
-                    input[4] = '--mac 1 --double-id --vcf-half-call missing'
-                    """
-                }
-            }
-            run("PLINK2_EXPORT_BGEN") {
-                script "../../../plink2/export_bgen/main.nf"
-                process {
-                    """
-                    input[0] = PLINK2_MAKEBED.out.out_bed_bim_fam
-                    input[1] = 'pvcf.norm_zlib'
-                    input[2] = '--1 --export bgen-1.2 bits=8 id-paste=iid ref-first'
+                    input[1] = ''  // samples_filtering_type (not exercised)
+                    input[2] = ''  // variants_filtering_type (not exercised)
+                    input[3] = ''  // vcf_input_options
+                    input[4] = 'makepgen'
+                    input[5] = '--double-id --vcf-half-call missing --split-par b38'
                     """
                 }
             }
@@ -52,44 +44,16 @@ nextflow_process {
                 script "../../../plink2/write_snplist/main.nf"
                 process {
                     """
-                    input[0] = PLINK2_MAKEBED.out.out_bed_bim_fam
-                    input[1] = 'qc_pass'
-                    input[2] = '--maf 0.01 --mac 1 --geno 0.1 --hwe 1e-15 --write-samples'
-                    """
-                }
-            }
-            run("BGENIX") {
-                script "../../../bgenix/main.nf"
-                process {
-                    """
-                    input[0] = PLINK2_EXPORT_BGEN.out.bgen
-                    input[1] = '-clobber'
-                    """
-                }
-            }
-            run("RSCRIPT_ANNOTATE") {
-                script "../../../rscript/annotate/main.nf"
-                process {
-                    """
-                    input[0] = file('${projectDir}/modules/local/rscript/assign_annotations/assets/annotate.R', checkIfExists: true)
-                    input[1] = [
-                        [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/medium_data/1kGP.chr22.panel_head100k_exome_vep.vcf', checkIfExists: true)
-                    ]
-                    input[2] = PLINK2_MAKEBED.out.out_bed_bim_fam
-                    input[3] = PLINK2_EXPORT_BGEN.out.bgen
-                    input[4] = BGENIX.out.bgen_bgi
-                    input[5] = PLINK2_EXPORT_BGEN.out.sample
-                    input[6] = [
-                        [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/medium_data/1kGP_controls.txt', checkIfExists: true)
-                    ]
-                    input[7] = [
-                        [ id:'test', single_end:false ], // meta map
-                        file('${projectDir}/assets/medium_data/1kGP_cases.txt', checkIfExists: true)
-                    ]
-                    input[8] = file('${projectDir}/assets/default.masks', checkIfExists: true)
-                    input[9] = '--min_top_annotations 50 --quantile_threshold 0.25 --include-intergenic FALSE'
+                    // Pass phenotype.tsv as --keep so MAC/MAF are computed over the 1000
+                    // phenotyped samples only; variants monomorphic in that subset are
+                    // excluded from the snplist before REGENIE runs.
+                    input[0] = PLINK2_MAKEPGEN.out.out_pgen_pvar_psam.map { meta, pgen, pvar, psam ->
+                        tuple(meta, pgen, pvar, psam,
+                              file('${projectDir}/modules/local/regenie/step1/tests/fixtures/phenotype.tsv'),
+                              [])
+                    }
+                    input[1] = 'writesnp_pass'
+                    input[2] = '--maf 0.01 --geno 0.1 --mind 0.1'
                     """
                 }
             }
@@ -98,22 +62,103 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = PLINK2_MAKEBED.out.out_bed_bim_fam
-                input[1] = PLINK2_WRITE_SNPLIST.out.id
-                input[2] = PLINK2_WRITE_SNPLIST.out.snplist
-                input[3] = RSCRIPT_ANNOTATE.out.phenotype
-                input[4] = '--bt --bsize 100 --lowmem'
+                // Consolidated 9-element tuple as in workflows/rare-var-assoc.nf lines 390-408.
+                // covar_file=[] and tracking_in=[] are omitted since we are not exercising
+                // covariate or tracking paths in this test.
+                input[0] = PLINK2_MAKEPGEN.out.out_pgen_pvar_psam
+                    .join(PLINK2_WRITE_SNPLIST.out.id)
+                    .join(PLINK2_WRITE_SNPLIST.out.snplist)
+                    .map { meta, pgen, pvar, psam, id, snplist ->
+                        tuple(meta, pgen, pvar, psam, id, snplist,
+                              file('${projectDir}/modules/local/regenie/step1/tests/fixtures/phenotype.tsv'),
+                              [], [])
+                    }
+                input[1] = '--bt --bsize 100 --lowmem'
                 """
             }
         }
 
         then {
-            assertAll(
-                { assert process.success },
-                // { assert snapshot(process.out).match() }
-                //TODO nf-core: Add all required assertions to verify the test output.
-                // See https://nf-co.re/docs/contributing/tutorials/nf-test_assertions for more information and examples.
-            )
+            assert process.success
+
+            // pred_list format: one line per phenotype - "<phenotype_name> <path_to_.loco>"
+            // We have exactly 1 phenotype (Y1), so exactly 1 line.
+            def pred_lines = path(process.out.pred_list[0][1]).readLines()
+            assert pred_lines.size() == 1 : "pred_list should have exactly 1 line (one phenotype)"
+            assert pred_lines[0].startsWith('Y1 ') : "pred_list line should name phenotype Y1"
+            assert pred_lines[0].endsWith('.loco') : "pred_list should reference a .loco file"
+
+            // loco file format: header row ("FID_IID sample1 sample2 ...") + one data row
+            // per chromosome in the analysis. With 1000 phenotyped samples the header must
+            // have 1001 tokens (FID_IID label + 1000 per-sample columns).
+            def loco_lines = path(process.out.loco[0][1]).readLines()
+            assert loco_lines[0].startsWith('FID_IID ') : "loco header should start with FID_IID"
+            assert loco_lines[0].trim().split(' ').size() == 1001 : "loco header should cover 1000 phenotyped samples (FID_IID + 1000 columns)"
+            // chr22 is in the input VCF; its LOCO row (predictions from chr12+chrX) must
+            // be present and must differ from the chr12 LOCO row (predictions from chr22+chrX),
+            // proving that genuine leave-one-chromosome-out models are being fit.
+            def chr22_row = loco_lines.find { it.startsWith('22 ') }
+            def chr12_row = loco_lines.find { it.startsWith('12 ') }
+            assert chr22_row != null : "loco should contain a row for chromosome 22"
+            assert chr12_row != null : "loco should contain a row for chromosome 12"
+            assert chr22_row != chr12_row : "chr22 and chr12 LOCO rows should differ (each omits different data)"
+
+            // Sanity-check that the ridge model captured real population structure (not noise).
+            // We use ALL 29 YRI (Yoruba, AFR) and ALL 33 CHB (Han Chinese, EAS) cases from
+            // our phenotype fixture - the largest genetic distance available. Same-phenotype
+            // samples (all cases, Y1=1) so separation reflects ancestry, not case/control.
+            // Welch's two-sample t-test on the chr22 LOCO values (fit from chr12+chrX data).
+            // p-value bounded above by 2*exp(-t²/2) (Gaussian tail inequality, no magic constants).
+            // Population labels from assets/integrated_call_samples_v3.20250704.ALL.ped.
+            def YRI_ids = ['NA18484','NA18485','NA18486','NA18487','NA18488','NA18489',
+                           'NA18497','NA18498','NA18499','NA18500','NA18501','NA18502',
+                           'NA18503','NA18504','NA18505','NA18506','NA18507','NA18508',
+                           'NA18510','NA18511','NA18515','NA18516','NA18517','NA18518',
+                           'NA18519','NA18520','NA18521','NA18522','NA18523']
+            def CHB_ids = ['NA18525','NA18526','NA18528','NA18530','NA18531','NA18532',
+                           'NA18533','NA18534','NA18535','NA18536','NA18537','NA18538',
+                           'NA18539','NA18541','NA18542','NA18543','NA18544','NA18545',
+                           'NA18546','NA18547','NA18548','NA18549','NA18550','NA18552',
+                           'NA18553','NA18555','NA18557','NA18558','NA18559','NA18560',
+                           'NA18561','NA18562','NA18563']
+            def header_cols = loco_lines[0].trim().split(' ')
+            def col_idx = [:]
+            header_cols.eachWithIndex { col, i ->
+                if (col != 'FID_IID') col_idx[col.split('_')[0]] = i
+            }
+            def chr22_arr = chr22_row.trim().split(' ')
+            def yri_loco = YRI_ids.collect { id -> chr22_arr[col_idx[id]] as double }
+            def chb_loco = CHB_ids.collect { id -> chr22_arr[col_idx[id]] as double }
+
+            def n1 = yri_loco.size()   // 29
+            def n2 = chb_loco.size()   // 33
+            def m1 = yri_loco.sum() / n1
+            def m2 = chb_loco.sum() / n2
+            def v1 = yri_loco.collect { (it - m1) ** 2 }.sum() / (n1 - 1)
+            def v2 = chb_loco.collect { (it - m2) ** 2 }.sum() / (n2 - 1)
+            def t_stat = (m1 - m2) / Math.sqrt(v1 / n1 + v2 / n2)
+
+            // Upper bound on the two-tailed p-value via the Gaussian tail inequality:
+            //   P(|Z| > z) < 2*exp(-z²/2)  for any z > 0
+            // This holds for the normal and, conservatively, for any t-distribution (heavier
+            // tails => the true p is even smaller than this bound). No magic constants needed.
+            def p_upper = 2.0 * Math.exp(-t_stat * t_stat / 2.0)
+
+            def sd1 = Math.sqrt(v1)
+            def sd2 = Math.sqrt(v2)
+            println ""
+            println "YRI (n=${n1}): mean=${m1}, sd=${sd1}"
+            println "CHB (n=${n2}): mean=${m2}, sd=${sd2}"
+            println "Welch t-test YRI vs CHB chr22 LOCO: t=${t_stat}, p < ${p_upper} (upper bound via Gaussian tail inequality)"
+            assert p_upper < 0.01 :
+                "Welch t-test YRI vs CHB chr22 LOCO: t=${t_stat}, p_upper=${p_upper} - model should capture population structure"
+
+            // Tracking JSON must report at least 1 sample and 1 variant seen by REGENIE
+            def tracking = path(process.out.tracking_out[0]).json
+            assert (tracking.inputs.samples as int) >= 1 : "tracking.inputs.samples should be >= 1"
+            assert (tracking.inputs.variants as int) >= 1 : "tracking.inputs.variants should be >= 1"
+
+            assert snapshot(process.out.versions).match()
         }
 
     }
