@@ -118,8 +118,8 @@ workflow RARE_VAR_ASSOC {
     }
 
 
-    bcftools_filter_1_options = "--exclude 'QUAL<${params.filter_and_enhance_vcf_qual_min} || AVG(FORMAT/GQ)<${params.filter_and_enhance_vcf_avg_gq_min} || AVG(FORMAT/DP)<${params.filter_and_enhance_vcf_avg_dp_min} || AVG(FORMAT/DP)>${params.filter_and_enhance_vcf_avg_dp_max}'"
-    bcftools_filter_2_options = "--exclude 'FORMAT/GQ<${params.filter_and_enhance_vcf_sample_gq_min} | FORMAT/DP < ${params.filter_and_enhance_vcf_sample_dp_min} | FORMAT/DP > ${params.filter_and_enhance_vcf_sample_dp_max}' --set-GTs '.'"
+    bcftools_filter_1_options = "--exclude 'QUAL<${params.filter_vcf_qual_min} || AVG(FORMAT/GQ)<${params.filter_vcf_avg_gq_min} || AVG(FORMAT/DP)<${params.filter_vcf_avg_dp_min} || AVG(FORMAT/DP)>${params.filter_vcf_avg_dp_max}'"
+    bcftools_filter_2_options = "--exclude 'FORMAT/GQ<${params.filter_vcf_sample_gq_min} | FORMAT/DP < ${params.filter_vcf_sample_dp_min} | FORMAT/DP > ${params.filter_vcf_sample_dp_max}' --set-GTs '.'"
     BCFTOOLS_VIEW_AND_FILTER2 (
         ch_vcf_with_sample_names_corrected
             .join(ch_vcf_with_sample_names_corrected_tbi, by: 0)
