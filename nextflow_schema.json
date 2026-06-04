@@ -183,44 +183,44 @@
                     "fa_icon": "fas fa-gear"
                 },
                 "filter_vcf_qual_min": {
-                    "type": "string",
-                    "default": "25",
+                    "type": "number",
+                    "default": 25,
                     "description": "Minimum QUAL score",
                     "fa_icon": "fas fa-gear"
                 },
                 "filter_vcf_avg_gq_min": {
-                    "type": "string",
-                    "default": "25",
+                    "type": "number",
+                    "default": 25,
                     "description": "Minimum average GQ across samples",
                     "fa_icon": "fas fa-gear"
                 },
                 "filter_vcf_avg_dp_min": {
-                    "type": "string",
-                    "default": "25",
+                    "type": "number",
+                    "default": 25,
                     "description": "Minimum average DP across samples",
                     "fa_icon": "fas fa-gear"
                 },
                 "filter_vcf_avg_dp_max": {
-                    "type": "string",
-                    "default": "200",
+                    "type": "number",
+                    "default": 200,
                     "description": "Maximum average DP across samples",
                     "fa_icon": "fas fa-gear"
                 },
                 "filter_vcf_sample_gq_min": {
-                    "type": "string",
-                    "default": "20",
+                    "type": "number",
+                    "default": 20,
                     "description": "Minimum per-sample GQ (set GT to missing below threshold)",
                     "fa_icon": "fas fa-gear"
                 },
                 "filter_vcf_sample_dp_min": {
-                    "type": "string",
-                    "default": "20",
+                    "type": "number",
+                    "default": 20,
                     "description": "Minimum per-sample DP",
                     "fa_icon": "fas fa-gear"
                 },
                 "filter_vcf_sample_dp_max": {
-                    "type": "string",
-                    "default": "250",
+                    "type": "number",
+                    "default": 250,
                     "description": "Maximum per-sample DP",
                     "fa_icon": "fas fa-gear"
                 }
