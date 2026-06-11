@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
-"""Exploratory data analysis for a multisample VCF (v5).
+"""Exploratory data analysis for a multisample VCF (v6).
 
-Two-pass, chunked pysam scan:
-- Pass 1: per-variant stats + per-sample aggregates, track heatmap maxima.
-- Pass 2 (use_dosage=true): build exact heatmaps with np.histogram2d.
+Single-pass cyvcf2 scan (replaces v5's two-pass pysam scan):
+- Per-variant stats + per-sample aggregates.
+- Heatmaps built in the same pass.  v5 needed a second pass only to learn the
+  per-group maxima that size the heatmap bins; here those maxima are supplied
+  up front (currently hardcoded, see _TEMP_MAX_BY_GROUP) so one pass suffices.
+
+FORMAT fields (DP/GQ/DS) are read as vectorized numpy arrays via
+``v.format(field)`` instead of v5's per-sample Python loop -- this is the
+main speedup. Genotype-derived stats (het rate, missingness, the GT
+encoding for the GT-vs-DS heatmap) come from ``v.gt_types`` /
+``v.genotype.array()`` and are equivalent to v5's per-sample encoding.
 """
 import os
 from pathlib import Path
@@ -13,7 +21,7 @@ import numpy as np
 import polars as pl
 import matplotlib.pyplot as plt
 import seaborn as sns
-import pysam
+from cyvcf2 import VCF
 import time
 import csv as _csv
 
@@ -31,7 +39,14 @@ output_dir = "plots"
 Path(output_dir).mkdir(exist_ok=True)
 
 
-HOMOZYGOUS_VALUES = {0, 2, 5, 9}
+HEATMAP_PAIRS = [('GQ', 'DS'), ('DP', 'DS'), ('GQ', 'DP'), ('GT', 'DS')]
+
+# Fixed heatmap axis maxima, identical for every group (overall and per
+# phenotype).  v5 derived these from per-group data maxima in a separate pass;
+# fixed values let us size the bins up front and build the heatmaps in a single
+# pass.  Values beyond a max fall outside the 2D histogram and are dropped --
+# acceptable for these coarse diagnostic plots.
+HEATMAP_STAT_MAX = {'DP': 300, 'GQ': 100, 'GT': 2, 'DS': 2}
 
 
 def emit_stat(name, data):
@@ -48,16 +63,6 @@ def emit_stat(name, data):
 
 def current_milli_time():
     return round(time.time() * 1000)
-
-
-# Function to encode genotype as integer using f(j,k) = (k*(k+1)/2) + j
-def encode_genotype(gt):
-    if gt is None or None in gt:
-        return None  # Missing genotype
-    alleles = sorted(gt)
-    j = alleles[0]
-    k = alleles[-1]  # For haploid (e.g. male chrX), k == j; for diploid, k is second allele
-    return (k * (k + 1) // 2) + j  # Integer encoding
 
 
 def load_phenotype(phenotype_file):
@@ -121,39 +126,78 @@ def _append_missingness(missingness_variants, gt_vals, group_labels, group_indic
         missingness_variants[group].append(miss_rate)
 
 
-def _update_max(max_by_group, values, group_labels, group_indices, stat):
-    for group in group_labels:
-        if group == 'all':
-            vals = values
-        else:
-            vals = values[group_indices[group]]
-        if vals.size == 0:
-            continue
-        if np.isnan(vals).all():
-            continue
-        m = float(np.nanmax(vals))
-        prev = max_by_group[group].get(stat)
-        if prev is None or m > prev:
-            max_by_group[group][stat] = m
+def _stat_bins_arange(max_val):
+    if max_val is None or not np.isfinite(max_val) or max_val < 0:
+        return None
+    return np.arange(0, max_val + 1, 1)
 
 
-def scan_pass1(vcf_file, phenotypes, group_indices, use_dosage, percentiles, chunk_size):
-    print(f"scan_pass1(vcf_file={vcf_file}, phenotypes={phenotypes}, group_indices={group_indices}, use_dosage={use_dosage}, percentiles={percentiles}, chunk_size={chunk_size})  ts = {current_milli_time()}")
-    vcf = pysam.VariantFile(vcf_file)
-    samples = list(vcf.header.samples)
+def _stat_bins_linspace(max_val):
+    if max_val is None or not np.isfinite(max_val) or max_val < 0:
+        return None
+    return np.linspace(0, max_val, 201)
+
+
+def _hist2d(values1, values2, xbins, ybins):
+    mask = np.isfinite(values1) & np.isfinite(values2)
+    if not np.any(mask):
+        return np.zeros((len(xbins) - 1, len(ybins) - 1), dtype=int)
+    hist, _, _ = np.histogram2d(values1[mask], values2[mask], bins=[xbins, ybins])
+    return hist.astype(int)
+
+
+def _format_field(v, field, n_samples):
+    """Return a length-n_samples float array for a per-sample FORMAT field.
+
+    Missing values become NaN. Int fields (DP/GQ) use cyvcf2's negative
+    sentinels for missing; floats (DS) come back as NaN already. All three
+    fields are non-negative, so masking ``< 0`` covers the int sentinels
+    without touching valid data.
+    """
+    arr = v.format(field)
+    if arr is None:
+        return np.full(n_samples, np.nan)
+    arr = np.asarray(arr, dtype=float).reshape(n_samples, -1)[:, 0]
+    arr[arr < 0] = np.nan
+    return arr
+
+
+def _encode_gt(v, gt_types, n_samples):
+    """Vectorized equivalent of v5's encode_genotype over all samples.
+
+    f(j,k) = (k*(k+1)/2) + j with j=min allele, k=max allele, computed over
+    valid (non-negative) alleles only so haploid calls (e.g. male chrX, stored
+    as ``[a, -1]``) encode like v5 rather than reading as missing. Samples whose
+    genotype has any missing allele are flagged via gt_types == 3 (UNKNOWN,
+    gts012 mode) -- equivalent to v5's ``None in gt`` -- and set to NaN.
+    """
+    g = v.genotype.array()
+    alleles = g[:, :-1]  # drop trailing phase column
+    valid = alleles >= 0
+    big = np.iinfo(alleles.dtype).max
+    amin = np.where(valid, alleles, big).min(axis=1).astype(np.int64)
+    amax = np.where(valid, alleles, -1).max(axis=1).astype(np.int64)
+    enc = (amax * (amax + 1) // 2 + amin).astype(float)
+    enc[gt_types == 3] = np.nan
+    return enc
+
+
+def scan(vcf_file, phenotypes, group_indices, use_dosage, percentiles, chunk_size):
+    print(f"scan(vcf_file={vcf_file}, phenotypes={phenotypes}, use_dosage={use_dosage}, percentiles={percentiles}, chunk_size={chunk_size})  ts = {current_milli_time()}")
+    vcf = VCF(vcf_file, gts012=True)
+    samples = list(vcf.samples)
     n_samples = len(samples)
+
+    # Per-phenotype heatmaps need the real per-group indices even in the >5
+    # branch (where group_indices below is collapsed to 'all'), mirroring v5
+    # where main() passed the original indices to the pass-2 heatmap builder.
+    orig_group_indices = group_indices
 
     if len(phenotypes) > 5:
         group_labels = ['all']
         group_indices = {'all': np.arange(n_samples, dtype=int)}
     else:
         group_labels = list(phenotypes)
-
-    max_group_labels = ['all'] + (list(phenotypes) if len(phenotypes) <= 5 else [])
-    max_group_indices = {'all': np.arange(n_samples, dtype=int)}
-    for pheno in phenotypes:
-        if pheno in group_indices:
-            max_group_indices[pheno] = group_indices[pheno]
 
     stats = ['DP', 'GQ'] + (['DS'] if use_dosage else [])
     vstats = _init_vstats(stats, group_labels, percentiles)
@@ -180,73 +224,93 @@ def scan_pass1(vcf_file, phenotypes, group_indices, use_dosage, percentiles, chu
 
     total_variants = 0
 
-    max_by_group = {g: {} for g in max_group_labels}
-
     case_indices = None
     control_indices = None
     if len(phenotypes) == 2:
         case_indices = group_indices[phenotypes[0]]
         control_indices = group_indices[phenotypes[1]]
 
-    for record in vcf.fetch():
+    # Heatmaps (only when dosage is available, matching v5's pass-2 condition).
+    # Bins are sized from fixed maxima (HEATMAP_STAT_MAX), identical for the
+    # overall and per-phenotype heatmaps, and accumulated over chunks of variants
+    # within this single pass.
+    heatmaps = {}
+    buf = {'DP': [], 'GQ': [], 'DS': [], 'GT': []}
+
+    def _bins(s1, s2):
+        return _stat_bins_arange(HEATMAP_STAT_MAX.get(s1)), _stat_bins_linspace(HEATMAP_STAT_MAX.get(s2))
+
+    if use_dosage:
+        for s1, s2 in HEATMAP_PAIRS:
+            xbins, ybins = _bins(s1, s2)
+            if xbins is None or ybins is None:
+                continue
+            heatmaps[(s1, s2, None)] = np.zeros((len(xbins) - 1, len(ybins) - 1), dtype=int)
+            for pheno in phenotypes:
+                heatmaps[(s1, s2, pheno)] = np.zeros((len(xbins) - 1, len(ybins) - 1), dtype=int)
+
+    def flush_chunk():
+        if not buf['DP']:
+            return
+        mats = {k: np.vstack(buf[k]) for k in ('DP', 'GQ', 'DS', 'GT')}
+        for s1, s2 in HEATMAP_PAIRS:
+            key = (s1, s2, None)
+            if key not in heatmaps:
+                continue
+            xbins, ybins = _bins(s1, s2)
+            heatmaps[key] += _hist2d(mats[s1].ravel(), mats[s2].ravel(), xbins, ybins)
+            for pheno in phenotypes:
+                idxs = orig_group_indices[pheno]
+                if idxs.size == 0:
+                    continue
+                v1 = mats[s1][:, idxs].ravel()
+                v2 = mats[s2][:, idxs].ravel()
+                heatmaps[(s1, s2, pheno)] += _hist2d(v1, v2, xbins, ybins)
+        for k in buf:
+            buf[k].clear()
+
+    for v in vcf:
         total_variants += 1
         if total_variants % 10000 == 0:
             print('.', end='', flush=True)
 
-        is_snp = all(len(record.ref) == 1 and len(alt) == 1 for alt in (record.alts or ['.']))
+        alts = v.ALT or ['.']
+        is_snp = len(v.REF) == 1 and all(len(alt) == 1 for alt in alts)
         if is_snp:
             snp_count += 1
         else:
             indel_count += 1
 
-        chrom_counts[record.chrom] = chrom_counts.get(record.chrom, 0) + 1
-        if 'AF' in record.info:
-            allele_freq.append(float(record.info['AF'][0]))
-        else:
+        chrom_counts[v.CHROM] = chrom_counts.get(v.CHROM, 0) + 1
+        af = v.INFO.get('AF')
+        if af is None:
             allele_freq.append(np.nan)
+        elif isinstance(af, (tuple, list)):
+            allele_freq.append(float(af[0]))
+        else:
+            allele_freq.append(float(af))
 
-        dp_vals = np.empty(n_samples, dtype=float)
-        gq_vals = np.empty(n_samples, dtype=float)
-        ds_vals = np.empty(n_samples, dtype=float) if use_dosage else None
-        gt_vals = np.empty(n_samples, dtype=float)
+        dp_vals = _format_field(v, 'DP', n_samples)
+        gq_vals = _format_field(v, 'GQ', n_samples)
+        ds_vals = _format_field(v, 'DS', n_samples) if use_dosage else None
 
-        for i, sample in enumerate(samples):
-            sample_data = record.samples[sample]
+        gt_types = v.gt_types
+        gt_vals = _encode_gt(v, gt_types, n_samples)
 
-            dp = sample_data.get('DP', np.nan)
-            if dp is None:
-                dp = np.nan
-            dp_vals[i] = dp
-            if not np.isnan(dp):
-                sum_dp[i] += dp
-                cnt_dp[i] += 1
+        # Per-sample aggregates (vectorized).
+        valid_dp = ~np.isnan(dp_vals)
+        sum_dp += np.where(valid_dp, dp_vals, 0.0)
+        cnt_dp += valid_dp
+        valid_gq = ~np.isnan(gq_vals)
+        sum_gq += np.where(valid_gq, gq_vals, 0.0)
+        cnt_gq += valid_gq
+        if use_dosage:
+            valid_ds = ~np.isnan(ds_vals)
+            sum_ds += np.where(valid_ds, ds_vals, 0.0)
+            cnt_ds += valid_ds
 
-            gq = sample_data.get('GQ', np.nan)
-            if gq is None:
-                gq = np.nan
-            gq_vals[i] = gq
-            if not np.isnan(gq):
-                sum_gq[i] += gq
-                cnt_gq[i] += 1
-
-            if use_dosage:
-                ds = sample_data.get('DS', np.nan)
-                if ds is None:
-                    ds = np.nan
-                ds_vals[i] = ds
-                if not np.isnan(ds):
-                    sum_ds[i] += ds
-                    cnt_ds[i] += 1
-
-            gt = sample_data.get('GT')
-            gt_enc = encode_genotype(gt)
-            if gt_enc is None:
-                gt_vals[i] = np.nan
-                missing_gt_count[i] += 1
-            else:
-                gt_vals[i] = float(gt_enc)
-                if gt_enc not in HOMOZYGOUS_VALUES:
-                    het_count[i] += 1
+        missing_gt_count += (gt_types == 3)
+        het_count += (gt_types == 1)
 
         _append_variant_stats(vstats, 'DP', dp_vals, group_labels, group_indices, percentiles)
         _append_variant_stats(vstats, 'GQ', gq_vals, group_labels, group_indices, percentiles)
@@ -270,11 +334,14 @@ def scan_pass1(vcf_file, phenotypes, group_indices, use_dosage, percentiles, chu
                     dp_diff.append(abs(case_mean - control_mean))
 
         if use_dosage:
-            _update_max(max_by_group, dp_vals, max_group_labels, max_group_indices, 'DP')
-            _update_max(max_by_group, gq_vals, max_group_labels, max_group_indices, 'GQ')
-            _update_max(max_by_group, gt_vals, max_group_labels, max_group_indices, 'GT')
-            _update_max(max_by_group, ds_vals, max_group_labels, max_group_indices, 'DS')
+            buf['DP'].append(dp_vals)
+            buf['GQ'].append(gq_vals)
+            buf['DS'].append(ds_vals)
+            buf['GT'].append(gt_vals)
+            if len(buf['DP']) >= chunk_size:
+                flush_chunk()
 
+    flush_chunk()
     vcf.close()
     print("")
 
@@ -308,152 +375,11 @@ def scan_pass1(vcf_file, phenotypes, group_indices, use_dosage, percentiles, chu
         'mean_ds': mean_ds,
         'missingness_samples': missingness_samples,
         'het_rates': het_rates,
-        'max_by_group': max_by_group,
+        'heatmaps': heatmaps,
         'phenotypes': phenotypes,
         'use_dosage': use_dosage,
         'percentiles': percentiles,
     }
-
-
-def _stat_bins_arange(max_val):
-    if max_val is None or not np.isfinite(max_val) or max_val < 0:
-        return None
-    return np.arange(0, max_val + 1, 1)
-
-
-def _stat_bins_linspace(max_val):
-    if max_val is None or not np.isfinite(max_val) or max_val < 0:
-        return None
-    return np.linspace(0, max_val, 201)
-
-
-def _hist2d(values1, values2, xbins, ybins):
-    mask = np.isfinite(values1) & np.isfinite(values2)
-    if not np.any(mask):
-        return np.zeros((len(xbins) - 1, len(ybins) - 1), dtype=int)
-    hist, _, _ = np.histogram2d(values1[mask], values2[mask], bins=[xbins, ybins])
-    return hist.astype(int)
-
-
-def scan_pass2_heatmaps(vcf_file, samples, phenotypes, group_indices, max_by_group, chunk_size):
-    print(f"scan_pass2_heatmaps(vcf_file={vcf_file}, samples={samples}, phenotypes={phenotypes}, group_indices={group_indices}, max_by_group={max_by_group}, chunk_size={chunk_size})  ts = {current_milli_time()}")
-    n_samples = len(samples)
-
-    heatmaps = {}
-    overall_pairs = [('GQ', 'DS'), ('DP', 'DS'), ('GQ', 'DP'), ('GT', 'DS')]
-
-    overall_max = max_by_group.get('all', {})
-    for s1, s2 in overall_pairs:
-        xbins = _stat_bins_arange(overall_max.get(s1))
-        ybins = np.linspace(0, 2, 201)
-        if xbins is not None:
-            heatmaps[(s1, s2, None)] = np.zeros((len(xbins) - 1, len(ybins) - 1), dtype=int)
-
-    for pheno in phenotypes:
-        maxes = max_by_group.get(pheno, {})
-        for s1, s2 in overall_pairs:
-            xbins = _stat_bins_arange(maxes.get(s1))
-            ybins = _stat_bins_linspace(maxes.get(s2))
-            if xbins is not None and ybins is not None:
-                heatmaps[(s1, s2, pheno)] = np.zeros((len(xbins) - 1, len(ybins) - 1), dtype=int)
-
-    vcf = pysam.VariantFile(vcf_file)
-    chunk_dp = []
-    chunk_gq = []
-    chunk_ds = []
-    chunk_gt = []
-
-    def flush_chunk():
-        if not chunk_dp:
-            return
-        dp_mat = np.vstack(chunk_dp)
-        gq_mat = np.vstack(chunk_gq)
-        ds_mat = np.vstack(chunk_ds)
-        gt_mat = np.vstack(chunk_gt)
-
-        stat_map = {
-            'DP': dp_mat,
-            'GQ': gq_mat,
-            'DS': ds_mat,
-            'GT': gt_mat,
-        }
-
-        for s1, s2 in overall_pairs:
-            key = (s1, s2, None)
-            if key in heatmaps:
-                xbins = _stat_bins_arange(overall_max.get(s1))
-                ybins = np.linspace(0, 2, 201)
-                v1 = stat_map[s1].ravel()
-                v2 = stat_map[s2].ravel()
-                heatmaps[key] += _hist2d(v1, v2, xbins, ybins)
-
-            for pheno in phenotypes:
-                key_p = (s1, s2, pheno)
-                if key_p in heatmaps:
-                    idxs = group_indices[pheno]
-                    if idxs.size == 0:
-                        continue
-                    maxes = max_by_group.get(pheno, {})
-                    xbins = _stat_bins_arange(maxes.get(s1))
-                    ybins = _stat_bins_linspace(maxes.get(s2))
-                    v1 = stat_map[s1][:, idxs].ravel()
-                    v2 = stat_map[s2][:, idxs].ravel()
-                    heatmaps[key_p] += _hist2d(v1, v2, xbins, ybins)
-
-        chunk_dp.clear()
-        chunk_gq.clear()
-        chunk_ds.clear()
-        chunk_gt.clear()
-
-    total_variants = 0
-    for record in vcf.fetch():
-        total_variants += 1
-        if total_variants % 10000 == 0:
-            print('.', end='', flush=True)
-        
-        dp_vals = np.empty(n_samples, dtype=float)
-        gq_vals = np.empty(n_samples, dtype=float)
-        ds_vals = np.empty(n_samples, dtype=float)
-        gt_vals = np.empty(n_samples, dtype=float)
-
-        for i, sample in enumerate(samples):
-            sample_data = record.samples[sample]
-
-            dp = sample_data.get('DP', np.nan)
-            if dp is None:
-                dp = np.nan
-            dp_vals[i] = dp
-
-            gq = sample_data.get('GQ', np.nan)
-            if gq is None:
-                gq = np.nan
-            gq_vals[i] = gq
-
-            ds = sample_data.get('DS', np.nan)
-            if ds is None:
-                ds = np.nan
-            ds_vals[i] = ds
-
-            gt = sample_data.get('GT')
-            gt_enc = encode_genotype(gt)
-            if gt_enc is None:
-                gt_vals[i] = np.nan
-            else:
-                gt_vals[i] = float(gt_enc)
-
-        chunk_dp.append(dp_vals)
-        chunk_gq.append(gq_vals)
-        chunk_ds.append(ds_vals)
-        chunk_gt.append(gt_vals)
-
-        if len(chunk_dp) >= chunk_size:
-            flush_chunk()
-
-    flush_chunk()
-    vcf.close()
-    print("")
-
-    return heatmaps
 
 
 # Plotting functions
@@ -783,36 +709,36 @@ def main(vcf_file, phenotype_file, percentiles, use_dosage, chunk_size):
     print(f"main()  percentiles = {percentiles}  use_dosage = {use_dosage}  ts = {current_milli_time()}", flush=True)
 
     pheno_df = load_phenotype(phenotype_file)
-    vcf = pysam.VariantFile(vcf_file)
-    samples = list(vcf.header.samples)
+    vcf = VCF(vcf_file)
+    samples = list(vcf.samples)
     vcf.close()
     phenotypes, group_indices = build_groups(samples, pheno_df)
 
-    pass1 = scan_pass1(vcf_file, phenotypes, group_indices, use_dosage, percentiles, chunk_size)
+    res = scan(vcf_file, phenotypes, group_indices, use_dosage, percentiles, chunk_size)
 
-    plot_variant_stats(pass1['vstats'], pass1['overall_means']['DP'], phenotypes, 'DP', percentiles, stat_label='Depth of Coverage')
-    plot_sample_stats(pass1['mean_dp'], samples, pheno_df, phenotypes, 'DP', stat_label='Depth of Coverage')
+    plot_variant_stats(res['vstats'], res['overall_means']['DP'], phenotypes, 'DP', percentiles, stat_label='Depth of Coverage')
+    plot_sample_stats(res['mean_dp'], samples, pheno_df, phenotypes, 'DP', stat_label='Depth of Coverage')
 
-    plot_variant_stats(pass1['vstats'], pass1['overall_means']['GQ'], phenotypes, 'GQ', percentiles, stat_label='Genotype Quality')
-    plot_sample_stats(pass1['mean_gq'], samples, pheno_df, phenotypes, 'GQ', stat_label='Genotype Quality')
+    plot_variant_stats(res['vstats'], res['overall_means']['GQ'], phenotypes, 'GQ', percentiles, stat_label='Genotype Quality')
+    plot_sample_stats(res['mean_gq'], samples, pheno_df, phenotypes, 'GQ', stat_label='Genotype Quality')
 
     if use_dosage:
-        plot_variant_stats(pass1['vstats'], pass1['overall_means']['DS'], phenotypes, 'DS', percentiles, stat_label='Genotype Dosage', include_log_scale=False)
-        plot_sample_stats(pass1['mean_ds'], samples, pheno_df, phenotypes, 'DS', stat_label='Genotype Dosage')
+        plot_variant_stats(res['vstats'], res['overall_means']['DS'], phenotypes, 'DS', percentiles, stat_label='Genotype Dosage', include_log_scale=False)
+        plot_sample_stats(res['mean_ds'], samples, pheno_df, phenotypes, 'DS', stat_label='Genotype Dosage')
 
-    plot_missingness(pass1['missingness_variants'], pass1['missingness_samples'], samples, pheno_df, phenotypes)
-    plot_dp_differences(pass1['dp_diff'])
-    plot_allele_frequency(pass1['allele_freq'])
-    plot_variant_types(pass1['variant_types'][0], pass1['variant_types'][1])
-    plot_chrom_density(pass1['chrom_counts'])
-    plot_heterozygosity(pass1['het_rates'], samples, pheno_df, phenotypes)
+    plot_missingness(res['missingness_variants'], res['missingness_samples'], samples, pheno_df, phenotypes)
+    plot_dp_differences(res['dp_diff'])
+    plot_allele_frequency(res['allele_freq'])
+    plot_variant_types(res['variant_types'][0], res['variant_types'][1])
+    plot_chrom_density(res['chrom_counts'])
+    plot_heterozygosity(res['het_rates'], samples, pheno_df, phenotypes)
 
-    plot_boxplots(pass1['mean_dp'], samples, pheno_df, 'DP', 'Depth of Coverage')
-    plot_boxplots(pass1['mean_gq'], samples, pheno_df, 'GQ', 'Genotype Quality')
+    plot_boxplots(res['mean_dp'], samples, pheno_df, 'DP', 'Depth of Coverage')
+    plot_boxplots(res['mean_gq'], samples, pheno_df, 'GQ', 'Genotype Quality')
     if use_dosage:
-        plot_boxplots(pass1['mean_ds'], samples, pheno_df, 'DS', 'Genotype Dosage')
+        plot_boxplots(res['mean_ds'], samples, pheno_df, 'DS', 'Genotype Dosage')
 
-        heatmaps = scan_pass2_heatmaps(vcf_file, samples, phenotypes, group_indices, pass1['max_by_group'], chunk_size)
+        heatmaps = res['heatmaps']
         plot_stat_vs_stat(heatmaps, phenotypes, stat1='GQ', stat2='DS')
         plot_stat_vs_stat(heatmaps, phenotypes, stat1='DP', stat2='DS')
         plot_stat_vs_stat(heatmaps, phenotypes, stat1='GQ', stat2='DP')

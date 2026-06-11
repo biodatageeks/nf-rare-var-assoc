@@ -27,7 +27,7 @@ nextflow_process {
                     file('${projectDir}/assets/three_chr_unprepared/unprepared_rand_500.vcf.gz', checkIfExists: true),
                     file('${projectDir}/assets/three_chr_unprepared/unprepared_rand_500.vcf.gz.tbi', checkIfExists: true),
                     file('${projectDir}/modules/local/python/eda/tests/fixtures/pheno.tsv', checkIfExists: true),
-                    file('${projectDir}/modules/local/python/eda/assets/eda_v5.py', checkIfExists: true)
+                    file('${projectDir}/modules/local/python/eda/assets/eda_v6.py', checkIfExists: true)
                 ]
                 input[1] = false
                 """
