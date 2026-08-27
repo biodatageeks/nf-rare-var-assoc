@@ -1,7 +1,7 @@
 # `assets/three_chr_unprepared/`
 
 Canonical 1000 Genomes test fixtures used by the pipeline's test profiles and by integration
-tests (IT-1..IT-7 in `docs/test-quality-and-cleanup/integration-tests.md`).
+tests (IT-1..IT-7, in `subworkflows/local/*/tests/` and `workflows/tests/`).
 
 ## Sample lists
 

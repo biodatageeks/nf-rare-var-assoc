@@ -1,0 +1,60 @@
+# FAVORannotator (CSV / Essential Database variant) -- container recipe.
+#
+# Upstream (zhouhufeng/FAVORannotator @ d65f565) publishes NO image. The two
+# Dockerfile drafts it ships are non-functional sketches:
+#   * Scripts/Dockerize/install_packages.R actually contains Dockerfile text
+#     (FROM/RUN lines) rather than R code, so `Rscript install_packages.R` fails;
+#   * Scripts/Dockerize/Dockerfile.txt uses `COPY ../CSV/...` paths that lie
+#     outside the build context, and one COPY has no destination;
+#   * neither installs xsv, which the CSV annotator shells out to.
+# This file is our working equivalent, keeping upstream's dependency intent
+# (bioconductor base + gdsfmt/SeqArray/readr + xsv).
+#
+# See README.md in this directory.
+# Build:  podman build -f Dockerfile.favorannotator -t favorannotator:1.0.0 .
+#
+# The FAVOR Essential DB is NOT baked in (717 GiB total upstream; we use the
+# chr12 + chr22 CSV tarballs only). Mount it at runtime under /favordb.
+
+FROM docker.io/bioconductor/bioconductor_docker:RELEASE_3_20
+
+# xsv: prebuilt static binary. Upstream installs it via Rust/Cargo, which drags
+# in a whole toolchain for one CLI; the released musl binary is identical in
+# behaviour and pins exactly.
+ARG XSV_VERSION=0.13.0
+# sha256 verified against the downloaded asset.
+ARG XSV_SHA256=d36b1be0f008d6597c2437e764fbe720eb7557f8980e0b03ca709e1020b5c52b
+RUN set -eux; \
+    curl -fsSL -o /tmp/xsv.tar.gz \
+      "https://github.com/BurntSushi/xsv/releases/download/${XSV_VERSION}/xsv-${XSV_VERSION}-x86_64-unknown-linux-musl.tar.gz"; \
+    echo "${XSV_SHA256}  /tmp/xsv.tar.gz" | sha256sum -c -; \
+    tar -xzf /tmp/xsv.tar.gz -C /usr/local/bin xsv; \
+    rm -f /tmp/xsv.tar.gz; \
+    xsv --version
+
+# NOTE: `R -e "install.packages(...)"` exits 0 even when a package fails to
+# install, so every install step below is followed by an explicit availability
+# check that quits non-zero. Without this the build succeeds silently and the
+# failure only surfaces at run time. Kept as separate layers so a transient
+# repository failure is attributable and cheap to retry.
+RUN R -q -e "BiocManager::install(c('gdsfmt','SeqArray','SeqVarTools'), ask=FALSE, update=FALSE)" \
+ && R -q -e "p <- c('gdsfmt','SeqArray','SeqVarTools'); m <- p[!sapply(p, requireNamespace, quietly=TRUE)]; if (length(m)) { cat('MISSING Bioconductor packages:', paste(m, collapse=', '), '\n'); quit(status=1) }"
+
+RUN R -q -e "install.packages(c('readr','dplyr','stringr','stringi'), repos='https://cloud.r-project.org')" \
+ && R -q -e "p <- c('readr','dplyr','stringr','stringi'); m <- p[!sapply(p, requireNamespace, quietly=TRUE)]; if (length(m)) { cat('MISSING CRAN packages:', paste(m, collapse=', '), '\n'); quit(status=1) }"
+
+RUN R -q -e "suppressPackageStartupMessages({library(gdsfmt); library(SeqArray); library(readr); library(dplyr)}); cat('R libs OK\n')"
+
+# FAVORdatabase_chrsplit.csv defines the per-chromosome CSV split boundaries the
+# annotator joins against. Vendored at build time so the run needs no network
+# (upstream's script fetches it from raw.githubusercontent.com at runtime).
+ADD https://raw.githubusercontent.com/zhouhufeng/FAVORannotator/d65f56580f804f9a30518f8b3569d1f851337edb/Scripts/SQL/FAVORdatabase_chrsplit.csv \
+    /opt/favorannotator/FAVORdatabase_chrsplit.csv
+
+COPY convert_vcf_to_gds.R favorannotator_csv_essential.R /opt/favorannotator/
+RUN chmod -R a+rX /opt/favorannotator
+
+ENV FAVOR_CHRSPLIT=/opt/favorannotator/FAVORdatabase_chrsplit.csv \
+    XSV=/usr/local/bin/xsv
+
+WORKDIR /work

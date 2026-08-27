@@ -25,3 +25,5 @@ assets/three_chr_unprepared/unprepared_rand_2k.vcf.gz
 assets/three_chr_unprepared/unprepared_rand_2k.vcf.gz.tbi
 assets/three_chr_unprepared/unprepared_rand_5k.vcf.gz
 assets/three_chr_unprepared/unprepared_rand_5k.vcf.gz.tbi
+
+__pycache__/

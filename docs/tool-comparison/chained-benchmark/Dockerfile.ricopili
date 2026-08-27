@@ -1,0 +1,236 @@
+# RICOPILI -- the quality-control and principal-components half of the combined
+# comparison methods. See README.md in this directory.
+#
+# Runs two modules only: preimp_dir (sample + variant QC) and pcaer (relatedness
+# + smartpca PCs). The imputation / meta-analysis / PRS stack is deliberately
+# pruned out.
+#
+# LICENCE -- RICOPILI is CC BY-NC-SA 4.0 (stated on the project site, not as a
+# LICENSE file in the repo). This Dockerfile vendors no upstream code: rp_bin is
+# fetched from git at build time. The BUILT IMAGE, however, contains rp_bin and
+# is therefore a derivative work -- DO NOT PUSH IT TO ANY REGISTRY. Build locally.
+#
+# Provenance of every input:
+#   rp_bin            git clone of Ripkelab/ricopili pinned to a7a2ce0, the commit
+#                     that set $rp_version = "2025_Feb_20.001" (rp_bin/Ricopili/Version.pm:19).
+#   rp_env_0225b.yaml https://personal.broadinstitute.org/braun/sharing/ (the same
+#                     directory the upstream README uses for dependencies), md5
+#                     published upstream as rp_env_0225b.md5.cksum. Supplies
+#                     EIGENSOFT 8.0.0 (smartpca), R 4.4.2 + RICOPILI's R packages,
+#                     perl 5.32, texlive-core, gsl 2.7.
+#   dependency tar    ricopili_dependencies_0225b.tar.gz from the same directory,
+#                     md5 6925280d327ce9e3c4d17ab8d7c67a2d (published upstream),
+#                     sha256 ea1f72b9cb641a63d1eddfe8a1096a5a54dcde70a0c5425c4042c580c91e5ffe
+#                     (measured). Supplies PLINK 1.9 + PLINK2.
+#                     NOTE: this 2025 tarball ships NO eigensoft tree -- unlike the
+#                     older 1118b one -- which is why smartpca comes from conda.
+#
+# Build (context = the directory holding the tarball, which is NOT in the repo):
+#   D=<DATA>/tools_comparison/ricopili
+#   podman build -f docs/tool-comparison/chained-benchmark/Dockerfile.ricopili \
+#                -t ricopili:2025_Feb_20.001 "$D"
+
+# ---------------------------------------------------------------------------
+# Stage 1 -- unpack the dependency tarball and prune it to the QC+PCA subset.
+# Kept in its own stage so the 1.6 GB tarball never becomes a layer of the
+# final image.
+# ---------------------------------------------------------------------------
+FROM docker.io/library/debian:bookworm-slim AS deps
+
+ARG DEP_TARBALL=ricopili_dependencies_0225b.tar.gz
+ARG DEP_MD5=6925280d327ce9e3c4d17ab8d7c67a2d
+
+COPY ${DEP_TARBALL} /tmp/deps.tar.gz
+
+RUN set -eux; \
+    echo "${DEP_MD5}  /tmp/deps.tar.gz" | md5sum -c -; \
+    mkdir -p /opt/rp_dep; \
+    tar -xzf /tmp/deps.tar.gz -C /opt/rp_dep --strip-components=1 \
+        --no-same-owner --no-same-permissions; \
+    rm -f /tmp/deps.tar.gz; \
+    cd /opt/rp_dep; \
+    rm -rf bcftools shapeit shapeit3 shapeit5 eagle Minimac3 Minimac4 \
+           impute_v2 impute_v4 metal ldsc liftover genetic_map_files; \
+    chmod -R a+rX /opt/rp_dep; \
+    test -x /opt/rp_dep/plink/plink; \
+    test -x /opt/rp_dep/plink2/plink2
+
+# ---------------------------------------------------------------------------
+# Stage 2 -- fetch rp_bin from git at the pinned commit. Fetching by SHA keeps
+# the code self-verifying: no tarball checksum to mirror.
+# ---------------------------------------------------------------------------
+FROM docker.io/library/debian:bookworm-slim AS rpbin
+
+ARG RP_COMMIT=a7a2ce072d50c4609359592a431552d2392353a0
+ARG RP_REPO=https://github.com/Ripkelab/ricopili.git
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends git ca-certificates; \
+    rm -rf /var/lib/apt/lists/*; \
+    mkdir -p /opt/ricopili; \
+    cd /opt/ricopili; \
+    git init -q .; \
+    git remote add origin "${RP_REPO}"; \
+    git fetch -q --depth 1 origin "${RP_COMMIT}"; \
+    git checkout -q FETCH_HEAD; \
+    test "$(git rev-parse HEAD)" = "${RP_COMMIT}"; \
+    grep -q '2025_Feb_20.001' rp_bin/Ricopili/Version.pm; \
+    rm -rf .git; \
+    chmod -R a+rX /opt/ricopili
+
+# ---------------------------------------------------------------------------
+# Stage 3 -- runtime. Conda env first (the expensive, rarely-changing layer).
+# ---------------------------------------------------------------------------
+FROM docker.io/condaforge/miniforge3:24.11.3-2
+
+ARG RP_ENV_URL=https://personal.broadinstitute.org/braun/sharing/rp_env_0225b.yaml
+ARG RP_ENV_MD5=6efb5f2938c53b3bce65a36280e344f7
+
+ENV RP_ENV=/opt/conda/envs/rp_env
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates curl procps; \
+    rm -rf /var/lib/apt/lists/*
+
+# The yaml's trailing "prefix:" points at the author's home directory; strip it
+# so the env lands in the image's own conda root.
+RUN set -eux; \
+    curl -fsSL -o /tmp/rp_env.yaml "${RP_ENV_URL}"; \
+    echo "${RP_ENV_MD5}  /tmp/rp_env.yaml" | md5sum -c -; \
+    sed -i '/^prefix:/d' /tmp/rp_env.yaml; \
+    mamba env create -n rp_env -f /tmp/rp_env.yaml; \
+    rm -f /tmp/rp_env.yaml; \
+    mamba clean -afy; \
+    test -x "${RP_ENV}/bin/smartpca"; \
+    test -x "${RP_ENV}/bin/R"; \
+    test -x "${RP_ENV}/bin/perl"
+
+# LaTeX from Debian rather than from the conda env. rep_qc2_14 renders its QC
+# report with pdflatex (rep_qc2_14:499, via mysystem, so a failure aborts the
+# whole QC step). conda-forge's texlive-core 20230313 ships no prebuilt formats
+# and cannot generate them: its fmtutil requires mktexlsr.pl, and the package
+# only ships a shell mktexlsr, so "fmtutil-sys --byfmt pdflatex" dies. Debian's
+# texlive ships the formats ready-made. cm-super is required as well -- the
+# report's latin1 inputenc pulls in TC fonts, and without Type1 versions
+# pdflatex fails on "Font tcrm1000 at 600 not found".
+# /opt/texbin shadows ONLY the conda env's tex binaries, leaving its R, perl and
+# EIGENSOFT first on PATH. The WHOLE tex toolchain has to be shadowed, not just
+# pdflatex: rp_bin's bundled pdfjam locates packages with kpsewhich, and conda's
+# kpsewhich searches conda's texmf tree, where pdfpages.sty does not exist
+# ("pdfjam ERROR: LaTeX package pdfpages.sty is not installed" in pcaer).
+# The engine binaries (kpsewhich, pdftex, ...) live in texlive-binaries, but the
+# format-dispatch WRAPPERS (pdflatex -> pdftex, latex, ...) are owned by
+# texlive-latex-base, so the symlink loop must enumerate those packages too --
+# enumerating texlive-binaries alone silently omits pdflatex (base is Ubuntu
+# noble via miniforge3, where pdflatex is a texlive-latex-base symlink, not a
+# texlive-binaries file). Assertions are functional, not just "test -L": the
+# link existing does not prove the shadowed binary runs or that pdfpages resolves.
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        texlive-latex-base texlive-latex-recommended texlive-fonts-recommended \
+        cm-super ghostscript; \
+    rm -rf /var/lib/apt/lists/*; \
+    mkdir -p /opt/texbin; \
+    dpkg -L texlive-binaries texlive-latex-base texlive-latex-recommended \
+            texlive-base texlive-fonts-recommended \
+        | grep '^/usr/bin/' | sort -u | while read -r b; do \
+        ln -sf "$b" "/opt/texbin/$(basename "$b")"; \
+    done; \
+    test -L /opt/texbin/pdflatex; \
+    test -L /opt/texbin/kpsewhich; \
+    /opt/texbin/pdflatex --version >/dev/null; \
+    test -n "$(/opt/texbin/kpsewhich pdfpages.sty)"
+
+COPY --from=deps  /opt/rp_dep   /opt/rp_dep
+COPY --from=rpbin /opt/ricopili /opt/ricopili
+
+# RPHOME is where Ricopili::Utils looks for ricopili.conf (Ricopili/Utils.pm:19).
+ENV RPHOME=/opt/ricopili \
+    rp_perlpackages=/opt/rp_dep/perl_modules \
+    PATH=/opt/texbin:/opt/conda/envs/rp_env/bin:/opt/ricopili/rp_bin:/opt/ricopili/rp_bin/pdfjam:/opt/conda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# ---------------------------------------------------------------------------
+# ricopili.conf -- written here rather than produced by the interactive
+# rp_config, which cannot run unattended. Ricopili::Utils::trans dies on ANY
+# key a running script asks for and does not find, so every key used anywhere
+# in rp_bin is present, including keys for the pruned modules (their paths
+# simply do not exist -- harmless unless those modules are run).
+#
+# batch_jobcommand SERIAL is what flips serial mode on: preimp_dir:46, pcaer:31.
+# ---------------------------------------------------------------------------
+RUN set -eux; \
+    mkdir -p /opt/ricopili/logs /rp_work; \
+    { \
+      echo "### RICOPILI configuration -- container edition, SERIAL (no scheduler)"; \
+      echo "home /opt/ricopili"; \
+      echo "bin /opt/ricopili/rp_bin"; \
+      echo "loloc /opt/ricopili/logs"; \
+      echo "sloc /tmp"; \
+      echo "init rp"; \
+      echo "email root@localhost"; \
+      echo "queue custom"; \
+      echo "uppmax_project NA"; \
+      echo "### binaries we actually use"; \
+      echo "p2loc /opt/rp_dep/plink"; \
+      echo "ploc /opt/rp_dep/plink"; \
+      echo "plink2loc /opt/rp_dep/plink2"; \
+      echo "eloc /opt/conda/envs/rp_env/bin"; \
+      echo "rloc R"; \
+      echo "r3loc R"; \
+      echo "rpac NA"; \
+      echo "hmloc /opt/rp_dep/hapmap_ref/"; \
+      echo "### pruned modules -- keys present so trans() cannot die, paths absent"; \
+      echo "bcloc /opt/rp_dep/bcftools"; \
+      echo "bcloc_plugins /opt/rp_dep/bcftools/plugins"; \
+      echo "bcrloc /opt/rp_dep/bcftools/resources"; \
+      echo "bgziploc /opt/rp_dep/bgzip"; \
+      echo "tabixloc /opt/rp_dep/tabix"; \
+      echo "liloc /opt/rp_dep/liftover"; \
+      echo "gmloc /opt/rp_dep/genetic_map_files"; \
+      echo "ealoc /opt/rp_dep/eagle"; \
+      echo "shloc /opt/rp_dep/shapeit"; \
+      echo "sh3loc /opt/rp_dep/shapeit3"; \
+      echo "sh5loc /opt/rp_dep/shapeit5"; \
+      echo "i2loc /opt/rp_dep/impute_v2"; \
+      echo "i4loc /opt/rp_dep/impute_v4"; \
+      echo "minimac3loc /opt/rp_dep/Minimac3"; \
+      echo "minimac4loc /opt/rp_dep/Minimac4"; \
+      echo "meloc /opt/rp_dep/metal"; \
+      echo "ldsc_start NA"; \
+      echo "ldsc_ref /opt/rp_dep/ldsc"; \
+      echo "vloc NA"; \
+      echo "hvloc NA"; \
+      echo "### batch keys -- SERIAL means nothing is ever submitted"; \
+      echo "batch_jobcommand SERIAL"; \
+      echo "batch_name NA"; \
+      echo "batch_jobfile NA"; \
+      echo "batch_memory_request NONE"; \
+      echo "batch_walltime NA"; \
+      echo "batch_array NA"; \
+      echo "batch_max_parallel_jobs_per_one_array NA"; \
+      echo "batch_stdout NA"; \
+      echo "batch_stderr NA"; \
+      echo "batch_job_dependency NA"; \
+      echo "batch_array_task_id NA"; \
+      echo "batch_other_job_flags NA"; \
+      echo "batch_job_output_jid NA"; \
+      echo "batch_ncores_per_node NA"; \
+      echo "batch_mem_per_node NA"; \
+    } > /opt/ricopili/ricopili.conf; \
+    for f in preimp_dir_info pcaer_info repqc2_info idtager_info clumper_info \
+             impute_dir_info merge_caller_info postimp_navi_info \
+             reference_dir_info replicator_info test_info; do \
+      touch "/opt/ricopili/logs/$f"; \
+    done; \
+    chmod -R a+rwX /opt/ricopili/logs
+
+# A container cannot send the mail the navigators try to send. Absence is only a
+# warning (preimp_dir:326), but a no-op keeps the logs clean.
+RUN printf '#!/bin/sh\nexit 0\n' > /usr/bin/mail && chmod +x /usr/bin/mail
+
+WORKDIR /rp_work
+
+CMD ["/bin/bash"]

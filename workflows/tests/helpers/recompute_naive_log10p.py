@@ -11,7 +11,7 @@ swapped, phenotype-to-sample mismap, dropped masks/covariates) that would make R
 top hits statistically meaningless, while tolerating the large numerical gap that legitimately
 exists between a burden test and a naive per-variant test.
 
-Naive LOG10P recipe (see docs/test-quality-and-cleanup/integration-tests.md, IT-6):
+Naive LOG10P recipe (used by the IT-6 integration test):
   1. Parse the merged regenie output. The ID column encodes the gene as the substring
      before the first '.', e.g. 'HOXC4.Mask_Mod.0.05' -> gene 'HOXC4', mask 'Mask_Mod'.
      Group rows by gene; keep max(LOG10P) and the mask of the winning row. Skip NA LOG10P.

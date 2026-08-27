@@ -1,0 +1,213 @@
+#!/usr/bin/env bash
+#
+# Benchmark run: nf-rare-var-assoc (this pipeline) -- MULTI-DATASET [REFERENCE ARM]
+# ==============================================================================
+# Runs nf-rare-var-assoc as the reference method. Shared by every comparison. This is a
+# COPY of nf-gwas-benchmark/run_nf_rare_var_assoc.sh with one change: the eval
+# fan-out that used to be inlined at the tail now delegates to the shared
+# benchmark-common/run_eval.sh (the identical block also lived in run_nf_gwas.sh).
+# The nf-gwas-benchmark/ copy is left untouched so that earlier published run stays
+# reproducible exactly as it was run.
+#
+# Runs the pipeline across MANY simulated phenotype datasets in a SINGLE
+# `nextflow run`. nf-rare-var-assoc natively fans out over a comma-separated list
+# of phenotype files (input_phenotype is tokenized on ',' and Cartesian-producted
+# with the VCF), so each `_dataset_idx_N_` draw runs the full
+# QC/PCA/grouping/association under meta.id = "${project_name}_dataset_idx_${N}".
+#
+# PREPARATION IS SKIPPED. We feed the already-prepared (split + CSQ-annotated +
+# DS-bearing) VCF and set `--skip_preparation true`, so the heavy VEP/normalisation
+# stage does NOT rerun per dataset. The filter_vcf_* genotype QC still runs -- it
+# lives in the main pipeline, not in prep.
+#
+# CHAINED-BENCHMARK NOTE: for the RICOPILI->STAAR chain, the reference results this
+# this produces are RE-SCORED against known answers restricted to the numbered
+# chromosomes, because STAARpipeline has no model for chromosome X. That re-score is driven by
+# the chain orchestrator calling run_eval.sh directly with filtered globs; this
+# script's own eval uses the FULL truth (its normal standalone job). Both the
+# causal globs and the eval run dir are overridable via env vars below if a caller
+# wants this script to do the filtered re-score itself.
+#
+# DATASET SELECTION: set DATASET_IDXS (space-separated); default is all run_<N>.
+#
+set -euo pipefail
+
+# ----------------------------------------------------------------------------
+# Configuration (edit paths here)
+# ----------------------------------------------------------------------------
+
+DATA="${DATA:-/data/doktorat/biodatageeks/article_on_nf_rare_var_assoc/tools_comparison}"
+RVA_REPO="${RVA_REPO:-/data/git/doktorat_pw/wum_pims/nf-rare-var-assoc}"
+EVAL_REPO="${EVAL_REPO:-/data/git/doktorat_pw/wum_pims/nf-eval-gene-assoc}"
+DATASETS_DIR="${DATA}/datasets"
+
+# Prepared (split + CSQ + DS) VCF -> input for skip_preparation=true.
+PREPARED_VCF="${DATA}/prepared.vcf.gz"
+# Original unprepared exome VCF -> input for the scoring step (it runs its own VEP).
+INPUT_VCF_RAW="${DATA}/20201028_CCDG_14151_B01_GRM_WGS_2020-08-05_chr_12_22_X.recalibrated_variants.exome.vcf.gz"
+
+PROJECT="tools_comparison"
+RUN_DIR="${DATA}/runs/nf_rare_var_assoc"
+EVAL_RUN_DIR="${EVAL_RUN_DIR:-${DATA}/runs/nf_rare_var_assoc_eval}"
+RVA_PROFILE="podman,medium_resources,nocache"   # nocache: fresh run, no work-dir cache reuse
+EVAL_PROFILE="podman,medium_resources"
+
+# Big intermediate result dirs to delete after the run (not needed downstream).
+CLEANUP_SUBDIRS=(
+    bcftools_view_and_filter2
+    bcftools_replace_sample_names
+    bcftools_view
+    check_x_chrom_present
+    plink2_export_other
+    plink2_makepgen
+)
+CLEANUP="${CLEANUP:-true}"   # set CLEANUP=false to keep intermediates
+
+# ----------------------------------------------------------------------------
+# Dataset selection + per-dataset file resolution
+# ----------------------------------------------------------------------------
+if [[ -z "${DATASET_IDXS:-}" ]]; then
+    DATASET_IDXS="$(ls -1d "${DATASETS_DIR}"/run_*/ 2>/dev/null \
+        | sed -E 's#.*/run_([0-9]+)/#\1#' | sort -n | tr '\n' ' ')"
+fi
+read -r -a IDXS <<< "$DATASET_IDXS"
+[[ ${#IDXS[@]} -gt 0 ]] || { echo "ERROR: no datasets selected (DATASETS_DIR=$DATASETS_DIR)" >&2; exit 1; }
+
+pheno_path() {
+    echo "${DATASETS_DIR}/run_$1/gcta_simu/tuner_base_run_$1_dataset_idx_$1_gcta_simu.phenotype.txt"
+}
+
+# Build the comma-separated phenotype list (one entry per selected dataset).
+PHENO_LIST=""
+for idx in "${IDXS[@]}"; do
+    p="$(pheno_path "$idx")"
+    [[ -e "$p" ]] || { echo "ERROR: missing phenotype file for run_${idx}: $p" >&2; exit 1; }
+    PHENO_LIST="${PHENO_LIST:+${PHENO_LIST},}${p}"
+done
+
+# ----------------------------------------------------------------------------
+# Sanity checks
+# ----------------------------------------------------------------------------
+for f in "$PREPARED_VCF" "$INPUT_VCF_RAW" "$RVA_REPO/main.nf" "$EVAL_REPO/main.nf"; do
+    [[ -e "$f" ]] || { echo "ERROR: missing required path: $f" >&2; exit 1; }
+done
+mkdir -p "$RUN_DIR" "$EVAL_RUN_DIR"
+
+# ----------------------------------------------------------------------------
+# Parameter file
+# ----------------------------------------------------------------------------
+PARAMS_FILE="${RUN_DIR}/params.nf_rare_var_assoc.yaml"
+cat > "$PARAMS_FILE" <<EOF
+# Auto-generated by run_nf_rare_var_assoc.sh -- edit the script, not this file.
+input_vcf: "${PREPARED_VCF}"
+input_phenotype: "${PHENO_LIST}"
+project_name: "${PROJECT}"
+outdir: "${RUN_DIR}/results"
+
+# Prepared VCF in, preparation skipped (genotype filter_vcf_* QC still runs).
+skip_preparation: true
+
+# Publish the intermediates (gene groupings + covariates) so a REGENIE-based
+# comparison can reuse them.
+publish_intermediate: true
+
+use_dosage: true
+
+filter_vcf_qual_min: 23
+filter_vcf_avg_gq_min: 23
+filter_vcf_avg_dp_min: 23
+filter_vcf_avg_dp_max: 107
+filter_vcf_sample_gq_min: 11
+filter_vcf_sample_dp_min: 22
+filter_vcf_sample_dp_max: 339
+
+inbreeding_outliers_range_stds: 6
+
+plink2_makepgen_3_options: "--geno 0.250 --hwe 1e-9 0.01 --mac 16 --maf 0.045000"
+plink2_makepgen_4_options: "--geno 0.100"
+plink2_makepgen_5_options: "--mind 0.200"
+plink2_write_snplist_qc_options: "--mind 0.150"
+plink2_indep_pairwise_options: "--mind 0.300"
+plink2_indep_pairwise_window: "800 80 0.2"
+plink2_missing_per_pheno_options: "--geno 0.350"
+plink2_indep_pairwise_window_pca: "800 80 0.2"
+plink2_king_cutoff_threshold_pca: 0.19
+plink2_write_snplist_step2_options: "--mind 0.200"
+
+regenie_step1_options: "--bt --bsize 400 --covarColList PC1_AVG,PC2_AVG,PC3_AVG,PC4_AVG"
+regenie_step2_options: "--bt --minMAC 7 --ref-first --firth --approx --bsize 200 --aaf-bins 0.2 --vc-tests skato --covarColList PC1_AVG,PC2_AVG,PC3_AVG,PC4_AVG"
+EOF
+
+# Extra config: make podman robust on this host (rootless podman needs keep-id
+# userns so containers can write to host-owned work dirs).
+EXTRA_CFG="${RUN_DIR}/podman_userns.config"
+cat > "$EXTRA_CFG" <<'EOF'
+podman.runOptions = '--userns=keep-id'
+EOF
+
+# ----------------------------------------------------------------------------
+# Launch
+# ----------------------------------------------------------------------------
+echo "=================================================================="
+echo " nf-rare-var-assoc benchmark run (multi-dataset, skip_preparation)"
+echo "   project  : ${PROJECT}"
+echo "   input    : ${PREPARED_VCF} (prepared; --skip_preparation)"
+echo "   datasets : ${IDXS[*]}  (${#IDXS[@]} total)"
+echo "   outdir   : ${RUN_DIR}/results"
+echo "   params   : ${PARAMS_FILE}"
+echo "   started  : $(date -Is)"
+echo "=================================================================="
+echo ""
+
+cd "$RVA_REPO"
+nextflow run "$RVA_REPO/main.nf" \
+    -profile "$RVA_PROFILE" \
+    -c "$EXTRA_CFG" \
+    -params-file "$PARAMS_FILE" \
+    -work-dir "${RUN_DIR}/work" \
+    -with-trace "${RUN_DIR}/trace.txt" \
+    -with-report "${RUN_DIR}/report.html" \
+    -with-timeline "${RUN_DIR}/timeline.html"
+
+echo ""
+echo "Finished: $(date -Is)"
+echo ""
+echo "Per-dataset files a REGENIE-based comparison can reuse (one set per dataset_idx):"
+ls -1 "${RUN_DIR}/results/bcftools/"*_dataset_idx_*.annotations 2>/dev/null || echo "  MISSING: *.annotations"
+ls -1 "${RUN_DIR}/results/bcftools/"*_dataset_idx_*.setlist     2>/dev/null || echo "  MISSING: *.setlist"
+ls -1 "${RUN_DIR}/results/merge/"*_dataset_idx_*_sex_covar.txt   2>/dev/null || echo "  MISSING: *_sex_covar.txt"
+
+# ----------------------------------------------------------------------------
+# Cleanup: drop big intermediate result dirs (not needed by eval or comparators).
+# ----------------------------------------------------------------------------
+if [[ "$CLEANUP" == "true" ]]; then
+    echo ""
+    echo "[cleanup] removing big intermediate result dirs under ${RUN_DIR}/results/ ..."
+    for sub in "${CLEANUP_SUBDIRS[@]}"; do
+        d="${RUN_DIR}/results/${sub}"
+        if [[ -d "$d" ]]; then
+            echo "  rm -rf ${d}"
+            rm -rf "$d"
+        fi
+    done
+fi
+
+# ----------------------------------------------------------------------------
+# Scoring: delegate to benchmark-common/run_eval.sh.
+# Causal globs default to the FULL truth; override the two CAUSAL_*_GLOB env vars
+# (e.g. point at filter_causal_autosomal.py output) to re-score autosomes-only.
+# ----------------------------------------------------------------------------
+: "${CAUSAL_SNPLIST_GLOB:=${DATASETS_DIR}/run_*/select_genes/*_dataset_idx_*_in_*.snplist}"
+: "${CAUSAL_GENES_GLOB:=${DATASETS_DIR}/run_*/select_genes/*_genes_dataset_idx_*.txt}"
+
+export EVAL_REPO EVAL_RUN_DIR EVAL_PROFILE
+export EVAL_PROJECT="${PROJECT}"
+export INPUT_VCF="${PREPARED_VCF}"
+export SKIP_PREP="true"
+export REGENIE_GLOB="${RUN_DIR}/results/regenie_step2/*_dataset_idx_*_step2_Y1.regenie"
+export CAUSAL_SNPLIST_GLOB CAUSAL_GENES_GLOB
+
+bash "$(dirname "$(readlink -f "$0")")/run_eval.sh"
+
+echo ""
+echo "nf-rare-var-assoc reference run finished: $(date -Is)"

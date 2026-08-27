@@ -1,211 +1,331 @@
-# psuszyns/rare-var-assoc-nf: Usage
+# Usage
 
-> _Documentation of pipeline parameters is generated automatically from the pipeline schema and can no longer be found in markdown files._
+How to prepare the input, run the pipeline, and set every parameter.
 
-## Introduction
+- [Requirements](#requirements)
+- [Input files](#input-files)
+- [Running the pipeline](#running-the-pipeline)
+- [Profiles](#profiles)
+- [Running several datasets in one go](#running-several-datasets-in-one-go)
+- [Running on a cluster](#running-on-a-cluster)
+- [Parameter reference](#parameter-reference)
+- [Troubleshooting](#troubleshooting)
 
-<!-- TODO nf-core: Add documentation about anything specific to running your pipeline. For general topics, please point to (and add to) the main nf-core website. -->
+## Requirements
 
-## Samplesheet input
+- [Nextflow](https://www.nextflow.io/) 25.10.2 or newer, and Java 17 or newer.
+- A container engine: Docker, Singularity, Apptainer, Podman, Shifter or Charliecloud.
+  Conda and Mamba also work, but are slower and give weaker reproducibility.
 
-You will need to create a samplesheet with information about the samples you would like to analyse before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row as shown in the examples below.
+Nothing has to be downloaded in advance. The VEP cache and the reference genome are
+fetched automatically the first time the preparation step runs.
 
-```bash
---input '[path to samplesheet file]'
+## Input files
+
+### The VCF
+
+`--input_vcf` is a single multi-sample VCF, optionally compressed. By default the
+pipeline prepares it itself, so it can be the raw output of your variant caller; it does
+not need to be normalised, deduplicated or annotated beforehand.
+
+For genotype dosages to be computed, the FORMAT field must contain genotype likelihoods
+(`PL`) alongside `GT`, `GQ` and `DP`. Without them the pipeline still runs, but on hard
+genotype calls only.
+
+Underscores in sample names are replaced with hyphens, because some downstream tools
+treat the underscore as a field separator. This applies to the phenotype files too, so
+the two stay consistent. Change the character with
+`--bcftools_replace_sample_names_sed_arg` and `--rscript_build_phenotypes_options`.
+
+### Case and control lists, or a phenotype file
+
+You must supply one of these two, and they are mutually exclusive.
+
+**Option 1: case and control lists.** Two plain text files, one sample identifier per
+line:
+
+```text title="cases.txt"
+HG03925
+HG03926
+HG03927
 ```
 
-### Multiple runs of the same sample
+Pass them with `--input_cases` and `--input_controls`. The pipeline builds the phenotype
+file for you: every sample listed in the case file gets 1, every sample listed in the
+control file gets 0.
 
-The `sample` identifiers have to be the same when you have re-sequenced the same sample more than once e.g. to increase sequencing depth. The pipeline will concatenate the raw reads before performing any downstream analysis. Below is an example for the same sample sequenced across 3 lanes:
+A case file may optionally have a second, tab-separated column of numeric values, in
+which case the phenotype is treated as quantitative rather than case/control.
 
-```csv title="samplesheet.csv"
-sample,fastq_1,fastq_2
-CONTROL_REP1,AEG588A1_S1_L002_R1_001.fastq.gz,AEG588A1_S1_L002_R2_001.fastq.gz
-CONTROL_REP1,AEG588A1_S1_L003_R1_001.fastq.gz,AEG588A1_S1_L003_R2_001.fastq.gz
-CONTROL_REP1,AEG588A1_S1_L004_R1_001.fastq.gz,AEG588A1_S1_L004_R2_001.fastq.gz
+**Option 2: a phenotype file.** A tab-separated file with a header, in the format REGENIE
+expects:
+
+```text title="phenotype.tsv"
+FID	IID	Y1
+HG00096	HG00096	0
+HG00097	HG00097	1
 ```
 
-### Full samplesheet
+Pass it with `--input_phenotype`. `FID` and `IID` are the family and individual
+identifiers, and are normally the same value. `Y1` is the phenotype: 1 for a case, 0 for a
+control.
 
-The pipeline will auto-detect whether a sample is single- or paired-end using the information provided in the samplesheet. The samplesheet can have as many columns as you desire, however, there is a strict requirement for the first 3 columns to match those defined in the table below.
+### The variant grouping file
 
-A final samplesheet file consisting of both single- and paired-end data may look something like the one below. This is for 6 samples, where `TREATMENT_REP3` has been sequenced twice.
+`--input_masks` defines which VEP consequences belong to which impact group. The default,
+[`assets/default.masks`](../assets/default.masks), defines three groups and is used unless
+you supply your own. It is tab-separated, with a group name and then a comma-separated
+list of VEP consequence terms:
 
-```csv title="samplesheet.csv"
-sample,fastq_1,fastq_2
-CONTROL_REP1,AEG588A1_S1_L002_R1_001.fastq.gz,AEG588A1_S1_L002_R2_001.fastq.gz
-CONTROL_REP2,AEG588A2_S2_L002_R1_001.fastq.gz,AEG588A2_S2_L002_R2_001.fastq.gz
-CONTROL_REP3,AEG588A3_S3_L002_R1_001.fastq.gz,AEG588A3_S3_L002_R2_001.fastq.gz
-TREATMENT_REP1,AEG588A4_S4_L003_R1_001.fastq.gz,
-TREATMENT_REP2,AEG588A5_S5_L003_R1_001.fastq.gz,
-TREATMENT_REP3,AEG588A6_S6_L003_R1_001.fastq.gz,
-TREATMENT_REP3,AEG588A6_S6_L004_R1_001.fastq.gz,
+```text
+Mask_High	stop_gained,stop_lost,start_lost,frameshift_variant,splice_donor_variant,...
+Mask_Mod	missense_variant,inframe_insertion,inframe_deletion,...
+Mask_HighMod	stop_gained,stop_lost,...,missense_variant,inframe_insertion,...
 ```
 
-| Column    | Description                                                                                                                                                                            |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sample`  | Custom sample name. This entry will be identical for multiple sequencing libraries/runs from the same sample. Spaces in sample names are automatically converted to underscores (`_`). |
-| `fastq_1` | Full path to FastQ file for Illumina short reads 1. File has to be gzipped and have the extension ".fastq.gz" or ".fq.gz".                                                             |
-| `fastq_2` | Full path to FastQ file for Illumina short reads 2. File has to be gzipped and have the extension ".fastq.gz" or ".fq.gz".                                                             |
-
-An [example samplesheet](../assets/samplesheet.csv) has been provided with the pipeline.
+`Mask_High` covers variants predicted to disrupt the protein, `Mask_Mod` covers those
+predicted to alter it moderately, and `Mask_HighMod` is the union of the two. Association
+tests are run for each group separately.
 
 ## Running the pipeline
 
-The typical command for running the pipeline is as follows:
-
 ```bash
-nextflow run psuszyns/rare-var-assoc-nf --input ./samplesheet.csv --outdir ./results  -profile docker
+nextflow run main.nf -profile docker \
+    --input_vcf     /path/to/input.vcf.gz \
+    --input_cases   /path/to/cases.txt \
+    --input_controls /path/to/controls.txt \
+    --project_name  myproject \
+    --outdir        results
 ```
 
-This will launch the pipeline with the `docker` configuration profile. See below for more information about profiles.
+`--project_name` is a short identifier that appears in output filenames. `--outdir` is
+where results are written.
 
-Note that the pipeline will create the following files in your working directory:
+### Two ways of running
 
-```bash
-work                # Directory containing the nextflow working files
-<OUTDIR>            # Finished results in specified location (defined with --outdir)
-.nextflow_log       # Log file from Nextflow
-# Other nextflow hidden files, eg. history of pipeline runs and old logs.
+**The full pipeline** (`--skip_preparation false --skip_reporting false`, the default)
+runs everything, including a nested call to
+[nf-prepare-vcf](https://github.com/psuszyns/nf-prepare-vcf) that normalises, annotates
+and computes dosages for the input VCF. This is the mode to use for a real analysis.
+
+**Skipping preparation and reporting** (`--skip_preparation true --skip_reporting true`)
+expects an already-prepared VCF and stops after the association tests. This is what
+`nextflow-gene-assoc-tuner` uses when tuning the pipeline's parameters on simulated data:
+`nf-prepare-vcf` is run once, and this pipeline is then run many times with different
+settings. The two flags are independent -- you can skip only one of them -- but this
+combination is the one that matters in practice, because preparation and reporting are by
+far the slowest parts.
+
+If you pass `--skip_preparation true`, the VCF must already be normalised, have
+multi-allelic sites split, carry `CHROM_POS_REF_ALT` variant identifiers, and contain VEP
+consequence annotations in a `CSQ` field. Otherwise the association step will match no
+variants.
+
+## Profiles
+
+Combine profiles with commas, for example `-profile docker,low_resources`.
+
+| Profile | What it does |
+|---|---|
+| `docker`, `podman`, `singularity`, `apptainer`, `shifter`, `charliecloud` | container engine to use |
+| `conda`, `mamba` | run from conda environments instead of containers |
+| `arm` | use ARM64 container images |
+| `wave` | build containers on the fly with Wave |
+| `low_resources` | reduce the memory and CPU each process requests, so the pipeline fits on a workstation. Required for the test suite. |
+| `medium_resources` | a middle setting between `low_resources` and the defaults |
+| `slurm`, `hq` | submit work to a Slurm cluster, or to HyperQueue |
+| `nocache` | disable Nextflow's task cache |
+| `debug` | keep working directories and print more detail |
+| `test`, `test_full`, `test_sim_chr22`, `test_skip_preparation_and_reporting` | small built-in datasets for checking that an installation works |
+
+## Running several datasets in one go
+
+`--input_phenotype` accepts a comma-separated list of phenotype files. Each is combined
+with the same VCF and analysed independently within a single run, which avoids repeating
+the expensive preparation step.
+
+For results to be kept apart, each filename must follow the pattern
+
+```
+<anything>_dataset_idx_<N>_<anything>.phenotype.txt
 ```
 
-If you wish to repeatedly use the same parameters for multiple runs, rather than specifying each flag in the command, you can specify these in a params file.
+where `<N>` is a number. The pipeline reads `<N>` out of the filename and labels that
+dataset's outputs `<project_name>_dataset_idx_<N>`. A file that does not match the
+pattern is still processed, but is labelled with `--project_name` alone -- so if you pass
+several such files, their results will collide.
 
-Pipeline settings can be provided in a `yaml` or `json` file via `-params-file <file>`.
+## Running on a cluster
 
-> [!WARNING]
-> Do not use `-c <file>` to specify parameters as this will result in errors. Custom config files specified with `-c` must only be used for [tuning process resource specifications](https://nf-co.re/docs/usage/configuration#tuning-workflow-resources), other infrastructural tweaks (such as output directories), or module arguments (args).
+Use `-profile slurm` or `-profile hq` together with a container profile, for example
+`-profile singularity,slurm`.
 
-The above pipeline run specified with a params file in yaml format:
+Two parameters are often needed on shared systems:
 
-```bash
-nextflow run psuszyns/rare-var-assoc-nf -profile docker -params-file params.yaml
-```
+- `--tmpdir` sets the temporary directory for every process. Useful when the node's
+  default temporary space is too small for the intermediate files.
+- `--errorStrategy` overrides how failures are handled. In addition to Nextflow's own
+  strategies (`retry`, `ignore`, `terminate`, `finish`), this pipeline accepts
+  `retryThenIgnore`, which retries a failing task and then continues the run without it
+  if it still fails.
 
-with:
+`--cpu_support_avx2 false` switches to a PLINK2 build that does not require AVX2
+instructions. Set it if the pipeline fails with an illegal-instruction error on older
+processors.
 
-```yaml title="params.yaml"
-input: './samplesheet.csv'
-outdir: './results/'
-<...>
-```
+## Parameter reference
 
-You can also generate such `YAML`/`JSON` files via [nf-core/launch](https://nf-co.re/launch).
+### Required
 
-### Updating the pipeline
+| Parameter | Description |
+|---|---|
+| `--input_vcf` | Path to the input multi-sample VCF |
+| `--outdir` | Directory to write results to |
 
-When you run the above command, Nextflow automatically pulls the pipeline code from GitHub and stores it as a cached version. When running the pipeline after this, it will always use the cached version if available - even if the pipeline has been updated since. To make sure that you're running the latest version of the pipeline, make sure that you regularly update the cached version of the pipeline:
+Plus **either** `--input_phenotype`, **or** both `--input_cases` and `--input_controls`.
 
-```bash
-nextflow pull psuszyns/rare-var-assoc-nf
-```
+### Input
 
-### Reproducibility
+| Parameter | Default | Description |
+|---|---|---|
+| `--input_cases` | -- | File listing case sample identifiers, one per line |
+| `--input_controls` | -- | File listing control sample identifiers, one per line |
+| `--input_phenotype` | -- | Tab-separated phenotype file, or a comma-separated list of them |
+| `--input_masks` | `assets/default.masks` | Definition of the VEP consequence impact groups |
+| `--project_name` | -- | Short identifier used in output filenames |
+| `--hild_path` | `assets/hg38_hild.txt` | Regions of high or unusual linkage disequilibrium, excluded from pruning |
 
-It is a good idea to specify the pipeline version when running the pipeline on your data. This ensures that a specific version of the pipeline code and software are used when you run your pipeline. If you keep using the same tag, you'll be running the same version of the pipeline, even if there have been changes to the code since.
+### Behaviour
 
-First, go to the [psuszyns/rare-var-assoc-nf releases page](https://github.com/psuszyns/rare-var-assoc-nf/releases) and find the latest pipeline version - numeric only (eg. `1.3.1`). Then specify this when running the pipeline with `-r` (one hyphen) - eg. `-r 1.3.1`. Of course, you can switch to another version by changing the number after the `-r` flag.
+| Parameter | Default | Description |
+|---|---|---|
+| `--skip_preparation` | `false` | Skip VCF preparation and expect an already-prepared VCF |
+| `--skip_reporting` | `false` | Skip all reporting steps |
+| `--use_dosage` | `false` | Use the DS dosage field rather than hard genotype calls in the association tests |
+| `--publish_intermediate` | `false` | Copy intermediate files into `--outdir` as well as the final results |
+| `--regenie_step1_kinship_filtering` | `false` | Apply relatedness-based sample filtering to the REGENIE step 1 input |
+| `--cpu_support_avx2` | `true` | Use the AVX2-optimised PLINK2 build; set to `false` on older processors |
+| `--tmpdir` | Nextflow default | Temporary directory for all processes |
+| `--errorStrategy` | Nextflow default | Process error strategy; also accepts `retryThenIgnore` |
 
-This version number will be logged in reports when you run the pipeline, so that you'll know what you used when you look back in the future. For example, at the bottom of the MultiQC reports.
+### Variant and genotype quality filters
 
-To further assist in reproducibility, you can use share and reuse [parameter files](#running-the-pipeline) to repeat pipeline runs with the same settings without having to write out a command with every single parameter.
+Applied to the VCF before any PLINK2 step. The first four are per-variant, computed
+across all samples; the last three are per-genotype, and a genotype failing them is set
+to missing rather than the variant being removed.
 
-> [!TIP]
-> If you wish to share such profile (such as upload as supplementary material for academic publications), make sure to NOT include cluster specific paths to files, nor institutional specific profiles.
+| Parameter | Default | Description |
+|---|---|---|
+| `--filter_vcf_qual_min` | `25` | Minimum variant QUAL score |
+| `--filter_vcf_avg_gq_min` | `25` | Minimum average genotype quality across samples |
+| `--filter_vcf_avg_dp_min` | `25` | Minimum average read depth across samples |
+| `--filter_vcf_avg_dp_max` | `200` | Maximum average read depth across samples |
+| `--filter_vcf_sample_gq_min` | `20` | Genotype quality below which a genotype is set to missing |
+| `--filter_vcf_sample_dp_min` | `20` | Minimum read depth for a genotype |
+| `--filter_vcf_sample_dp_max` | `250` | Maximum read depth for a genotype |
 
-## Core Nextflow arguments
+### PLINK2 quality control
 
-> [!NOTE]
-> These options are part of Nextflow and use a _single_ hyphen (pipeline parameters use a double-hyphen)
+After the shared initial steps the data follows four paths, each with its own thresholds:
+inbreeding-coefficient filtering, principal-component analysis, REGENIE step 1, and
+REGENIE step 2. The reasoning behind the separate settings is in
+[pipeline.md](pipeline.md).
 
-### `-profile`
+| Parameter | Default | Description |
+|---|---|---|
+| `--plink2_makepgen_1_options` | `--double-id --vcf-half-call missing --split-par b38 --1` | Initial VCF-to-pgen import (shared) |
+| `--plink2_makepgen_2_options` | `--impute-sex max-female-xf=0.2 min-male-xf=0.8` | Sex imputation thresholds (shared) |
+| `--plink2_makepgen_3_options` | `--geno 0.1 --hwe 1e-13 0.001 --mac 70 --maf 0.01` | Common-variant filtering for the REGENIE step 1 and principal-component paths |
+| `--plink2_missing_per_pheno_options` | `--geno 0.2` | Per-phenotype variant missingness filter, same paths |
+| `--inbreeding_outliers_range_stds` | `3` | Standard deviations from the mean inbreeding coefficient beyond which a sample is an outlier |
+| `--plink2_indep_pairwise_options` | `--mind 0.1` | Extra filtering on the inbreeding and principal-component paths |
+| `--plink2_indep_pairwise_window` | `50 5 0.2` | Linkage-disequilibrium pruning window for the inbreeding path |
+| `--plink2_indep_pairwise_window_pca` | `500 50 0.2` | Linkage-disequilibrium pruning window for principal-component analysis |
+| `--plink2_write_snplist_qc_options` | `--mind 0.1` | Extra filtering when writing the REGENIE step 1 variant list |
+| `--plink2_king_cutoff_threshold_pca` | `0.0884` | Relatedness cutoff used to choose the samples principal components are computed from |
+| `--plink2_pca_settings` | `allele-wts 10` | Principal-component settings, including how many components to compute |
+| `--plink2_makepgen_4_options` | `--geno 0.2` | Variant missingness filter on the REGENIE step 2 path |
+| `--plink2_makepgen_5_options` | `--mind 0.2` | Sample missingness filter on the REGENIE step 2 path |
+| `--plink2_write_snplist_step2_options` | `--mind 0.2` | Extra filtering when writing the REGENIE step 2 variant list |
+| `--plink2_export_other_options` | `dosage=DS --double-id --vcf-half-call missing --split-par b38 --1 --export Av` | Dosage export settings |
+| `--plink2_import_dosage_options` | `skip0=1 skip1=2 id-delim=_ chr-col-num=1 pos-col-num=4 ref-first --make-pgen` | Dosage re-import settings, used just before REGENIE step 2 |
 
-Use this parameter to choose a configuration profile. Profiles can give configuration presets for different compute environments.
+The relatedness cutoff only decides which samples the principal components are computed
+from. **Related samples are not removed from the association test** -- see
+[pipeline.md](pipeline.md).
 
-Several generic profiles are bundled with the pipeline which instruct the pipeline to use software packaged using different methods (Docker, Singularity, Podman, Shifter, Charliecloud, Apptainer, Conda) - see below.
+### Association testing
 
-> [!IMPORTANT]
-> We highly recommend the use of Docker or Singularity containers for full pipeline reproducibility, however when this is not possible, Conda is also supported.
+| Parameter | Default | Description |
+|---|---|---|
+| `--regenie_step1_options` | `--bt --bsize 100 --lowmem --covarColList PC1_AVG,PC2_AVG` | REGENIE step 1 (whole-genome model) |
+| `--regenie_step2_options` | `--bt --minMAC 1 --ref-first --firth --approx --bsize 200 --lowmem --aaf-bins 0.01,0.05,0.1,1 --write-mask --write-mask-snplist --vc-tests skato --covarColList PC1_AVG,PC2_AVG` | REGENIE step 2 (association tests) |
+| `--rscript_annotate_options` | `--min_top_annotations 30 --max_annotations 62 --quantile_threshold 0.25 --include-intergenic FALSE` | Variant annotation and grouping |
+| `--rscript_vcf2aaf_options` | `AF_nfe_gnomad AF` | Which INFO fields to take alternative allele frequencies from, in order of preference |
 
-The pipeline also dynamically loads configurations from [https://github.com/nf-core/configs](https://github.com/nf-core/configs) when it runs, making multiple config profiles for various institutional clusters available at run time. For more information and to check if your system is supported, please see the [nf-core/configs documentation](https://github.com/nf-core/configs#documentation).
+`--bt` selects a case/control analysis; remove it for a quantitative phenotype.
+`--covarColList` must name principal components that actually exist -- with the default
+`allele-wts 10`, that is `PC1_AVG` through `PC10_AVG`.
 
-Note that multiple profiles can be loaded, for example: `-profile test,docker` - the order of arguments is important!
-They are loaded in sequence, so later profiles can overwrite earlier profiles.
+### Reporting
 
-If `-profile` is not specified, the pipeline will run locally and expect all software to be installed and available on the `PATH`. This is _not_ recommended, since it can lead to different results on different machines dependent on the computer environment.
+| Parameter | Default | Description |
+|---|---|---|
+| `--phenotypes_apply_rint` | `false` | Apply a rank-based inverse normal transformation to the phenotype before reporting |
+| `--manhattan_annotation_enabled` | `true` | Label significant genes on the Manhattan plot |
+| `--annotation_min_log10p` | `3` | Least -log10(p) a gene needs before it is labelled |
+| `--plot_ylimit` | `0` | Upper limit of the Manhattan plot's y axis; 0 means fit to the data |
+| `--multiqc_title` | -- | Title for the MultiQC report |
+| `--multiqc_config` | -- | Custom MultiQC configuration file |
+| `--multiqc_logo` | -- | Logo for the MultiQC report |
 
-- `test`
-  - A profile with a complete configuration for automated testing
-  - Includes links to test data so needs no other parameters
-- `docker`
-  - A generic configuration profile to be used with [Docker](https://docker.com/)
-- `singularity`
-  - A generic configuration profile to be used with [Singularity](https://sylabs.io/docs/)
-- `podman`
-  - A generic configuration profile to be used with [Podman](https://podman.io/)
-- `shifter`
-  - A generic configuration profile to be used with [Shifter](https://nersc.gitlab.io/development/shifter/how-to-use/)
-- `charliecloud`
-  - A generic configuration profile to be used with [Charliecloud](https://hpc.github.io/charliecloud/)
-- `apptainer`
-  - A generic configuration profile to be used with [Apptainer](https://apptainer.org/)
-- `wave`
-  - A generic configuration profile to enable [Wave](https://seqera.io/wave/) containers. Use together with one of the above (requires Nextflow ` 24.03.0-edge` or later).
-- `conda`
-  - A generic configuration profile to be used with [Conda](https://conda.io/docs/). Please only use Conda as a last resort i.e. when it's not possible to run the pipeline with Docker, Singularity, Podman, Shifter, Charliecloud, or Apptainer.
+### VEP annotation
 
-### `-resume`
+Used only when `--skip_preparation` is `false`.
 
-Specify this when restarting a pipeline. Nextflow will use cached results from any pipeline steps where the inputs are the same, continuing from where it got to previously. For input to be considered the same, not only the names must be identical but the files' contents as well. For more info about this parameter, see [this blog post](https://www.nextflow.io/blog/2019/demystifying-nextflow-resume.html).
+| Parameter | Default | Description |
+|---|---|---|
+| `--vep_cache_url` | Ensembl release 113, GRCh38 | Where to download the VEP cache from |
+| `--ref_fasta_url` | Ensembl release 113, GRCh38 | Where to download the reference genome from |
+| `--vep_annotate_options` | see `nextflow.config` | VEP command-line options |
+| `--vep_updatecache_options` | `--AUTO acf --ASSEMBLY GRCh38` | VEP cache download options |
 
-You can also supply a run name to resume a specific run: `-resume [run-name]`. Use the `nextflow log` command to show previous run names.
+To use a different genome build, change `--vep_cache_url`, `--ref_fasta_url` and the
+`--split-par` value inside `--plink2_makepgen_1_options` together. The default
+`assets/hg38_hild.txt` is also build-specific.
 
-### `-c`
+## Troubleshooting
 
-Specify the path to a specific config file (this is a core Nextflow command). See the [nf-core website documentation](https://nf-co.re/usage/configuration) for more information.
+**The association step reports no variants, or no genes.** Almost always a mismatch in
+variant identifiers or chromosome names between the VCF and the grouping files. With
+`--skip_preparation true`, check that the VCF has `CHROM_POS_REF_ALT` identifiers and a
+`CSQ` field.
 
-## Custom configuration
+**An illegal-instruction error in a PLINK2 step.** The processor does not support AVX2.
+Set `--cpu_support_avx2 false`.
 
-### Resource requests
+**A process runs out of memory.** Try `-profile low_resources` or `medium_resources`, or
+raise the limits in a custom configuration file passed with `-c`.
 
-Whilst the default requirements set within the pipeline will hopefully work for most people and with most input data, you may find that you want to customise the compute resources that the pipeline requests. Each step in the pipeline has a default set of requirements for number of CPUs, memory and time. For most of the pipeline steps, if the job exits with any of the error codes specified [here](https://github.com/nf-core/rnaseq/blob/4c27ef5610c87db00c3c5a3eed10b1d161abf575/conf/base.config#L18) it will automatically be resubmitted with higher resources request (2 x original, then 3 x original). If it still fails after the third attempt then the pipeline execution is stopped.
+**A process runs out of temporary space.** Set `--tmpdir` to a directory on a larger
+filesystem.
 
-To change the resource requests, please see the [max resources](https://nf-co.re/docs/usage/configuration#max-resources) and [tuning workflow resources](https://nf-co.re/docs/usage/configuration#tuning-workflow-resources) section of the nf-core website.
+**REGENIE stops with "all phenotypes have less than 10 cases".** There are genuinely too
+few cases left after quality control. Loosening the missingness thresholds may help, but
+below roughly a dozen cases no burden test can be run.
 
-### Custom Containers
+**Sex imputation gives implausible results, or many samples come out ambiguous.** The
+default thresholds (`max-female-xf=0.2 min-male-xf=0.8`) assume reasonable coverage of
+chromosome X. Exome data covers chromosome X sparsely, so the inbreeding estimate is
+noisier and more samples land between the two thresholds. Widen them in
+`--plink2_makepgen_2_options` if needed.
 
-In some cases, you may wish to change the container or conda environment used by a pipeline steps for a particular tool. By default, nf-core pipelines use containers and software from the [biocontainers](https://biocontainers.pro/) or [bioconda](https://bioconda.github.io/) projects. However, in some cases the pipeline specified version maybe out of date.
+**The run is slow.** The reporting steps dominate the runtime. Use `--skip_reporting
+true` when only the association results are needed, and `--skip_preparation true` when
+running repeatedly on the same prepared VCF.
 
-To use a different container from the default container or conda environment specified in a pipeline, please see the [updating tool versions](https://nf-co.re/docs/usage/configuration#updating-tool-versions) section of the nf-core website.
-
-### Custom Tool Arguments
-
-A pipeline might not always support every possible argument or option of a particular tool used in pipeline. Fortunately, nf-core pipelines provide some freedom to users to insert additional parameters that the pipeline does not include by default.
-
-To learn how to provide additional arguments to a particular tool of the pipeline, please see the [customising tool arguments](https://nf-co.re/docs/usage/configuration#customising-tool-arguments) section of the nf-core website.
-
-### nf-core/configs
-
-In most cases, you will only need to create a custom config as a one-off but if you and others within your organisation are likely to be running nf-core pipelines regularly and need to use the same settings regularly it may be a good idea to request that your custom config file is uploaded to the `nf-core/configs` git repository. Before you do this please can you test that the config file works with your pipeline of choice using the `-c` parameter. You can then create a pull request to the `nf-core/configs` repository with the addition of your config file, associated documentation file (see examples in [`nf-core/configs/docs`](https://github.com/nf-core/configs/tree/master/docs)), and amending [`nfcore_custom.config`](https://github.com/nf-core/configs/blob/master/nfcore_custom.config) to include your custom profile.
-
-See the main [Nextflow documentation](https://www.nextflow.io/docs/latest/config.html) for more information about creating your own configuration files.
-
-If you have any questions or issues please send us a message on [Slack](https://nf-co.re/join/slack) on the [`#configs` channel](https://nfcore.slack.com/channels/configs).
-
-## Running in the background
-
-Nextflow handles job submissions and supervises the running jobs. The Nextflow process must run until the pipeline is finished.
-
-The Nextflow `-bg` flag launches Nextflow in the background, detached from your terminal so that the workflow does not stop if you log out of your session. The logs are saved to a file.
-
-Alternatively, you can use `screen` / `tmux` or similar tool to create a detached session which you can log back into at a later time.
-Some HPC setups also allow you to run nextflow within a cluster job submitted your job scheduler (from where it submits more jobs).
-
-## Nextflow memory requirements
-
-In some cases, the Nextflow Java virtual machines can start to request a large amount of memory.
-We recommend adding the following line to your environment to limit this (typically in `~/.bashrc` or `~./bash_profile`):
-
-```bash
-NXF_OPTS='-Xms1g -Xmx4g'
-```
+**Checking what was filtered out and where.** Every step records how many samples and
+variants it received and returned. Open
+`<outdir>/generate_tracking_report/*_sankey_report.html` -- it shows the whole path
+through the pipeline, and is the fastest way to find the step responsible for an
+unexpected loss of data.
