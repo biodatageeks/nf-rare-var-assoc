@@ -21,27 +21,26 @@ variants into genes by predicted functional impact, running the association test
 REGENIE, and reporting. Each step records how many samples and variants entered and left
 it, so the whole run can be audited afterwards.
 
-![nf-rare-var-assoc pipeline](docs/draw_io_diagrams/nf_rare_var_assoc_metromap.drawio.png "Pipeline diagram")
+![nf-rare-var-assoc pipeline](docs/draw_io_diagrams/nf_rare_var_assoc.drawio.png "Pipeline diagram")
 
 ## What the pipeline does
 
-1. **Prepares the VCF** -- sorting, splitting multi-allelic sites, removing exact
+1. **Prepares the VCF**: sorting, splitting multi-allelic sites, removing exact
    duplicates, assigning variant identifiers, VEP annotation, and computing dosages from
    genotype likelihoods. Delegated to
-   [nf-prepare-vcf](https://github.com/psuszyns/nf-prepare-vcf).
+   [nf-prepare-vcf](https://github.com/biodatageeks/nf-prepare-vcf).
 2. **Filters variants** on site quality and on per-genotype quality and depth, then
    applies PLINK2 quality control with **different thresholds for each downstream use**.
-3. **Filters samples** -- sex imputation, per-phenotype missingness, and removal of
-   inbreeding-coefficient outliers.
-4. **Corrects for population structure** -- linkage-disequilibrium pruning, relatedness
+3. **Filters samples** per-phenotype missingness, and removal of
+   inbreeding-coefficient outliers. Also, sex imputation.
+4. **Corrects for population structure**: linkage-disequilibrium pruning, relatedness
    estimation, principal-component analysis, and projection of every sample onto the
    resulting components.
 5. **Groups variants into genes** by VEP consequence, producing per-gene variant sets,
    annotation files, impact tiers and allele-frequency groups.
-6. **Tests for association** with REGENIE: a whole-genome step followed by burden,
-   SKAT-O and Firth tests across several allele-frequency thresholds.
-7. **Reports** -- Manhattan and QQ plots, exploratory data-quality figures,
-   principal-component plots, an HTML report, a MultiQC report, and a per-step record of
+6. **Tests for association** with REGENIE: a whole-genome step followed by burden and SKAT-O tests across several allele-frequency thresholds, with Firth/SPA imbalance correction.
+7. **Reports**: Manhattan and QQ plots, data-quality figures,
+   principal-component plots, an HTML report, and a per-step record of
    how the data flowed through the pipeline.
 
 A fuller description of each step, and why the quality-control thresholds differ between
@@ -50,10 +49,9 @@ them, is in [docs/pipeline.md](docs/pipeline.md).
 ## Requirements
 
 - [Nextflow](https://www.nextflow.io/) 25.10.2 or newer, and Java 17 or newer.
-- A container engine: Docker, Singularity, Apptainer, Podman, Shifter or Charliecloud.
-  Conda and Mamba also work but are slower and less reproducible.
+- A container engine: Docker, Podman, Singularity or Apptainer.
 
-No reference data has to be downloaded in advance -- the VEP cache and reference genome
+No reference data has to be downloaded in advance - the VEP cache and reference genome
 are fetched by the preparation step on first use.
 
 ## Quick start
@@ -94,7 +92,7 @@ These are written to `--outdir` by default:
 | `pipeline_info/` | Nextflow's own execution report, timeline and trace |
 
 Adding `--publish_intermediate true` also writes the output of every intermediate step,
-including the exploratory data-analysis figures, the principal components and the gene
+including the data-analysis figures, the principal components and the gene
 groupings. Every output directory is described in [docs/output.md](docs/output.md).
 
 ## Documentation
@@ -126,12 +124,6 @@ ordinary workstation.
 This pipeline uses code and infrastructure developed and maintained by the
 [nf-core](https://nf-co.re) community, reused here under the
 [MIT license](https://github.com/nf-core/tools/blob/main/LICENSE).
-
-> **The nf-core framework for community-curated bioinformatics pipelines.**
->
-> Philip Ewels, Alexander Peltzer, Sven Fillinger, Harshil Patel, Johannes Alneberg, Andreas Wilm, Maxime Ulysse Garcia, Paolo Di Tommaso & Sven Nahnsen.
->
-> _Nat Biotechnol._ 2020 Feb 13. doi: [10.1038/s41587-020-0439-x](https://dx.doi.org/10.1038/s41587-020-0439-x).
 
 ## Copyright
 

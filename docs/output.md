@@ -10,7 +10,7 @@ files are prefixed with `<project_name>_dataset_idx_<N>_`; otherwise the prefix 
 
 ## Written by default
 
-### `rscript_manhattan_qq_plots/` -- the main report
+### `rscript_manhattan_qq_plots/` - the main report
 
 A single self-contained HTML file per phenotype. This is the place to start. It contains:
 
@@ -18,13 +18,12 @@ A single self-contained HTML file per phenotype. This is the place to start. It 
   by `--manhattan_annotation_enabled` and `--annotation_min_log10p`),
 - a QQ plot with the genomic inflation factor, which shows whether the test is well
   calibrated,
-- a table of the strongest associations,
 - summary statistics for the phenotype,
 - the principal-component plot,
-- the exploratory data-quality figures,
+- the data-quality figures,
 - the parameters the run used.
 
-### `regenie_step2/` -- the association results
+### `regenie_step2/` - the association results
 
 | File | Contents |
 |---|---|
@@ -46,14 +45,14 @@ CHROM GENPOS ID ALLELE0 ALLELE1 A1FREQ N TEST BETA SE CHISQ LOG10P EXTRA
 | `ID` | `<gene>.<impact group>.<allele-frequency threshold>` |
 | `A1FREQ` | combined frequency of the variants in that group |
 | `N` | samples analysed |
-| `TEST` | `ADD` for the burden test, `ADD-SKATO` for SKAT-O, and so on -- one row each |
+| `TEST` | `ADD` for the burden test, `ADD-SKATO` for SKAT-O, and so on - one row each |
 | `BETA`, `SE` | effect size and its standard error (burden tests only; SKAT-O has no single effect size) |
-| `LOG10P` | **-log10 of the p-value**. This is the column to sort on -- larger means more significant. |
+| `LOG10P` | **-log10 of the p-value**. This is the column to sort on - larger means more significant. |
 
 A gene appears many times, once per combination of impact group, frequency threshold and
 test, so filter to the combination you care about before interpreting anything.
 
-### `rscript_buildreports/` -- per-variant carrier tables
+### `rscript_buildreports/` - per-variant carrier tables
 
 For every variant that entered a gene group, the allele counts and frequencies in cases
 and in controls:
@@ -68,15 +67,15 @@ The last file is the one to open after finding an interesting gene in the result
 shows which variants drove the signal, how often each occurs in cases and in controls,
 and what VEP predicted them to do.
 
-### `generate_tracking_report/` -- how the data flowed through the pipeline
+### `generate_tracking_report/` - how the data flowed through the pipeline
 
 | File | Contents |
 |---|---|
 | `*_sankey_report.html` | a diagram of samples and variants entering and leaving each step |
 | `*_pipeline_report.txt` | the same as plain text, one block per step |
 
-Every step records how many samples and variants it received and returned, together with
-the parameters it used. This is the fastest way to find where data was lost:
+Most steps record how many samples and variants were received and returned, together with
+the parameters that were used, for example:
 
 ```
 Process: BCFTOOLS_VIEW_AND_FILTER2_..._viewfilter2
@@ -106,22 +105,20 @@ trace file to find which steps are slow or run out of memory.
 ### `exploratory_data_analysis/plots/`
 
 Roughly fifty figures, as both PNG and SVG, describing the data before association
-testing. They are also embedded in the main HTML report, so you only need this directory
-if you want the image files themselves. They cover:
+testing, as well as csv files with the data used for genrating the plots. The plots are 
+also embedded in the main HTML report, so you only need this directory
+if you want the csv files or the image files themselves. They cover:
 
-- **genotype quality, read depth and dosage** -- distributions per variant and per sample,
-  plotted separately for cases and controls (files beginning `1_`, `3_`, `5_`, `16_`),
-- **missingness** -- per variant and per sample, by phenotype (`7_`, `9_`),
-- **case/control differences** in read depth (`10_`), which is a common source of false
+- **genotype quality, read depth and dosage** - distributions per variant and per sample,
+  also plotted separately for cases and controls,
+- **missingness** - per variant and per sample, also by phenotype,
+- **case/control differences** in read depth, which is a common source of false
   positives,
-- **allele frequency, variant types and variant density per chromosome** (`11_`, `12_`,
-  `13_`),
-- **heterozygosity per sample** (`15_`), where outliers indicate contamination or poor
+- **allele frequency, variant types and variant density per chromosome**,
+- **heterozygosity per sample**, where outliers indicate contamination or poor
   quality,
-- **relationships between measures** -- depth against quality, dosage against depth,
-  dosage against genotype (`17_`), which show whether the derived dosages behave sensibly.
-
-Files with a `b` suffix (`1b_`, `3b_`, `10b_`) are the same figure on a different scale.
+- **relationships between measures** - depth against quality, dosage against depth,
+  dosage against genotype, which show whether the derived dosages behave sensibly.
 
 ### Association inputs and population structure
 
@@ -136,12 +133,6 @@ Files with a `b` suffix (`1b_`, `3b_`, `10b_`) are the same figure on a differen
 | `calculate_f_outliers/` | inbreeding coefficients and the samples flagged as outliers |
 | `merge_results/` | association results merged across chunks, one file per phenotype |
 
-### Gene groupings
-
-`bcftools/` holds the per-dataset `.annotations`, `.setlist` and `.aaf` files: which
-variants belong to which gene, what VEP predicted for each, and their allele frequencies.
-These define what the association test actually tested.
-
 ### Preparation and quality control
 
 | Directory | Contents |
@@ -149,10 +140,11 @@ These define what the association test actually tested.
 | `prepare/`, `bcftools_norm/`, `bcftools_annotate/`, `vep_annotate/`, `vep_updatecache/`, `fix_zero_pl/` | VCF preparation: normalisation, variant identifiers, VEP annotation, dosage computation |
 | `bcftools_view_and_filter2/` | the quality-filtered VCF |
 | `bcftools_replace_sample_names/`, `bcftools_index/`, `bcftools_vcf2frq/` | sample renaming, indexing, allele-frequency extraction |
+| `bcftools_assign_annotations` | annotations and setlist files containing variant, gene name and annotation assignments |
 | `plink2_makepgen/`, `plink2_makebed/`, `plink2_write_snplist/`, `plink2_export_other/`, `plink2_import_dosage/` | genotype format conversions and the quality-controlled variant sets |
 | `plink19_makeset/`, `plink19_makebed/` | PLINK 1.9 conversions used by the principal-component step |
-| `rscript_build_phenotypes/`, `phenotype/` | the phenotype file built from the case and control lists |
-| `rscript_assign_annotations/`, `rscript_vcftoaaf/` | intermediate annotation and allele-frequency files |
+| `rscript_build_phenotypes/`, `phenotype/` | the phenotype file built from the case and control lists and a list of all samples present in all phenotypes |
+| `python_vcftoaaf/` | allele-frequency files |
 | `check_x_chrom_present/`, `extract/`, `rename/`, `download_file/` | small bookkeeping steps |
 
 Every directory also contains a `*_tracking.json` file with the sample and variant counts
@@ -162,8 +154,8 @@ that the tracking report is built from.
 
 The Manhattan and QQ plots in the main report should be read together. A QQ plot whose
 points lift away from the diagonal along their whole length, and a genomic inflation
-factor well above 1, mean the test statistics are inflated -- usually because of
-uncorrected population structure -- and the p-values cannot be taken at face value. Check
+factor well above 1, mean the test statistics are inflated - usually because of
+uncorrected population structure - and the p-values cannot be taken at face value. Check
 the principal-component plot for unexpected structure, and consider including more
 components through `--covarColList` in `--regenie_step2_options`.
 

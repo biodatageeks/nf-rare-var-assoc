@@ -3,12 +3,12 @@
 What each step does and why. For how to run it see [usage.md](usage.md); for what it
 writes see [output.md](output.md).
 
-![nf-rare-var-assoc pipeline](draw_io_diagrams/nf_rare_var_assoc_metromap.drawio.png "Pipeline diagram")
+![nf-rare-var-assoc pipeline](draw_io_diagrams/nf_rare_var_assoc.drawio.png "Pipeline diagram")
 
 ## The problem this pipeline addresses
 
 In a rare-variant association study, no single variant occurs often enough to be tested
-on its own. Variants are instead grouped -- usually by gene -- and each group is tested as
+on its own. Variants are instead grouped, usually by gene, and each group is tested as
 a whole. That makes the result depend heavily on decisions taken long before the
 statistical test: which variants survive quality control, which are assigned to which
 gene, how a genotype's uncertainty is represented, and how population structure is
@@ -19,7 +19,7 @@ did, so the result can be traced back through every decision that produced it.
 
 ## 1. Preparing the VCF
 
-Delegated to [nf-prepare-vcf](https://github.com/psuszyns/nf-prepare-vcf), and skipped
+Delegated to [nf-prepare-vcf](https://github.com/biodatageeks/nf-prepare-vcf), and skipped
 when `--skip_preparation true` is set.
 
 - **Sorting, splitting multi-allelic sites and removing exact duplicates.** A site with
@@ -36,12 +36,12 @@ when `--skip_preparation true` is set.
 - **VEP annotation.** Predicted consequences are written into the VCF's `CSQ` field, and
   are what the gene grouping step later reads.
 - **Dosage computation from genotype likelihoods.** A hard genotype call throws away how
-  confident the caller was. Instead, a dosage -- the expected number of alternative
-  alleles, between 0 and 2 -- is computed from the `PL` genotype likelihoods and stored
+  confident the caller was. Instead, a dosage - the expected number of alternative
+  alleles, between 0 and 2 - is computed from the `PL` genotype likelihoods and stored
   in a `DS` field. The computation also corrects calls where every likelihood is zero,
   which some callers emit for homozygous-reference sites, using the genotype quality
   instead. Only genotypes above a minimum quality contribute.
-- **Gene ranges and conversion to PLINK format.**
+- **Gene ranges computation.**
 
 ## 2. Variant and genotype quality filtering
 
@@ -79,8 +79,7 @@ studies. The correction has four stages:
 
 1. **Linkage-disequilibrium pruning** to an approximately independent set of common
    variants, excluding regions of unusually strong linkage disequilibrium listed in
-   `--hild_path` -- the major histocompatibility complex and a small number of large
-   inversions, whose structure would otherwise dominate the components.
+   `--hild_path`.
 2. **Relatedness estimation**, to choose a set of mutually unrelated samples.
 3. **Principal-component analysis** on that unrelated set.
 4. **Projection** of *every* sample, including the related ones, onto those components.
@@ -92,20 +91,20 @@ The resulting scores become covariates in both association steps.
 *computed from*, because principal components are distorted if close relatives dominate
 the sample. All samples are then projected onto those components and all of them enter
 the association test, where REGENIE's whole-genome model accounts for the remaining
-relatedness. Describing this step as relatedness filtering would be wrong.
+relatedness.
 
 ## 5. The four quality-control paths, and why the thresholds differ
 
-After the shared steps above, the data splits into four paths, each with its own PLINK2
-thresholds. This is deliberate: the four uses have genuinely different requirements, and
-a single set of thresholds would be wrong for at least three of them.
+After some shared steps, the data splits into four paths, each with its own PLINK2
+thresholds. This is deliberate: the four uses have different requirements, and
+a single set of thresholds would not be flexible enough.
 
 | Path | What it feeds | What it needs |
 |---|---|---|
 | Inbreeding-coefficient filtering | sample quality control | common, independent variants -- the coefficient is meaningless on rare ones |
 | Principal-component analysis | covariates | common, independent variants, pruned harder and over a wider window |
 | REGENIE step 1 | the whole-genome model | common, high-quality variants; **rare variants contribute nothing here** |
-| REGENIE step 2 | the association tests | **rare variants, kept** -- this is the only path where they matter, so frequency filters must not be applied |
+| REGENIE step 2 | the association tests | **rare variants, kept** - this is the only path where they matter, so frequency filters must not be applied |
 
 The essential point is the contrast between the last two. REGENIE step 1 fits a
 whole-genome model to capture relatedness and background genetic effects, and needs
@@ -116,7 +115,16 @@ that same floor would remove exactly the variants the study is about. Its settin
 
 Missingness thresholds also differ between the two: step 1 can afford to be strict,
 because it only needs enough common variants to fit a model, while step 2 must be looser
-or rare variants -- which are inherently harder to genotype -- would be lost.
+or rare variants, which are inherently harder to genotype, would be lost.
+
+### Order of missingness filtering
+
+PLINK default operations order, which is used when several filters are applied in the same 
+PLINK call, is that samples missingness filtering (`--mind`) is performed first, and variants
+missingness filtering (`--geno`) is executed second, on the results of the first filtering.
+This pipeline seeks to retain as many samples as possible because it is tailored for small
+cohorts - samples are the most valuable data here. Because of that this pipeline executes
+additional PLINK calls, with `--geno` filtering executed before the `--mind` filtering.
 
 ## 6. Grouping variants into genes
 
@@ -148,15 +156,15 @@ prediction that captures relatedness and the polygenic background. This is what 
 related samples to be kept.
 
 **Step 2** tests each gene, in each impact group, at each allele-frequency threshold in
-`--aaf-bins`, using:
+`--aaf-bins`, using (this is configurable, but below we give what the default values produce):
 
 - a **burden test**, which sums the variants in a group and asks whether the total differs
   between cases and controls. Powerful when the variants act in the same direction.
 - **SKAT-O**, which combines a burden test with a variance-component test. Retains power
   when some variants raise and others lower risk, which a burden test cancels out.
 - **Firth correction**, which keeps p-values valid when cases are few or a variant is seen
-  almost exclusively in one group -- the situation ordinary logistic regression handles
-  badly, and the normal situation in rare-variant analysis.
+  almost exclusively in one group - the situation ordinary logistic regression handles
+  badly, and a normal situation in rare-variant analysis.
 
 With `--use_dosage true`, the dosages computed during preparation are used instead of hard
 genotype calls, so genotype uncertainty carries through into the test.
@@ -170,21 +178,14 @@ genotype calls, so genotype uncertainty carries through into the test.
   heterozygosity and allele frequency, plotted separately for cases and controls. The
   case/control comparisons matter most: a systematic difference in coverage between the
   two groups produces association signals that are entirely technical.
-- **Per-variant carrier tables** record, for every variant in a gene group, its allele
-  counts and frequencies in cases and controls and the identifiers of the samples carrying
-  it. This is what turns a significant gene into something that can be examined.
-- **A data-flow record.** Every step writes how many samples and variants it received and
-  returned, plus the parameters it used. These are assembled into a diagram and a text
+- **A data-flow record.** Most steps writes how many samples and variants they received and
+  returned, plus the parameters that were used. These are assembled into a diagram and a text
   report, so any loss of data can be traced to the step that caused it.
 
-Reporting is by far the slowest part of the pipeline. `--skip_reporting true` disables all
-of it when only the association results are needed.
+`--skip_reporting true` disables all reporting, saving time, when only the association results
+are needed.
 
 ## Design decisions worth knowing about
-
-**Left-alignment is off.** Standard practice, but it would change indel positions and
-therefore variant identifiers, breaking the link between the VCF and the gene groupings.
-Identifier stability was chosen over convention.
 
 **Dosages are computed, imported late, and not used everywhere.** Dosages are exported and
 then re-imported immediately before the association test rather than being carried through
@@ -195,7 +196,7 @@ assume discrete genotypes.
 **Sex is imputed rather than read.** The pipeline derives sex from chromosome X
 heterozygosity instead of trusting sample metadata, and acts on the result. On exome data,
 where chromosome X is sparsely covered, the estimate is noisier and more samples fall
-between the two thresholds -- widen them with `--plink2_makepgen_2_options` if this
+between the two thresholds - widen them with `--plink2_makepgen_2_options` if this
 happens.
 
 **The focus is coding variation.** The impact groups are built from protein-coding
