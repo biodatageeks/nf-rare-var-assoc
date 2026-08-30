@@ -125,12 +125,15 @@ This pipeline uses code and infrastructure developed and maintained by the
 [nf-core](https://nf-co.re) community, reused here under the
 [MIT license](https://github.com/nf-core/tools/blob/main/LICENSE).
 
-## Copyright
+## License
 
-Copyright (c) 2026 Piotr Suszyński, Tomasz Gambin. All rights reserved.
+Copyright (c) 2026 Piotr Suszyński, Tomasz Gambin.
 
-This software is proprietary. No part of it may be reproduced, distributed, or used
-in any form without explicit written permission from the copyright holders.
+This pipeline is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software Foundation,
+either version 3 of the License, or (at your option) any later version. See the
+[LICENSE](LICENSE) file for the full text.
 
-A licence to use this software free of charge for scientific and non-profit purposes
-may be obtained from the authors upon request.
+It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+PURPOSE.
