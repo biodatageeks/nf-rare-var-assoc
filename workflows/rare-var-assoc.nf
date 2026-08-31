@@ -439,19 +439,19 @@ workflow RARE_VAR_ASSOC {
     ch_tracking_step2 = ch_tracking_step2.mix(REGENIE_STEP2.out.tracking_out.first())
 
     if (!params.skip_reporting) {
-        r_script_buildreports_ch = Channel.fromPath(params.rscript_buildreports_path, checkIfExists: true).first()
-        RSCRIPT_BUILDREPORTS (
-            REGENIE_STEP2.out.masks_snplist
-                .join(ch_regenie_step2_regenie_out, by: 0)
-                .join(ch_step2_vcf, by: 0)
-                .join(ch_phenotype, by: 0)
-                .join(ch_annotations, by: 0)
-                .combine(r_script_buildreports_ch)
-        )
-        ch_annotated_snps  = RSCRIPT_BUILDREPORTS.out.annotated_snps
-        ch_res_log10p_1_annotated  = RSCRIPT_BUILDREPORTS.out.res_log10p_1_annotated
-        ch_annotated_snps_with_sample_ids  = RSCRIPT_BUILDREPORTS.out.annotated_snps_with_sample_ids
-        ch_versions = ch_versions.mix(RSCRIPT_BUILDREPORTS.out.versions.first())
+        //r_script_buildreports_ch = Channel.fromPath(params.rscript_buildreports_path, checkIfExists: true).first()
+        //RSCRIPT_BUILDREPORTS (
+        //    REGENIE_STEP2.out.masks_snplist
+        //        .join(ch_regenie_step2_regenie_out, by: 0)
+        //        .join(ch_step2_vcf, by: 0)
+        //        .join(ch_phenotype, by: 0)
+        //        .join(ch_annotations, by: 0)
+        //        .combine(r_script_buildreports_ch)
+        //)
+        //ch_annotated_snps  = RSCRIPT_BUILDREPORTS.out.annotated_snps
+        //ch_res_log10p_1_annotated  = RSCRIPT_BUILDREPORTS.out.res_log10p_1_annotated
+        //ch_annotated_snps_with_sample_ids  = RSCRIPT_BUILDREPORTS.out.annotated_snps_with_sample_ids
+        //ch_versions = ch_versions.mix(RSCRIPT_BUILDREPORTS.out.versions.first())
 
         ch_regenie_step2_regenie_out  //.map { t -> [t[0].id, t[1]] }
             .transpose()

@@ -1,2 +1,2 @@
-skip_ld_report: true
+compute_ld_report: false
 publish_intermediate: false

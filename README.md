@@ -1,6 +1,6 @@
 # nf-rare-var-assoc
 
-[![GitHub Actions CI Status](https://github.com/psuszyns/rare-var-assoc-nf/actions/workflows/ci.yml/badge.svg)](https://github.com/psuszyns/rare-var-assoc-nf/actions/workflows/ci.yml)
+[![GitHub Actions CI Status](https://github.com/biodatageeks/rare-var-assoc-nf/actions/workflows/ci.yml/badge.svg)](https://github.com/biodatageeks/rare-var-assoc-nf/actions/workflows/ci.yml)
 [![nf-test](https://img.shields.io/badge/unit_tests-nf--test-337ab7.svg)](https://www.nf-test.com)
 [![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A525.10.2-23aa62.svg)](https://www.nextflow.io/)
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
@@ -110,10 +110,10 @@ Requires [nf-test](https://www.nf-test.com/) and Nextflow 25.10.2 or newer.
 
 ```bash
 # fast suite, as run in continuous integration
-nf-test test --tag ci --profile low_resources
+nf-test test --tag ci --profile low_resources,podman
 
 # full suite, including slow integration tests
-nf-test test --profile low_resources
+nf-test test --profile low_resources,podman
 ```
 
 The `low_resources` profile caps the memory each process requests so the suite runs on an

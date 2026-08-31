@@ -25,9 +25,9 @@ fetched automatically the first time the preparation step runs.
 ### The VCF
 
 `--input_vcf` is a single multi-sample VCF, optionally compressed. A multi-sample VCF may
-be produced from gvcf files for example by [GLNexus](https://github.com/dnanexus-rnd/GLnexus).
-By default the pipeline "prepares" it: normalises, deduplicates and annotates the VCF, so
-this doesn't have to be done beforehand by the user.
+be produced from gvcf files for example by [GLNexus](https://github.com/dnanexus-rnd/GLnexus). The VCF file should also contain an allele frequency field in the INFO column.
+By default the pipeline "prepares" the VCF: normalises, deduplicates and annotates the
+VCF, so this doesn't have to be done beforehand by the user.
 
 For genotype dosages to be computed, the FORMAT field must contain genotype likelihoods
 (`PL`) alongside `GT`, `GQ` and `DP`. Without them the pipeline still runs, but on hard

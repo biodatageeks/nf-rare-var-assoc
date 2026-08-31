@@ -17,7 +17,7 @@ nextflow_process {
     //   - 500 variants across chr12, chr22, chrX; 35 multiallelic sites
     //   - 3202 samples (1000G high-coverage, HG00096..NA21144)
     //
-    // The child run is configured via prep.yml (skip_ld_report=true, publish_intermediate=true).
+    // The child run is configured via prep.yml (compute_ld_report=false, publish_intermediate=true).
     // Container + resource settings are forwarded automatically via workflow.profile:
     //   the module passes -profile ${workflow.profile} to the child nextflow run.
     // publish_intermediate=true is mandatory: without it BCFTOOLS_NORM and
