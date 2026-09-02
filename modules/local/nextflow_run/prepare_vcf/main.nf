@@ -8,18 +8,18 @@ process PREPARE_VCF {
     // verbatim to the child so container settings and resource limits are consistent.
     // Resume: no -resume flag; child always runs fresh when parent cache misses.
     // publish_intermediate=true in prep.yml is required so tracking JSONs are published
-    // from BCFTOOLS_NORM and PLINK2_MAKEPGEN to results/bcftools_norm/ and
-    // results/plink2_makepgen/ respectively.
+    // from BCFTOOLS_NORM and PLINK2_MAKEPGEN to child_results/bcftools_norm/ and
+    // child_results/plink2_makepgen/ respectively.
 
     input:
     tuple val(meta), path(vcf)
     path(params_file)
 
     output:
-    tuple val(meta), path("results/bcftools_reheader/*_reheader.vcf.gz"),    emit: prepared_vcf
-    tuple val(meta), path("results/bcftools_index/*_reheader.vcf.gz.tbi"),   emit: prepared_vcf_tbi
-    path("results/**/*tracking*.json"),                                      emit: tracking, optional: true
-    path("results/pipeline_info/nf-prepare-vcf_software_versions.yml"),      emit: versions, optional: true
+    tuple val(meta), path("child_results/bcftools_reheader/*_reheader.vcf.gz"),    emit: prepared_vcf
+    tuple val(meta), path("child_results/bcftools_index/*_reheader.vcf.gz.tbi"),   emit: prepared_vcf_tbi
+    path("child_results/**/*tracking*.json"),                                      emit: tracking, optional: true
+    path("child_results/pipeline_info/nf-prepare-vcf_software_versions.yml"),      emit: versions, optional: true
 
     when:
     task.ext.when == null || task.ext.when
@@ -32,7 +32,7 @@ process PREPARE_VCF {
         ${profile_arg} \\
         -params-file ${params_file} \\
         --input_vcf ${vcf} \\
-        --outdir results \\
+        --outdir child_results \\
         --cpu_support_avx2 ${params.cpu_support_avx2} \\
         -work-dir \${PWD}/child_work \\
         -ansi-log false
