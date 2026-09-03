@@ -1,6 +1,6 @@
 process PREPARE_VCF {
     tag "$meta.id"
-    label 'process_1'
+    label 'process_9'
 
     // Invokes nf-prepare-vcf as a child nextflow run on the same node (no container).
     // nextflow must be on PATH in the host environment.
