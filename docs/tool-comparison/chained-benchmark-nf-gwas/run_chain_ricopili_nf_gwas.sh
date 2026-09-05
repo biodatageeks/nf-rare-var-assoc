@@ -65,6 +65,13 @@ COMMON="${COMMON:-${RVA_REPO}/docs/tool-comparison/benchmark-common}"
 INPUT_VCF="${INPUT_VCF:-${DATA}/20201028_CCDG_14151_B01_GRM_WGS_2020-08-05_chr_12_22_X.recalibrated_variants.exome.vcf.gz}"
 PED="${PED:-${RVA_REPO}/assets/integrated_call_samples_v3.20250704.ALL.ped}"   # 1000G sex source
 
+# Reference for the stage D normalisation. This is the FASTA nf-prepare-vcf uses, and
+# the association VCF's identifiers only match the borrowed masks when both are
+# normalised against the same sequence. Chr-prefixed, so stage D exports chr-prefixed
+# names and strips the prefix afterwards. The .fai must sit next to it.
+REFDIR="${REFDIR:-/data/doktorat/biodatageeks/1000g/GRCh38_reference_genome}"
+REF="${REF:-GRCh38_full_analysis_set_plus_decoy_hla.fa}"
+
 # The one borrowed input: the per-dataset gene groupings published by a run of
 # nf-rare-var-assoc with --publish_intermediate true.
 RVA_RESULTS="${RVA_RESULTS:-${DATA}/runs/nf_rare_var_assoc/results}"
@@ -155,7 +162,8 @@ pheno_path() {
 # ----------------------------------------------------------------------------
 # Sanity checks
 # ----------------------------------------------------------------------------
-for f in "$INPUT_VCF" "$PED" "$GENE_MASKS" "${NFGWAS_REPO}/main.nf"; do
+for f in "$INPUT_VCF" "$PED" "$GENE_MASKS" "${NFGWAS_REPO}/main.nf" \
+         "${REFDIR}/${REF}" "${REFDIR}/${REF}.fai"; do
     [[ -e "$f" ]] || { echo "ERROR: missing required path: $f" >&2; exit 1; }
 done
 mkdir -p "$RUN_DIR" "$REGENIE_OUT_DIR"
@@ -336,7 +344,8 @@ for idx in "${IDXS[@]}"; do
     # exchanged. Our own variant IDs carry the answer -- stage A set them to
     # <chr>:<pos>:<REF>:<ALT> -- so field 3 is the true REF and --ref-allele restores
     # it exactly, with no reference-genome guessing. Without this the identifiers
-    # bcftools re-derives below would be CHROM_POS_ALT_REF and would not match the masks.
+    # bcftools re-derives below would be CHROM_POS_ALT_REF and would not match the masks,
+    # and the normalisation below would abort on the exchanged sites.
     awk -F'\t' '{n=split($2,a,":"); if (n==4 && a[3]!="") print $2"\t"a[3]}' \
         "${QCPRE}.bim" > "${WD}/ref_alleles.txt"
     printf 'n_variants_ref_allele_forced\t%s\n' "$(wc -l < "${WD}/ref_alleles.txt")" >> "$RET"
@@ -360,8 +369,10 @@ for idx in "${IDXS[@]}"; do
     #          everywhere it is used -- RICOPILI's QC ran on it, and it stays in the
     #          prediction genotypes below.
     #
-    # --output-chr MT writes 12 / 22 / X with NO chr prefix, the convention the gene groupings
-    # use. id-paste=iid is REQUIRED: plink2 names VCF samples FID_IID and preimp_dir
+    # --output-chr chrM writes chr12 / chr22 / chrX. The prefix is what the reference
+    # FASTA uses, so it has to be present for the normalisation below; it is stripped
+    # straight afterwards, leaving the 12 / 22 / X the gene groupings use.
+    # id-paste=iid is REQUIRED: plink2 names VCF samples FID_IID and preimp_dir
     # rewrites FID to 'con_sim_<study>_mix_rp_*<IID>'.
     { printf '#FID\tIID\tSEX\n'; awk '{print $1"\t"$2"\t2"}' "${QCPRE}.fam"; } > "${WD}/sex_diploid.txt"
     bcft -v "$WD":/w:z "$RICOPILI_IMG" bash -lc "
@@ -370,18 +381,29 @@ for idx in "${IDXS[@]}"; do
           --merge-x --sort-vars --ref-allele force /w/ref_alleles.txt 2 1 \
           --make-pgen --out /w/xmerged
         /opt/rp_dep/plink2/plink2 --pfile /w/xmerged --update-sex /w/sex_diploid.txt \
-          --output-chr MT --export vcf bgz id-paste=iid \
+          --output-chr chrM --export vcf bgz id-paste=iid \
           --out /w/assoc.export"
 
-    # Re-derive identifiers exactly as nf-rare-var-assoc does -- byte for byte the same
-    # bcftools call, which is what makes the reused masks match. NO left-normalisation
-    # here: it would shift indel positions and desynchronise every grouping
-    # identifier, and nf-rare-var-assoc does not left-align either.
-    bcft -v "$WD":/w:z "$BCFTOOLS_IMG" bash -lc '
-        set -e
-        bcftools annotate --set-id "%CHROM\_%POS\_%REF\_%FIRST_ALT" \
-            --threads '"${THREADS}"' -Oz -o /w/assoc.vcf.gz /w/assoc.export.vcf.gz
-        bcftools index -t /w/assoc.vcf.gz'
+    # The rename map for the step below: every contig of the export, chr prefix stripped.
+    bcft -v "$WD":/w:z "$BCFTOOLS_IMG" bash -lc 'bcftools view -h /w/assoc.export.vcf.gz' \
+        | grep '^##contig' | sed -E 's/.*ID=([^,>]+).*/\1/' \
+        | awk '{n=$1; sub(/^chr/,"",n); print $1"\t"n}' > "${WD}/chr_map.txt"
+
+    # The association VCF, prepared the way nf-prepare-vcf prepares the reference arm's
+    # input, in that order: split multi-allelic sites and normalise against the reference
+    # FASTA, strip the chr prefix, then set CHROM_POS_REF_ALT. The identifiers therefore
+    # carry left-aligned indel positions, which is what makes the borrowed masks match.
+    # bcftools norm exits on a REF/ALT mismatch -- the --ref-allele restoration above is
+    # what keeps it from doing so.
+    bcft -v "$WD":/w:z -v "$REFDIR":/ref:z,ro "$BCFTOOLS_IMG" bash -lc "
+        set -e -o pipefail
+        bcftools norm --fasta-ref /ref/${REF} -m -any --rm-dup exact \
+            --threads ${THREADS} -Ou /w/assoc.export.vcf.gz 2> /w/norm.log \
+        | bcftools annotate --rename-chrs /w/chr_map.txt -Ou \
+        | bcftools annotate --set-id '%CHROM\\_%POS\\_%REF\\_%FIRST_ALT' \
+              --threads ${THREADS} -Oz -o /w/assoc.vcf.gz
+        bcftools index -t /w/assoc.vcf.gz"
+    sed 's/^/    [norm] /' "${WD}/norm.log"
 
     # Prediction genotypes for REGENIE step 1: the same QC'd bed, with FID rewritten
     # back to the sample id so it joins to the phenotype and covariate files. TRUE sex

@@ -10,7 +10,8 @@ nextflow_process {
 
     // Runs the full nf-prepare-vcf child pipeline on the unprepared_rand_500 fixture.
     // The child pipeline does: BCFTOOLS_SORT -> BCFTOOLS_NORM (split multiallelics,
-    // strip chr prefix, assign unique IDs) -> VEP_ANNOTATE (CSQ) ->
+    // left-align and normalise against the reference FASTA) -> BCFTOOLS_ANNOTATE
+    // (strip chr prefix, assign unique IDs) -> VEP_ANNOTATE (CSQ) ->
     // CALC_DOSAGE_POLARSBIO -> BCFTOOLS_REHEADER (adds DS FORMAT header).
     //
     // Fixture: assets/three_chr_unprepared/unprepared_rand_500.vcf.gz

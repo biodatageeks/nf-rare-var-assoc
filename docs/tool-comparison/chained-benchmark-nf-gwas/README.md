@@ -44,8 +44,21 @@ is only one version, not a Filtered/Full pair.
 
 ## Converting RICOPILI's output for nf-gwas
 
-Stage D is the only genuinely new part, and three details in it fail quietly if they are
+Stage D is the only genuinely new part, and four details in it fail quietly if they are
 got wrong.
+
+### Normalising against the reference genome
+
+The borrowed gene groupings key variants by `CHROM_POS_REF_ALT`, and nf-prepare-vcf builds
+those keys after left-aligning and trimming indels against a reference FASTA. The
+association VCF therefore has to be normalised against the same FASTA
+(`GRCh38_full_analysis_set_plus_decoy_hla.fa`, `REFDIR`/`REF` in the script) before its
+identifiers are assigned, or every indel key lands a few bases away from the mask entry
+that names it. The FASTA is chr-prefixed, which is why the export writes `chr12` and the
+prefix is stripped in the step after the normalisation rather than by plink2.
+
+`bcftools norm` exits on a REF/ALT mismatch, so a wrong reference stops the run instead of
+quietly dropping variants — provided the reference allele has been restored first.
 
 ### Restoring the reference allele
 
@@ -102,12 +115,14 @@ awk -F'\t' '{n=split($2,a,":"); if (n==4 && a[3]!="") print $2"\t"a[3]}' qc.bim 
 plink2 --bfile <qc> --merge-x --sort-vars --ref-allele force ref_alleles.txt 2 1 \
        --make-pgen --out xmerged
 
-# pass 2: diploid X, chromosome names matching the gene groupings, sample name = IID
-plink2 --pfile xmerged --update-sex sex_diploid.txt --output-chr MT \
+# pass 2: diploid X, chromosome names matching the reference FASTA, sample name = IID
+plink2 --pfile xmerged --update-sex sex_diploid.txt --output-chr chrM \
        --export vcf bgz id-paste=iid --out assoc.export
 
-# identifiers; deliberately no left-normalisation, matching the reference pipeline
-bcftools annotate --set-id '%CHROM\_%POS\_%REF\_%FIRST_ALT' -Oz -o assoc.vcf.gz assoc.export.vcf.gz
+# normalise against the reference, strip the chr prefix, then assign identifiers
+bcftools norm --fasta-ref <ref.fa> -m -any --rm-dup exact -Ou assoc.export.vcf.gz \
+  | bcftools annotate --rename-chrs chr_map.txt -Ou \
+  | bcftools annotate --set-id '%CHROM\_%POS\_%REF\_%FIRST_ALT' -Oz -o assoc.vcf.gz
 
 # prediction genotypes: same bed, family ID rewritten to the sample id, TRUE sex kept
 plink2 --bfile <qc> --update-ids update_ids.txt --output-chr MT --make-bed --out prediction
