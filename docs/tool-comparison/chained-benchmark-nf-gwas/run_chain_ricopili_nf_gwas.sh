@@ -208,8 +208,8 @@ for idx in "${IDXS[@]}"; do
 
     # The borrowed input: the per-dataset gene groupings.
     RVA_ID="${RVA_PROJECT}_dataset_idx_${idx}"
-    ANNO_FILE="${RVA_RESULTS}/bcftools/${RVA_ID}.annotations"
-    SETLIST_FILE="${RVA_RESULTS}/bcftools/${RVA_ID}.setlist"
+    ANNO_FILE="${RVA_RESULTS}/bcftools_assign_annotations/${RVA_ID}.annotations"
+    SETLIST_FILE="${RVA_RESULTS}/bcftools_assign_annotations/${RVA_ID}.setlist"
     for p in "$ANNO_FILE" "$SETLIST_FILE"; do
         [[ -e "$p" ]] || { echo "ERROR: reused mask file for run_${idx} not found: $p" >&2
                            echo "       These come from an nf-rare-var-assoc run (project ${RVA_PROJECT})." >&2
