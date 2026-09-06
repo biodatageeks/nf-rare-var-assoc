@@ -39,15 +39,17 @@ set -euo pipefail
 DATA="${DATA:-/data/doktorat/biodatageeks/article_on_nf_rare_var_assoc/tools_comparison}"
 RVA_REPO="${RVA_REPO:-/data/git/doktorat_pw/wum_pims/nf-rare-var-assoc}"
 EVAL_REPO="${EVAL_REPO:-/data/git/doktorat_pw/wum_pims/nf-eval-gene-assoc}"
-DATASETS_DIR="${DATA}/datasets"
+DATASETS_DIR="${DATASETS_DIR:-${DATA}/datasets}"
 
-# Prepared (split + CSQ + DS) VCF -> input for skip_preparation=true.
-PREPARED_VCF="${DATA}/prepared.vcf.gz"
+# Prepared (split + normalised + CSQ + DS) VCF -> input for skip_preparation=true.
+# The masks this run publishes are keyed on this file's variant identifiers, so every
+# arm that borrows them must be built from the same file.
+PREPARED_VCF="${PREPARED_VCF:-${DATA}/prepared.vcf.gz}"
 # Original unprepared exome VCF -> input for the scoring step (it runs its own VEP).
-INPUT_VCF_RAW="${DATA}/20201028_CCDG_14151_B01_GRM_WGS_2020-08-05_chr_12_22_X.recalibrated_variants.exome.vcf.gz"
+INPUT_VCF_RAW="${INPUT_VCF_RAW:-${DATA}/20201028_CCDG_14151_B01_GRM_WGS_2020-08-05_chr_12_22_X.recalibrated_variants.exome.vcf.gz}"
 
-PROJECT="tools_comparison"
-RUN_DIR="${DATA}/runs/nf_rare_var_assoc"
+PROJECT="${PROJECT:-tools_comparison}"
+RUN_DIR="${RUN_DIR:-${DATA}/runs/nf_rare_var_assoc}"
 EVAL_RUN_DIR="${EVAL_RUN_DIR:-${DATA}/runs/nf_rare_var_assoc_eval}"
 RVA_PROFILE="podman,medium_resources,nocache"   # nocache: fresh run, no work-dir cache reuse
 EVAL_PROFILE="podman,medium_resources"
