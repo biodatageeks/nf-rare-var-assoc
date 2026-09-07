@@ -12,7 +12,7 @@ process PREPARE_VCF {
     // child_results/plink2_makepgen/ respectively.
 
     input:
-    tuple val(meta), path(vcf)
+    tuple val(meta), path(vcf), path(ref_fasta), path(ref_fasta_fai)
     path(params_file)
 
     output:
@@ -26,12 +26,14 @@ process PREPARE_VCF {
 
     script:
     def child_pipeline = "${projectDir}/../nf-prepare-vcf/main.nf"
+    def ref_fasta_arg  = ref_fasta ? "--input_ref_fasta ${ref_fasta}" : ''
     def profile_arg    = workflow.profile ? "-profile ${workflow.profile}" : ''
     """
     nextflow run ${child_pipeline} \\
         ${profile_arg} \\
         -params-file ${params_file} \\
         --input_vcf ${vcf} \\
+        ${ref_fasta_arg} \\
         --outdir child_results \\
         --cpu_support_avx2 ${params.cpu_support_avx2} \\
         -work-dir \${PWD}/child_work \\

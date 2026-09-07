@@ -28,7 +28,10 @@ when `--skip_preparation true` is set.
 - **Normalisation against the reference genome.** Indels are left-aligned and trimmed to
   their shortest representation, so that the same indel is written the same way however
   the variant caller happened to place it. Annotation resources and VEP use the same
-  convention, so normalising is what lets variants be matched against them reliably.
+  convention, so normalising is what lets variants be matched against them reliably. The
+  reference used is the FASTA given with `--input_ref_fasta`, or, when that is not set,
+  one downloaded by `nf-prepare-vcf` -- GRCh38 by default. The same reference is then
+  used for VEP annotation.
 - **Chromosome renaming and variant identifiers.** Every variant is given the identifier
   `CHROM_POS_REF_ALT`. This happens *after* the multi-allelic split and normalisation, so
   identifiers are unique and derived from the normalised position and alleles. All later

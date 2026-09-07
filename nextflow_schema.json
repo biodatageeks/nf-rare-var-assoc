@@ -50,6 +50,14 @@
                     "description": "Path to the masks file.",
                     "fa_icon": "fas fa-briefcase-medical"
                 },
+                "input_ref_fasta": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "Path to the reference genome FASTA to normalize and annotate against.",
+                    "help_text": "Passed on to the nested nf-prepare-vcf run, which uses it for bcftools norm and VEP. If not given, that pipeline downloads the reference from its default_ref_fasta_url (GRCh38). Used only when --skip_preparation is false.",
+                    "fa_icon": "fas fa-dna"
+                },
                 "project_name": {
                     "type": "string",
                     "description": "Project name.",

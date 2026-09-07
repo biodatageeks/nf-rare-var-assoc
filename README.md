@@ -52,7 +52,9 @@ them, is in [docs/pipeline.md](docs/pipeline.md).
 - A container engine: Docker, Podman, Singularity or Apptainer.
 
 No reference data has to be downloaded in advance - the VEP cache and reference genome
-are fetched by the preparation step on first use.
+are fetched by the preparation step on first use. If a reference FASTA is already
+available locally, `--input_ref_fasta /path/to/reference.fa` uses it instead of
+downloading one.
 
 ## Quick start
 

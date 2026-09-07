@@ -18,7 +18,8 @@ How to prepare the input, run the pipeline, and set every parameter.
   Conda and Mamba also work, but are slower and give weaker reproducibility.
 
 Nothing has to be downloaded in advance. The VEP cache and the reference genome are
-fetched automatically the first time the preparation step runs.
+fetched automatically the first time the preparation step runs. If you already have a
+reference FASTA on disk, point `--input_ref_fasta` at it to skip that download.
 
 ## Input files
 
@@ -87,6 +88,35 @@ Mask_HighMod	stop_gained,stop_lost,...,missense_variant,inframe_insertion,...
 `Mask_High` covers variants predicted to disrupt the protein, `Mask_Mod` covers those
 predicted to alter it moderately, and `Mask_HighMod` is the union of the two. Association
 tests are run for each group separately.
+
+### The reference genome
+
+`--input_ref_fasta` is an optional path to a reference genome FASTA. It is passed on to
+the nested `nf-prepare-vcf` run, which uses it in two places: `bcftools norm` normalises
+the VCF against it (left-aligning and trimming indels), and VEP annotates against it.
+
+If `--input_ref_fasta` is not given, `nf-prepare-vcf` downloads a reference itself, from
+its own `default_ref_fasta_url` -- by default the 1000 Genomes GRCh38 full analysis set,
+`GRCh38_full_analysis_set_plus_decoy_hla.fa`, together with its `.fai`. That is a
+multi-gigabyte download, so on a machine or cluster that already has a reference it is
+worth passing `--input_ref_fasta` instead.
+
+The FASTA has to match the input VCF: same genome build and the same contig naming, or
+`bcftools norm` will fail with a reference-mismatch error. It also has to match the rest
+of the run's build assumptions -- the VEP cache, the `--split-par` value inside
+`--plink2_makepgen_1_options`, and `--hild_path` are all GRCh38 by default. The reference
+is used only when `--skip_preparation` is `false`; with preparation skipped the VCF is
+expected to be normalised already.
+
+```bash
+nextflow run main.nf -profile docker \
+    --input_vcf        /path/to/input.vcf.gz \
+    --input_cases      /path/to/cases.txt \
+    --input_controls   /path/to/controls.txt \
+    --input_ref_fasta  /path/to/GRCh38_full_analysis_set_plus_decoy_hla.fa \
+    --project_name     myproject \
+    --outdir           results
+```
 
 ## Running the pipeline
 
@@ -193,6 +223,7 @@ Plus **either** `--input_phenotype`, **or** both `--input_cases` and `--input_co
 | `--input_controls` | -- | File listing control sample identifiers, one per line |
 | `--input_phenotype` | -- | Tab-separated phenotype file, or a comma-separated list of them |
 | `--input_masks` | `assets/default.masks` | Definition of the VEP consequence impact groups |
+| `--input_ref_fasta` | -- | Reference genome FASTA to normalise and annotate against. When not given, the preparation step downloads one; ignored when `--skip_preparation` is `true` |
 | `--project_name` | -- | Short identifier used in output filenames |
 | `--hild_path` | `assets/hg38_hild.txt` | Regions of high or unusual linkage disequilibrium, excluded from pruning |
 
@@ -281,20 +312,29 @@ the imputed sex.
 | `--multiqc_title` | -- | Title for the MultiQC report |
 | `--multiqc_logo` | -- | Logo for the MultiQC report |
 
-### VEP annotation
+### VEP annotation and the reference genome
 
-Used only when `--skip_preparation` is `false`.
+Used only when `--skip_preparation` is `false`. Annotation happens inside the nested
+`nf-prepare-vcf` run, and these are that pipeline's parameters:
 
 | Parameter | Default | Description |
 |---|---|---|
 | `--vep_cache_url` | Ensembl release 113, GRCh38 | Where to download the VEP cache from |
-| `--ref_fasta_url` | Ensembl release 113, GRCh38 | Where to download the reference genome from |
-| `--vep_annotate_options` | see `nextflow.config` | VEP command-line options |
+| `--vep_ref_fasta_url` | Ensembl release 113, GRCh38 | Where to download the FASTA that VEP itself reads from |
+| `--default_ref_fasta_url` | 1000 Genomes GRCh38 full analysis set | Reference genome downloaded when `--input_ref_fasta` is not given |
+| `--vep_annotate_options` | see `nf-prepare-vcf`'s `nextflow.config` | VEP command-line options |
 | `--vep_updatecache_options` | `--AUTO acf --ASSEMBLY GRCh38` | VEP cache download options |
 
-To use a different genome build, change `--vep_cache_url`, `--ref_fasta_url` and the
-`--split-par` value inside `--plink2_makepgen_1_options` together. The default
-`assets/hg38_hild.txt` is also build-specific.
+The nested run gets its parameters from
+[`conf/nf_prepare_params.yml`](../conf/nf_prepare_params.yml), plus `--input_vcf`,
+`--input_ref_fasta` and `--cpu_support_avx2`, which this pipeline forwards. To change any
+of the parameters in the table above, add it to that file -- passing it on this
+pipeline's command line has no effect.
+
+To use a different genome build, change the VEP cache and reference genome (either
+`--input_ref_fasta` or the URLs above) and the `--split-par` value inside
+`--plink2_makepgen_1_options` together. The default `assets/hg38_hild.txt` is also
+build-specific.
 
 ## Troubleshooting
 
@@ -302,6 +342,12 @@ To use a different genome build, change `--vep_cache_url`, `--ref_fasta_url` and
 variant identifiers or chromosome names between the VCF and the grouping files. With
 `--skip_preparation true`, check that the VCF has `CHROM_POS_REF_ALT` identifiers and a
 `CSQ` field.
+
+**The preparation step fails in `bcftools norm` with a reference mismatch**, or reports
+that a sequence is not found. The FASTA given with `--input_ref_fasta` does not match the
+VCF -- a different genome build, or different contig names (`chr1` versus `1`). Use a
+matching reference, or drop `--input_ref_fasta` and let the preparation step download its
+default GRCh38 one.
 
 **An illegal-instruction error in a PLINK2 step.** The processor does not support AVX2.
 Set `--cpu_support_avx2 false`.

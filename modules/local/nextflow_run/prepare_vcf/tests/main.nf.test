@@ -18,6 +18,11 @@ nextflow_process {
     //   - 500 variants across chr12, chr22, chrX; 35 multiallelic sites
     //   - 3202 samples (1000G high-coverage, HG00096..NA21144)
     //
+    // The reference FASTA and its .fai are the optional 3rd and 4th tuple elements
+    // (--input_ref_fasta and the index staged next to it). Both are [] here, so the child
+    // run downloads the reference itself from nf-prepare-vcf's default_ref_fasta_url --
+    // which is what the pipeline does when --input_ref_fasta is not given.
+    //
     // The child run is configured via prep.yml (compute_ld_report=false, publish_intermediate=true).
     // Container + resource settings are forwarded automatically via workflow.profile:
     //   the module passes -profile ${workflow.profile} to the child nextflow run.
@@ -44,7 +49,9 @@ nextflow_process {
                 input[0] = Channel.of(
                     tuple(
                         [ id: 'rand500' ],
-                        file('${projectDir}/assets/three_chr_unprepared/unprepared_rand_500.vcf.gz', checkIfExists: true)
+                        file('${projectDir}/assets/three_chr_unprepared/unprepared_rand_500.vcf.gz', checkIfExists: true),
+                        [],
+                        []
                     )
                 )
                 input[1] = Channel.value(

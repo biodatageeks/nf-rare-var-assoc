@@ -61,6 +61,15 @@ workflow RARE_VAR_ASSOC {
     ch_multiqc_files = Channel.empty()
     ch_masks = Channel.fromPath(params.input_masks, checkIfExists: true).first()
     ch_meta = ch_input_vcf.map { t -> t[0] }
+    // --input_ref_fasta is optional: when not given, [] is passed to PREPARE_VCF, which then
+    // omits --input_ref_fasta so that nf-prepare-vcf downloads the reference itself, from
+    // its default_ref_fasta_url
+    input_ref_fasta = params.input_ref_fasta ? file(params.input_ref_fasta, checkIfExists: true) : []
+    // the <fasta>.fai is optional: staged next to the FASTA when it exists so the nested run
+    // picks it up by name, otherwise nf-prepare-vcf builds the index itself
+    input_ref_fasta_fai = params.input_ref_fasta && file("${params.input_ref_fasta}.fai").exists()
+        ? file("${params.input_ref_fasta}.fai")
+        : []
 
 
     // call BCFTOOLS_ASSIGN_ANNOTATIONS with a dummy python script to pull the bioinf_combo image before HyperQueue provisions workers on PLGrid
@@ -76,7 +85,7 @@ workflow RARE_VAR_ASSOC {
         ch_prep_params_file = Channel.fromPath("${projectDir}/conf/nf_prepare_params.yml", checkIfExists: true).first()
 
         PREPARE_VCF (
-            ch_input_vcf,
+            ch_input_vcf.map { meta, vcf -> tuple(meta, vcf, input_ref_fasta, input_ref_fasta_fai) },
             ch_prep_params_file
         )
         ch_prepared_vcf = PREPARE_VCF.out.prepared_vcf
