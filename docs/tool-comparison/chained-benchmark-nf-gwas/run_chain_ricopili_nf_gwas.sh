@@ -654,6 +654,10 @@ if [[ "$SCORE" == "true" ]]; then
     [[ -x "$PAIRWISE_PYTHON" ]] || PAIRWISE_PYTHON="python3"
     RUNS_DIR="$(dirname "$EVAL_RUN_DIR")"                 # .../runs
     EVAL_SUBDIR="$(basename "$EVAL_RUN_DIR")"             # ricopili_nf_gwas_qcmatched_eval
+    # The reference arm's scores to compare against: a subdirectory of runs/. It must be
+    # the eval of the run whose masks RVA_RESULTS points at, since the two arms are only
+    # comparable when they share the gene groupings.
+    REF_EVAL_SUBDIR="${REF_EVAL_SUBDIR:-nf_rare_var_assoc_eval}"
     PW_OUT="${PW_OUT:-${RUNS_DIR}/pairwise_ricopili_nf_gwas_qcmatched}"
 
     # --missing zero: a dataset this could not analyse (e.g. run_27, whose quality control left
@@ -666,7 +670,7 @@ if [[ "$SCORE" == "true" ]]; then
     # (a) headline: nf-rare-var-assoc against this combined method.
     "$PAIRWISE_PYTHON" "${COMMON}/pairwise_compare.py" \
         --runs "$RUNS_DIR" --missing "$MISSING" \
-        --arm-a nf_rare_var_assoc nf_rare_var_assoc_eval \
+        --arm-a nf_rare_var_assoc "$REF_EVAL_SUBDIR" \
         --arm-b ricopili_nf_gwas_qcmatched "$EVAL_SUBDIR" \
         --out "${PW_OUT}/vs_reference"
     # (b) cross-check: nf-gwas alone (given our quality control and components)

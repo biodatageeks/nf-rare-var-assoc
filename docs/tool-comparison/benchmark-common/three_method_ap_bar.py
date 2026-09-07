@@ -19,9 +19,17 @@ Two output styles (--style):
                           is included at 1:1 and its text stays legible: no in-plot title
                           (the caption carries it), numeric dataset ticks, print-scale fonts.
 
+Each arm's eval subdirectory is set with --arm-a / --arm-b / --arm-c (label and
+subdirectory, as pairwise_compare.py takes them), so a figure can be built from any
+run's scores. The colour and left-to-right order belong to the slot, not to the
+subdirectory, which keeps a method's identity the same across figures.
+
 Usage:
   python three_method_ap_bar.py --runs <runs_dir> --out <out_stem>
   python three_method_ap_bar.py --style panel --out <tex_dir>/aux/three_method_ap_bar
+  python three_method_ap_bar.py \
+      --arm-a "nf-rare-var-assoc"  nf_rare_var_assoc_eval_<date> \
+      --arm-b "RICOPILI + nf-gwas" ricopili_nf_gwas_qcmatched_rerun_<date>_eval
 Defaults target this workstation's layout.
 """
 from __future__ import annotations
@@ -39,7 +47,10 @@ C_REF   = "#2a78d6"   # blue   -- nf-rare-var-assoc (its identity across the fig
 C_NFGW  = "#eb6834"   # orange -- RICOPILI + nf-gwas
 C_STAAR = "#1baf7a"   # aqua   -- RICOPILI + STAAR (Full)
 
-METHODS = [
+# Each arm: display label, its eval subdirectory under <runs>/, and its colour. The
+# colour belongs to the slot, not to the subdirectory, so an arm keeps its identity
+# across the figures when --arm-* points it at a different run's eval.
+DEFAULT_METHODS = [
     ("nf-rare-var-assoc", "nf_rare_var_assoc_eval",   C_REF),
     ("RICOPILI + nf-gwas", "ricopili_nf_gwas_qcmatched_eval",   C_NFGW),
     ("RICOPILI + STAAR",   "ricopili_staar_qcmatched_full_eval", C_STAAR),
@@ -58,8 +69,19 @@ def main() -> None:
                     choices=["average_precision", "auc_pr", "auc_roc"])
     ap.add_argument("--style", default="standalone", choices=["standalone", "panel"],
                     help="standalone = wide screen figure; panel = print size")
+    for flag, (label, subdir, _c) in zip(("--arm-a", "--arm-b", "--arm-c"),
+                                         DEFAULT_METHODS):
+        ap.add_argument(flag, nargs=2, metavar=("LABEL", "EVAL_SUBDIR"),
+                        default=[label, subdir],
+                        help=f"label and eval subdirectory under <runs>/ for this arm "
+                             f"(default: {label} {subdir})")
     args = ap.parse_args()
     panel = args.style == "panel"
+
+    # Slot order fixes the colours; only the label and eval subdirectory are overridable.
+    methods = [(lbl, sub, colour)
+               for (lbl, sub), (_l, _s, colour) in zip(
+                   (args.arm_a, args.arm_b, args.arm_c), DEFAULT_METHODS)]
 
     out_stem = args.out or os.path.join(args.runs, "pairwise_ricopili_staar",
                                         "three_method_ap_bar")
@@ -67,7 +89,7 @@ def main() -> None:
 
     # Load each method's recall-scaled measure, indexed by dataset_idx.
     series = {}
-    for label, subdir, _ in METHODS:
+    for label, subdir, _ in methods:
         df = load_arm(args.runs, subdir)
         series[label] = df[args.metric]
         n_present = int(df[args.metric].notna().sum())
@@ -89,13 +111,13 @@ def main() -> None:
         "axes.axisbelow": True,
     })
 
-    n_m = len(METHODS)
+    n_m = len(methods)
     bar_w = 0.8 / n_m
     # panel: ~10.9cm x 4.6cm -- 0.64 of an A4 text width, so the PDF is included at
     # ~1:1 and no font shrinks.
     fig, ax = plt.subplots(figsize=(4.35, 1.85) if panel else (12.5, 4.2))
 
-    for j, (label, _subdir, color) in enumerate(METHODS):
+    for j, (label, _subdir, color) in enumerate(methods):
         s = series[label]
         vals = np.array([s.get(i, np.nan) for i in all_idx], dtype=float)
         # offset so the group of n_m bars is centred on the tick
@@ -127,7 +149,7 @@ def main() -> None:
     if panel:
         ax.tick_params(labelsize=5, length=2, pad=1.5)
 
-    handles = [Patch(facecolor=c, label=l) for l, _s, c in METHODS]
+    handles = [Patch(facecolor=c, label=l) for l, _s, c in methods]
     # panel: upper LEFT -- the low-index datasets leave that corner empty, and the
     # right side carries the tallest bars. 5pt matches the paired-difference panel's key.
     ax.legend(handles=handles, frameon=False, fontsize=5 if panel else 8.5,
