@@ -104,7 +104,19 @@ groupings. Every output directory is described in [docs/output.md](docs/output.m
 | [docs/usage.md](docs/usage.md) | Input file formats, how to run the pipeline, the complete parameter reference, running on a cluster, and troubleshooting |
 | [docs/output.md](docs/output.md) | Every output directory and file, and how to interpret them |
 | [docs/pipeline.md](docs/pipeline.md) | What each analysis step does and why |
-| [docs/tool-comparison/](docs/tool-comparison/) | The benchmark comparing this pipeline against other rare-variant analysis software |
+| [docs/tool-comparison/README.md](docs/tool-comparison/README.md) | The benchmark comparing this pipeline against other rare-variant analysis software, and the simulated datasets it was measured on |
+
+### The benchmark and its data
+
+[docs/tool-comparison/README.md](docs/tool-comparison/README.md) describes how this
+pipeline was compared against other rare-variant analysis software: which tools were
+combined into a complete alternative, the script that runs each of them, and how the
+results are scored and compared statistically.
+
+The simulated phenotypes used for that comparison are committed here, in
+[assets/tool_comparison_datasets/](assets/tool_comparison_datasets/), together with the
+causal variants and the candidate genes they were drawn from, so any of the reported
+numbers can be recomputed.
 
 ## Testing
 

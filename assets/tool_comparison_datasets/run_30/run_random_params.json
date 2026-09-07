@@ -1,0 +1,10 @@
+{
+    "bcftools_filter_1_options": "\"--exclude 'QUAL<11 || AVG(FORMAT/GQ)<3 || AVG(FORMAT/DP)<7 || AVG(FORMAT/DP)>201' --output-type z --write-index=tbi\"",
+    "bcftools_view_1_options": "\"--min-af 0.01:minor --max-af 0.11:minor --output-type z --write-index=tbi\"",
+    "annotations_str": "'CSQ ~ \".*\"'",
+    "select_genes_min_variant_count": "5",
+    "select_genes_k_genes": "6",
+    "select_genes_variant_fraction": "0.0535546669724866",
+    "select_genes_max_allele_length": "21",
+    "gcta_simu_options": "\"--simu-cc 667 1333 --simu-hsq 0.2996816551824564 --simu-k 0.005518503651601864 --simu-rep 1\""
+}

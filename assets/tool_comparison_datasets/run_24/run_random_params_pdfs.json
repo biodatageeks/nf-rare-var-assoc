@@ -1,0 +1,17 @@
+{
+    "af_range": 0.25,
+    "annotations_list": 0.2,
+    "max_allele_length": 0.02,
+    "qual_th": 0.08333333333333333,
+    "cohort_proportion": 1.0,
+    "dp_min_filter1": 0.08333333333333333,
+    "simu_k": 17.428604947945296,
+    "variant_fraction": 1.5384615384615388,
+    "cohort_count": 1.0,
+    "min_variant_count": 0.25,
+    "simu_hsq": 1.430615164520744,
+    "min_af": 0.125,
+    "k_genes": 0.09090909090909091,
+    "gq_th_filter1": 0.08333333333333333,
+    "dp_max_filter1": 0.006666666666666667
+}

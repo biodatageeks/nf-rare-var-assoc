@@ -1,0 +1,10 @@
+{
+    "bcftools_filter_1_options": "\"--exclude 'QUAL<11 || AVG(FORMAT/GQ)<13 || AVG(FORMAT/DP)<9 || AVG(FORMAT/DP)>157' --output-type z --write-index=tbi\"",
+    "bcftools_view_1_options": "\"--min-af 0.0:minor --max-af 0.05:minor --output-type z --write-index=tbi\"",
+    "annotations_str": "'CSQ ~ \".*stop_gained.*\" || CSQ ~ \".*stop_lost.*\" || CSQ ~ \".*start_lost.*\" || CSQ ~ \".*stop_gained&splice_region_variant.*\" || CSQ ~ \".*stop_gained&frameshift_variant.*\" || CSQ ~ \".*stop_gained&NMD_transcript_variant.*\" || CSQ ~ \".*frameshift_variant.*\" || CSQ ~ \".*frameshift_variant&NMD_transcript_variant.*\" || CSQ ~ \".*frameshift_variant&splice_region_variant.*\" || CSQ ~ \".*splice_donor_variant.*\" || CSQ ~ \".*splice_acceptor_variant.*\" || CSQ ~ \".*splice_donor_variant&NMD_transcript_variant.*\" || CSQ ~ \".*splice_donor_variant&splice_donor_region_variant&intron_variant.*\" || CSQ ~ \".*splice_acceptor_variant&non_coding_transcript_variant.*\" || CSQ ~ \".*start_lost&splice_region_variant.*\" || CSQ ~ \".*splice_donor_variant&non_coding_transcript_variant.*\" || CSQ ~ \".*missense_variant.*\" || CSQ ~ \".*missense_variant&splice_region_variant.*\" || CSQ ~ \".*missense_variant&splice_region_variant&NMD_transcript_variant.*\" || CSQ ~ \".*missense_variant&NMD_transcript_variant.*\" || CSQ ~ \".*inframe_insertion.*\" || CSQ ~ \".*inframe_insertion&splice_region_variant.*\" || CSQ ~ \".*inframe_deletion.*\" || CSQ ~ \".*inframe_deletion&splice_region_variant.*\" || CSQ ~ \".*frameshift_variant&stop_lost&splice_region_variant.*\"'",
+    "select_genes_min_variant_count": "4",
+    "select_genes_k_genes": "5",
+    "select_genes_variant_fraction": "0.3136023910584774",
+    "select_genes_max_allele_length": "31",
+    "gcta_simu_options": "\"--simu-cc 667 1333 --simu-hsq 0.1252276921156051 --simu-k 0.0035691210238011028 --simu-rep 1\""
+}
