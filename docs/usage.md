@@ -210,9 +210,17 @@ Two parameters are often needed on shared systems:
   if it still fails. This is necessary is some of the datasets might fail but we
   would still be interested in results for other datasets.
 
-`--cpu_support_avx2 false` switches to a PLINK2 build that does not require AVX2
-instructions. Set it if the pipeline fails with an illegal-instruction error on older
-processors.
+## Processors without AVX2
+
+`cpu_support_avx2` switches to a PLINK2 build that does not require AVX2 instructions.
+Set it if a PLINK2 step fails with an illegal-instruction error -- on older processors, or
+on Apple Silicon, where the x86 images run under emulation. On Nextflow 26.04.0 and newer
+this boolean can only be set in a configuration file, not on the command line:
+
+```bash
+echo 'params.cpu_support_avx2 = false' > noavx2.config
+nextflow run . -profile docker -c noavx2.config ...
+```
 
 ## Parameter reference
 
@@ -246,7 +254,7 @@ Plus **either** `--input_phenotype`, **or** both `--input_cases` and `--input_co
 | `--use_dosage` | `false` | Use the DS dosage field rather than hard genotype calls in the association tests |
 | `--publish_intermediate` | `false` | Copy intermediate files into `--outdir` as well as the final results |
 | `--regenie_step1_kinship_filtering` | `false` | Apply relatedness-based sample filtering to the REGENIE step 1 input |
-| `--cpu_support_avx2` | `true` | Use the AVX2-optimised PLINK2 build; set to `false` on older processors |
+| `cpu_support_avx2` | `true` | Use the AVX2-optimised PLINK2 build; set to `false` on older processors, in a configuration file |
 | `--tmpdir` | Nextflow default | Temporary directory for all processes |
 | `--errorStrategy` | Nextflow default | Process error strategy; also accepts `retryThenIgnore` |
 
@@ -337,7 +345,7 @@ Used only when `--skip_preparation` is `false`. Annotation happens inside the ne
 
 The nested run gets its parameters from
 [`conf/nf_prepare_params.yml`](../conf/nf_prepare_params.yml), plus `--input_vcf`,
-`--input_ref_fasta` and `--cpu_support_avx2`, which this pipeline forwards. To change any
+`--input_ref_fasta` and `cpu_support_avx2`, which this pipeline forwards. To change any
 of the parameters in the table above, add it to that file -- passing it on this
 pipeline's command line has no effect.
 
@@ -359,8 +367,8 @@ VCF -- a different genome build, or different contig names (`chr1` versus `1`). 
 matching reference, or drop `--input_ref_fasta` and let the preparation step download its
 default GRCh38 one.
 
-**An illegal-instruction error in a PLINK2 step.** The processor does not support AVX2.
-Set `--cpu_support_avx2 false`.
+**An illegal-instruction error in a PLINK2 step.** AVX2 is not available -- see
+[Processors without AVX2](#processors-without-avx2).
 
 **A process runs out of memory.** Try `-profile medium_resources`, or
 raise the limits in a custom configuration file passed with `-c`.

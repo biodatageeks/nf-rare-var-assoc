@@ -28,14 +28,19 @@ process PREPARE_VCF {
     def child_pipeline = "${projectDir}/../nf-prepare-vcf/main.nf"
     def ref_fasta_arg  = ref_fasta ? "--input_ref_fasta ${ref_fasta}" : ''
     def profile_arg    = workflow.profile ? "-profile ${workflow.profile}" : ''
+    // Values given on a nextflow command line are always strings, and the string "false"
+    // is truthy in Groovy -- so --cpu_support_avx2 false would leave the child on the AVX2
+    // images. Hand it over in a config file instead, where it stays a real boolean.
     """
+    echo 'params.cpu_support_avx2 = ${params.cpu_support_avx2}' > child_avx2.config
+
     nextflow run ${child_pipeline} \\
         ${profile_arg} \\
+        -c child_avx2.config \\
         -params-file ${params_file} \\
         --input_vcf ${vcf} \\
         ${ref_fasta_arg} \\
         --outdir child_results \\
-        --cpu_support_avx2 ${params.cpu_support_avx2} \\
         -work-dir \${PWD}/child_work \\
         -ansi-log false
     """
