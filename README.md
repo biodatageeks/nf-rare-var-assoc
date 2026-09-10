@@ -121,7 +121,15 @@ be saved to `results_test` under current working directory.
 > [!NOTE]
 > During the first run the reference genome and the VEP cache is downloaded which may take
 > some time. The user may want to monitor the size of the `../vep_cachedir` to verify if
-> progress is being made. Subsequent runs will reuse existing cache and in that case the
+> progress is being made.
+>
+> Apart from that, the container images are also downloaded on the first run, which is also
+> a multi-gigabyte download. In case the user may want to use different location for storing
+> the images and containers, or for storing temporary files, the user may want to set a
+> relevant environment variable, such as NXF_APPTAINER_CACHEDIR, NXF_TEMP, NXF_CACHE_DIR and
+> TMPDIR.
+>
+> Subsequent runs will reuse existing caches and in that case the
 > `nextflow run main.nf -profile podman,low_resources,test` run should take 2-3 minutes.
 
 ## What you get
