@@ -156,7 +156,7 @@ numbers can be recomputed.
 
 ## Testing
 
-Requires [nf-test](https://www.nf-test.com/) and Nextflow 25.10.2 or newer.
+Requires Nextflow 25.10.2 or newer and [nf-test](https://www.nf-test.com/) 0.9.5 or newer.
 
 ```bash
 # fast suite, as run in continuous integration
