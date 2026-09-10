@@ -116,6 +116,12 @@ defaults from `nextflow.config`. The input vcf and phenotype files used are avai
 the `assets/medium_data` directory (see `conf/test.config` for details). The outputs will 
 be saved to `results_test` under current working directory.
 
+> [!NOTE]
+> During the first run the reference genome and the VEP cache is downloaded which may take
+> some time. The user may want to monitor the size of the `../vep_cachedir` to verify if
+> progress is being made. Subsequent runs will reuse existing cache and in that case the
+> `nextflow run main.nf -profile podman,low_resources,test` run should take 2-3 minutes.
+
 ## What you get
 
 These are written to `--outdir` by default:
