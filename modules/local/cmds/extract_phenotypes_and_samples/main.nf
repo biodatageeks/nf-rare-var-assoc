@@ -3,6 +3,11 @@ process EXTRACT_PHENOTYPES_AND_SAMPLES {
     tag "$meta.id"
     label 'process_1'
 
+    conda "conda-forge::coreutils=9.5"
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/ubuntu:22.04' :
+        'nf-core/ubuntu:22.04' }"
+
     input:
     tuple val(meta), path(pheno_file)
 

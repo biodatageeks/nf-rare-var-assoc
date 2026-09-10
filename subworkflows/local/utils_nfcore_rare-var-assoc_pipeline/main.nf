@@ -25,6 +25,11 @@ include { RSCRIPT_BUILD_PHENOTYPES  } from '../../../modules/local/rscript/build
 process JOIN_CASES_AND_CONTROLS {
     label 'process_1'
 
+    conda "conda-forge::coreutils=9.5"
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/ubuntu:22.04' :
+        'nf-core/ubuntu:22.04' }"
+
     input:
     tuple val(meta), path(cases), path(controls)
     val(options)
@@ -52,6 +57,11 @@ process JOIN_CASES_AND_CONTROLS {
 
 process PHENOTYPE_SAMPLES {
     label 'process_1'
+
+    conda "conda-forge::coreutils=9.5"
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/ubuntu:22.04' :
+        'nf-core/ubuntu:22.04' }"
 
     input:
     tuple val(meta), path(phenotype)

@@ -2,6 +2,11 @@ process CHECK_X_CHROM_PRESENT {
     tag "$meta.id"
     label 'process_1'
 
+    conda "conda-forge::coreutils=9.5"
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/ubuntu:22.04' :
+        'nf-core/ubuntu:22.04' }"
+
     input:
     tuple val(meta), path(pgen), path(pvar), path(psam)
 
