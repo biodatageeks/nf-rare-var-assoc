@@ -50,6 +50,9 @@ them, is in [docs/pipeline.md](docs/pipeline.md).
 
 - [Nextflow](https://www.nextflow.io/) 25.10.2 or newer, and Java 17 or newer.
 - A container engine: Docker, Podman, Singularity or Apptainer.
+- The [nf-prepare-vcf](https://github.com/biodatageeks/nf-prepare-vcf) git repository checked
+  out alongside this git repository (so that nf-rare-var-assoc and nf-prepare-vcf are
+  present in the same parent directory).
 
 No reference data has to be downloaded in advance - the VEP cache and reference genome
 are fetched by the preparation step on first use. If a reference FASTA is already
@@ -57,6 +60,22 @@ available locally, `--input_ref_fasta /path/to/reference.fa` uses it instead of
 downloading one.
 
 ## Quick start
+
+First, clone the nf-prepare-vcf git repository to the parent directory of the directory to
+which you cloned nf-rare-var-assoc and also create a directory called `vep_cachedir` in
+that parent directory:
+
+```bash
+cd ..
+git clone git@github.com:biodatageeks/nf-prepare-vcf.git
+mkdir vep_cachedir
+cd nf-rare-var-assoc
+```
+
+In the end the parent directory should contain `nf-rare-var-assoc`, `nf-prepare-vcf`
+and `vep_cachedir` subdirectories.
+
+Then you can run nf-rare-var-assoc using your vcf and cases and controls files by:
 
 ```bash
 nextflow run main.nf -profile docker \
@@ -79,6 +98,8 @@ nextflow run main.nf -profile docker \
 
 Both input styles, their file formats, every parameter, and how to run on a cluster are
 described in [docs/usage.md](docs/usage.md).
+During the first run the nf-prepare-vcf will download the VEP cache which may take some
+time - this is a one time action.
 
 ### Small testing dataset example
 
