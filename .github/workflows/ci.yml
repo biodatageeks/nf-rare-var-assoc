@@ -13,6 +13,18 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      - name: Delete unnecessary tools folder PyPy
+        run: rm -rf /opt/hostedtoolcache/PyPy
+
+      - name: Delete unnecessary tools folder Python
+        run: rm -rf /opt/hostedtoolcache/Python
+
+      - name: Delete unnecessary tools folder node
+        run: rm -rf /opt/hostedtoolcache/node
+
+      - name: Delete unnecessary tools folder go
+        run: rm -rf /opt/hostedtoolcache/go
+
       - name: Checkout
         uses: actions/checkout@v4
 
