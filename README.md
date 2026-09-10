@@ -80,6 +80,21 @@ nextflow run main.nf -profile docker \
 Both input styles, their file formats, every parameter, and how to run on a cluster are
 described in [docs/usage.md](docs/usage.md).
 
+### Small testing dataset example
+
+To run the pipeline on a small dataset (a small subset of the Thousand Genomes data), which
+can be used as a basic validation of the pipeline function and also serves as an example
+showcasing the correct input configuration, execute: 
+
+```bash
+nextflow run main.nf -profile podman,low_resources,test
+```
+
+This run uses `conf/test.config` as its configuration, with some values overriding the
+defaults from `nextflow.config`. The input vcf and phenotype files used are available in
+the `assets/medium_data` directory (see `conf/test.config` for details). The outputs will 
+be saved to `results_test` under current working directory.
+
 ## What you get
 
 These are written to `--outdir` by default:
