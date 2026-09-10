@@ -204,8 +204,13 @@ workflow PIPELINE_COMPLETION {
     //
     // Completion email and summary
     //
+    // `workflow` does not resolve inside the handler closure when it is registered
+    // from a subworkflow body, so capture the metadata here.
+    def wf = workflow
     workflow.onComplete {
         completionSummary(monochrome_logs)
+        println "Pipeline completed at: ${wf.complete}"
+        println "Execution status: ${ wf.success ? 'OK' : 'failed' }"
     }
 
     workflow.onError {

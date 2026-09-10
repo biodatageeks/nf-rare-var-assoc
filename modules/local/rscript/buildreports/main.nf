@@ -43,6 +43,7 @@ process RSCRIPT_BUILDREPORTS {
     stub:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
+    def VERSION = '4.4.2-0.1'
     """
     touch ${prefix}_annotated_snps.csv
     touch ${prefix}_res_log10p_1_annotated.csv

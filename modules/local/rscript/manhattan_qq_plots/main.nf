@@ -62,6 +62,7 @@ process RSCRIPT_MANHATTAN_QQ_PLOTS {
     stub:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
+    def VERSION = '4.4.2.5-0.1'
     """
     touch ${prefix}.html
 

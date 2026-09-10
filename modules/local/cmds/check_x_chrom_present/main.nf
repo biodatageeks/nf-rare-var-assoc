@@ -6,7 +6,7 @@ process CHECK_X_CHROM_PRESENT {
     tuple val(meta), path(pgen), path(pvar), path(psam)
 
     output:
-    tuple val(meta), env(has_x), path(pgen), path(pvar), path(psam), emit: has_x
+    tuple val(meta), env('has_x'), path(pgen), path(pvar), path(psam), emit: has_x
 
     script:
     """

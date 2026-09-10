@@ -36,6 +36,7 @@ process RSCRIPT_BUILD_PHENOTYPES {
 
     stub:
     def prefix = task.ext.prefix ?: "${meta.id}"
+    def VERSION = '4.4.2-0.2'
     """
     touch ${prefix}_phenotype.txt
     
