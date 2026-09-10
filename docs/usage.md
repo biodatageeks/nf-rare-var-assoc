@@ -16,6 +16,11 @@ How to prepare the input, run the pipeline, and set every parameter.
 - [Nextflow](https://www.nextflow.io/) 25.10.2 or newer, and Java 17 or newer.
 - A container engine: Docker, Singularity, Apptainer, Podman, Shifter or Charliecloud.
   Conda and Mamba also work, but are slower and give weaker reproducibility.
+- The [nf-prepare-vcf](https://github.com/biodatageeks/nf-prepare-vcf) git repository checked
+  out alongside this git repository (so that nf-rare-var-assoc and nf-prepare-vcf are
+  present in the same parent directory).
+- Before the first run an empty directory named `vep_cachedir` should be created in the parent
+  directory of the `nf-rare-var-assoc` directory.
 
 Nothing has to be downloaded in advance. The VEP cache and the reference genome are
 fetched automatically the first time the preparation step runs. If you already have a
@@ -119,6 +124,11 @@ nextflow run main.nf -profile docker \
 ```
 
 ## Running the pipeline
+
+> [!IMPORTANT]
+> Before running please make sure that the parent directory of the `nf-rare-var-assoc`
+> directory contains `nf-rare-var-assoc`, `nf-prepare-vcf` and `vep_cachedir` subdirectories.
+> Consult [Requirements](#requirements) if this is not the case.
 
 ```bash
 nextflow run main.nf -profile docker \

@@ -53,6 +53,8 @@ them, is in [docs/pipeline.md](docs/pipeline.md).
 - The [nf-prepare-vcf](https://github.com/biodatageeks/nf-prepare-vcf) git repository checked
   out alongside this git repository (so that nf-rare-var-assoc and nf-prepare-vcf are
   present in the same parent directory).
+- Before the first run an empty directory named `vep_cachedir` should be created in the parent
+  directory of the `nf-rare-var-assoc` directory.
 
 No reference data has to be downloaded in advance - the VEP cache and reference genome
 are fetched by the preparation step on first use. If a reference FASTA is already
