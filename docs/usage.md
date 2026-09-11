@@ -376,6 +376,13 @@ raise the limits in a custom configuration file passed with `-c`.
 **A process runs out of temporary space.** Set `--tmpdir` to a directory on a larger
 filesystem.
 
+**Failed to pull a container image** For example the error message may look like:
+```
+Error: unable to copy from source docker://ghcr.io/rgcgithub/regenie/regenie:v4.1.gz: initializing source docker://ghcr.io/rgcgithub/regenie/regenie:v4.1.gz: Requesting bearer token: received unexpected HTTP status: 403 Forbidden
+```
+All images used in this pipeline are public. Point the REGISTRY_AUTH_FILE environment
+variable to an empty file or run `podman logout ghcr.io` or similar command.
+
 **REGENIE stops with "all phenotypes have less than 10 cases".** There are genuinely too
 few cases left after quality control. Loosening the missingness thresholds may help, but
 below roughly a dozen cases no burden test can be run.
