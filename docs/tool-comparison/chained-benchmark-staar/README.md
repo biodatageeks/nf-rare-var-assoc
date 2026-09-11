@@ -55,7 +55,7 @@ individually).
 DATA=/data/doktorat/biodatageeks/article_on_nf_rare_var_assoc
 F=$DATA/tools_comparison/favor                  # annotation database and working files
 D=$DATA/tools_comparison/ricopili               # RICOPILI dependency archive
-ARM=/data/git/doktorat_pw/wum_pims/nf-rare-var-assoc/docs/tool-comparison/chained-benchmark
+ARM=/data/git/doktorat_pw/wum_pims/nf-rare-var-assoc/docs/tool-comparison/chained-benchmark-staar
 REFDIR=/data/doktorat/biodatageeks/genome_in_a_bottle/reference
 REF=GRCh38_GIABv3_no_alt_analysis_set_maskedGRC_decoys_MAP2K3_KMT2C_KCNJ18.fasta.gz
 mkdir -p $F/db $F/work $D
@@ -202,21 +202,21 @@ Notes on this sequence:
 `run_chain_ricopili_staar.sh` performs, for each dataset in turn: building a PLINK
 dataset from the raw VCF, RICOPILI quality control (`preimp_dir`), RICOPILI principal
 components (`pcaer`), GENESIS structure estimation, export back to VCF, and the STAAR
-association test for both versions described in the next section. It writes one
-REGENIE-shaped result table per dataset per version, plus a table recording how many
-variants and samples survived each quality-control step.
+association test in each configuration selected by `SPA_MODES`. It writes one
+REGENIE-shaped result table per dataset per configuration, plus a table recording how
+many variants and samples survived each quality-control step, the settings used, and the
+genomic inflation factor.
 
 ```bash
-ARM=$RVA_REPO/docs/tool-comparison/chained-benchmark
+ARM=$RVA_REPO/docs/tool-comparison/chained-benchmark-staar
 
-# quick check that everything is wired up: one dataset, one chromosome, 20 genes, ~7 minutes
-DATASET_IDXS="18" CHRS="22" VERSIONS="filtered full" MAX_GENES=20 CLEANUP=false \
+# quick check that everything is wired up: one dataset, one chromosome, 20 genes
+DATASET_IDXS="18" CHRS="22" MAX_GENES=20 \
   bash "$ARM/run_chain_ricopili_staar.sh" 2>&1 | tee ~/smoke_run18.log
 echo "EXIT=${PIPESTATUS[0]}"
 
 # a real run
-nohup env DATASET_IDXS="4 18 27" CHRS="12 22" VERSIONS="filtered full" \
-      CLEANUP=false SCORE=false THREADS=4 \
+nohup env DATASET_IDXS="4 18 27" CHRS="12 22" SCORE=false THREADS=4 \
       bash "$ARM/run_chain_ricopili_staar.sh" > ~/run.log 2>&1 &
 
 tail -f ~/run.log | grep -E '^\[[A-G]\]|^\[run_|VERDICT|ERROR|eval table'
@@ -225,10 +225,49 @@ tail -f ~/run.log | grep -E '^\[[A-G]\]|^\[run_|VERDICT|ERROR|eval table'
 `MAX_GENES` **must be left unset for any run whose results will be scored** -- it exists
 only for quick checks. `CHRS` defaults to `"12 22"`.
 
-**Expected cost:** roughly 2 seconds per gene per version at this sample size, so one
-fully scored dataset is about (427 genes on chromosome 22 + 1000 on chromosome 12) x 2
-seconds x 2 versions, or about 95 minutes of association testing, plus about 7 minutes
-for quality control, structure estimation and export.
+A dataset whose result tables already exist is skipped, so an interrupted run can be
+relaunched with the same command. A dataset that fails is reported and skipped rather
+than ending the run. The script deletes nothing: it prints the size of each dataset's
+work directory and the command to remove it, and refuses to start a dataset whose work
+directory still has files in it, because RICOPILI will not re-run in one. Set
+`CLEANUP=true` to have each work directory removed once its tables are written.
+
+**Expected cost:** at this sample size, about 2.5 seconds per gene without the
+saddlepoint approximation and about 0.8 seconds per gene with it, which is cheaper
+because it omits the SKAT and ACAT-V components. Over the 427 genes on chromosome 22 and
+1000 on chromosome 12, one fully scored dataset is roughly 60 minutes for `nospa` plus 20
+minutes for `spa`, and about 7 minutes for quality control, structure estimation and
+export.
+
+## Variant aggregation and the association test
+
+STAAR aggregates only variants whose minor allele frequency is below `rare_maf_cutoff`,
+and tests only genes with at least two such variants. The cutoff is set to match the
+other methods:
+
+| Method | Setting | Value |
+|---|---|---|
+| nf-rare-var-assoc | REGENIE `--aaf-bins` | 0.1 |
+| RICOPILI + nf-gwas | `regenie_gene_aaf` | 0.1 |
+| RICOPILI + STAAR | `rare_maf_cutoff` (`RARE_MAF`) | 0.1 |
+
+REGENIE's cutoff is on alternate allele frequency and STAAR's on minor allele frequency.
+The two agree for rare variants and differ only where the alternate allele is the more
+common one.
+
+The association test runs in two configurations for every dataset, selected by
+`SPA_MODES`:
+
+| Mode | Test | Reported p-value |
+|---|---|---|
+| `nospa` | SKAT, burden and ACAT-V combined | `STAAR-O` |
+| `spa` | burden only, with the saddlepoint approximation | `STAAR-B` |
+
+The saddlepoint approximation suits the imbalanced case/control ratios in these
+datasets, but STAAR applies it to the burden test alone. Both configurations are
+therefore run and scored, and the one with the higher mean recall-scaled average
+precision across all datasets is reported. Everything else -- quality control, principal
+components, the relatedness matrix and the covariates -- is identical between them.
 
 ## The two versions: removing relatives against modelling them
 
@@ -313,6 +352,26 @@ threshold, no minor-allele-frequency floor, and all of `pcaer`. Set
 `PREIMP_GENO`, `PREIMP_MIND`, `PREIMP_PRE_GENO` and `PREIMP_MIDI` back to
 `0.02/0.02/0.05/0.02` to reproduce a run with RICOPILI's defaults.
 
+### Minor allele frequency
+
+`preimp_dir --maf` stays at its default of 0, so no frequency floor is applied to the
+data used for association. A floor there would remove the rare variants the comparison
+exists to measure, because `preimp_dir` produces a single quality-controlled dataset that
+feeds both the association test and the principal components.
+
+nf-rare-var-assoc applies its floor only to the marker set used for principal components
+and REGENIE's first step, never to its association set. Each method uses the same
+threshold for that purpose:
+
+| Method | Where the floor is applied | Value |
+|---|---|---|
+| nf-rare-var-assoc | `plink2_makepgen_3_options --maf` | 0.05 |
+| RICOPILI + nf-gwas | nf-gwas `qc_maf`, on the prediction genotypes | 0.05 |
+| RICOPILI + STAAR | `pcaer`'s pruning step (not configurable) | 0.05 |
+
+The GENESIS step used by the Full version prunes at 0.01, its own default. A higher
+value leaves too few independent exome markers to estimate relatedness from.
+
 **`--pre_geno` is easy to get wrong, and raising `--geno` alone would have had no
 effect.** RICOPILI computes the pre-filter list before any sample filtering and then
 excludes those variants from every later step, so they never return. The effective
@@ -355,41 +414,44 @@ couple of minutes) and rescans whatever tables are on disk, so newly finished da
 are picked up automatically and no list needs editing.
 
 ```bash
-ARM=/data/git/doktorat_pw/wum_pims/nf-rare-var-assoc/docs/tool-comparison/chained-benchmark
+ARM=/data/git/doktorat_pw/wum_pims/nf-rare-var-assoc/docs/tool-comparison/chained-benchmark-staar
 COMMON=/data/git/doktorat_pw/wum_pims/nf-rare-var-assoc/docs/tool-comparison/benchmark-common
 T=/data/doktorat/biodatageeks/article_on_nf_rare_var_assoc/tools_comparison
 PY=/data/git/playground_all/python/.venv/bin/python   # needs pandas, scipy, matplotlib
 
-# 1. score both versions
-bash "$ARM/run_staar_eval.sh"
-# -> runs/ricopili_staar_{filtered,full}_eval/results/compute_score/*_auc_summary.csv
-#    (VERSIONS=full bash "$ARM/run_staar_eval.sh" for just one)
+DATE=2026_09_12        # the run to score; matches RUN_DATE in the run scripts
+M=ricopili_staar_$DATE
 
-# 2. compare each version against this pipeline
-for V in filtered full; do
-  $PY "$COMMON/pairwise_compare.py" --runs "$T/runs" --missing drop \
-    --arm-a nf_rare_var_assoc nf_rare_var_assoc_eval \
-    --arm-b "ricopili_staar_$V" "ricopili_staar_${V}_eval" \
-    --out "$T/runs/pairwise_ricopili_staar/vs_reference_$V"
+# 1. score both configurations
+bash "$ARM/run_staar_eval.sh"
+# -> runs/${M}_full_{nospa,spa}_eval/results/compute_score/*_auc_summary.csv
+#    (ARMS=full_spa bash "$ARM/run_staar_eval.sh" for just one)
+
+# 2. compare each configuration against this pipeline
+for A in full_nospa full_spa; do
+  $PY "$COMMON/pairwise_compare.py" --runs "$T/runs" --missing zero \
+    --arm-a "nf_rare_var_assoc_$DATE" "nf_rare_var_assoc_${DATE}_eval" \
+    --arm-b "$M" "${M}_${A}_eval" \
+    --out "$T/runs/pairwise_${M}/vs_reference_$A"
 done
 
-# 3. draw the three-method bar chart
-cd "$COMMON" && $PY three_method_ap_bar.py --runs "$T/runs"
+# 3. draw the three-method bar chart, naming the configuration chosen in step 2
+cd "$COMMON" && $PY three_method_ap_bar.py --runs "$T/runs" \
+  --arm-c "RICOPILI + STAAR" "${M}_full_nospa_eval"
 ```
 
-`--missing drop` compares only the datasets a version actually produced; `--missing zero`
-instead counts a missing result as a score of zero, so a failure counts against the
-method that failed. Which is appropriate depends on what you are measuring.
+`--missing zero` scores a dataset a method produced no result for as zero, so a failure
+counts against the method that failed. Use `--missing drop` to compare only the datasets
+both methods produced.
 
-The bar chart uses the Full version. To switch it to Filtered, or to change which
-datasets appear, edit the `METHODS` list and `all_idx` in
-`benchmark-common/three_method_ap_bar.py`.
+Step 2 reports both configurations. Take the one with the higher mean recall-scaled
+average precision, use it for the bar chart in step 3, and report the other alongside it.
 
 After a refresh, check that the scoring log prints one `_auc_summary.csv` per dataset per
-version, that `pairwise_compare.py` prints `coverage: ... produced N/30`, and that the
-bar chart log prints `RICOPILI + STAAR ... datasets=N`. If a dataset is missing, check
+configuration, that `pairwise_compare.py` prints `coverage: ... produced N/30`, and that
+the bar chart log prints `RICOPILI + STAAR ... datasets=N`. If a dataset is missing, check
 that its `*_dataset_idx_<N>_step2_Y1.regenie` table exists under
-`regenie_per_dataset/<version>/`.
+`regenie_per_dataset/<configuration>/`.
 
 ### Regenerating `genes_info_hgnc.tsv`
 

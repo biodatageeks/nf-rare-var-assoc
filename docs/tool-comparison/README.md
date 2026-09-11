@@ -23,7 +23,7 @@ narrower comparison:
 
 | Directory | What it compares | Notes |
 |---|---|---|
-| [chained-benchmark/](chained-benchmark/) | RICOPILI (quality control and principal components) combined with STAARpipeline (association) | STAARpipeline brings its own functional annotations, so this is the only comparison where the annotation step is entirely the other tool's. Run in two versions, one removing related samples and one modelling them. |
+| [chained-benchmark-staar/](chained-benchmark-staar/) | RICOPILI (quality control and principal components) combined with STAARpipeline (association) | STAARpipeline brings its own functional annotations, so this is the only comparison where the annotation step is entirely the other tool's. Run in two configurations of the association test, and the better one is reported. |
 | [chained-benchmark-nf-gwas/](chained-benchmark-nf-gwas/) | RICOPILI combined with [nf-gwas](https://github.com/genepi/nf-gwas) | Both halves are complete pipelines a user configures and runs, with no analysis code of ours between them. The gene groupings are still borrowed, because nf-gwas cannot build them. |
 | [nf-gwas-benchmark/](nf-gwas-benchmark/) | nf-rare-var-assoc against nf-gwas alone | The earliest comparison. nf-gwas is given this pipeline's gene groupings *and* principal components, so it measures only the quality-control and dosage stages, not the tools as a whole. The two combined comparisons above exist because of this limitation. Kept unchanged so its result remains reproducible. |
 | [benchmark-common/](benchmark-common/) | -- | The parts that do not depend on which tool is being compared: running this pipeline as the reference, scoring any method's results, and comparing two methods statistically. |

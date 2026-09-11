@@ -24,12 +24,13 @@ MISSING DATASETS (--missing):
   One method can fail to produce a result for a dataset the other handled -- for example
   a combined method whose quality control leaves too few cases, on a dataset the
   reference pipeline's own filtering kept analysable. Two ways to treat that dataset:
-    drop  (default) -- pair only on datasets BOTH arms produced (intersection). Lenient:
-            it silently excludes the dataset, which rewards a method for failing to run.
-    zero  -- a method that produced NOTHING scores 0 (zero causal-gene recall, which is
-            exactly what the recall-scaling formula yields for an empty result set), and
-            the pair is kept. This penalises the failure instead of hiding it, and is the
-            honest choice when one method genuinely could not analyse a valid dataset.
+    zero  (default) -- a method that produced NOTHING scores 0 (zero causal-gene recall,
+            which is exactly what the recall-scaling formula yields for an empty result
+            set), and the pair is kept. This penalises the failure instead of hiding it,
+            and is the honest choice when one method genuinely could not analyse a valid
+            dataset. Every arm of this comparison is scored on this policy.
+    drop  -- pair only on datasets BOTH arms produced (intersection). Lenient: it
+            silently excludes the dataset, which rewards a method for failing to run.
   Either way the COVERAGE (how many datasets each method produced a result for) is
   reported, because "ran 30/30 vs 29/30" is itself a result.
 
@@ -466,10 +467,10 @@ def main() -> None:
                     help="arm B label and its eval subdir under <runs>/")
     ap.add_argument("--out", default=None,
                     help="output directory for CSVs + figures (default: <runs>/pairwise_comparison)")
-    ap.add_argument("--missing", choices=["drop", "zero"], default="drop",
-                    help="datasets one arm did not produce: 'drop' pairs only on the "
-                         "intersection (lenient); 'zero' keeps them and scores the "
-                         "missing arm 0 (penalises the failure). Default: drop.")
+    ap.add_argument("--missing", choices=["drop", "zero"], default="zero",
+                    help="datasets one arm did not produce: 'zero' keeps them and scores "
+                         "the missing arm 0 (penalises the failure); 'drop' pairs only on "
+                         "the intersection (lenient). Default: zero.")
     ap.add_argument("--no-plots", action="store_true",
                     help="skip the figures (write only the CSVs)")
     ap.add_argument("--display-a", default=None, metavar="NAME",

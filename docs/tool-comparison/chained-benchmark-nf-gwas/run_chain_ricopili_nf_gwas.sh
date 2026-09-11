@@ -40,7 +40,7 @@
 #   run out of variants. The PREIMP_* values below are preimp_dir's own command-line
 #   options; nothing is patched and every other threshold stays as shipped. Set them
 #   to 0.02/0.02/0.05/0.02 to reproduce a run with RICOPILI's defaults. The reasoning
-#   is in ../chained-benchmark/README.md.
+#   is in ../chained-benchmark-staar/README.md.
 #
 # QUICK CHECK: EXPORT_ONLY=true runs stages A-D and the identifier check, then stops
 #   (about 5 minutes per dataset instead of a full Nextflow run). This is the cheap
@@ -72,16 +72,25 @@ PED="${PED:-${RVA_REPO}/assets/integrated_call_samples_v3.20250704.ALL.ped}"   #
 REFDIR="${REFDIR:-/data/doktorat/biodatageeks/1000g/GRCh38_reference_genome}"
 REF="${REF:-GRCh38_full_analysis_set_plus_decoy_hla.fa}"
 
+# The date every run directory here is stamped with. Declared before anything that
+# interpolates it. Keep it in step with the reference arm and the STAAR arm.
+RUN_DATE="${RUN_DATE:-2026_09_12}"
+
 # The one borrowed input: the per-dataset gene groupings published by a run of
-# nf-rare-var-assoc with --publish_intermediate true.
-RVA_RESULTS="${RVA_RESULTS:-${DATA}/runs/nf_rare_var_assoc/results}"
+# nf-rare-var-assoc with --publish_intermediate true. The two arms are only comparable
+# when they share the gene groupings, so this defaults to the SAME-dated reference run.
+# Point RVA_RESULTS elsewhere to borrow from a different one, deliberately.
+RVA_RESULTS="${RVA_RESULTS:-${DATA}/runs/nf_rare_var_assoc_${RUN_DATE}/results}"
 RVA_PROJECT="${RVA_PROJECT:-tools_comparison}"
 GENE_MASKS="${GENE_MASKS:-${RVA_REPO}/assets/default.masks}"   # static mask definition
 
-# NOTE: the default moved to .../ricopili_nf_gwas_qcmatched with the QC harmonization,
-# so the original defaults run under .../ricopili_nf_gwas stays on disk for comparison.
-# Set RUN_DIR=${DATA}/runs/ricopili_nf_gwas to overwrite it instead.
-RUN_DIR="${RUN_DIR:-${DATA}/runs/ricopili_nf_gwas_qcmatched}"
+# Run directory. Dated, so every re-run lands beside its predecessors instead of
+# overwriting them -- nothing on disk is ever replaced by a later run. METHOD is
+# derived from the directory name and is what every result table, the nf-gwas project,
+# the eval project and the pairwise arm are named after, so pointing RUN_DIR somewhere
+# else renames all of them consistently and cannot produce a mislabelled table.
+RUN_DIR="${RUN_DIR:-${DATA}/runs/ricopili_nf_gwas_${RUN_DATE}}"   # RUN_DATE set above
+METHOD="$(basename "$RUN_DIR")"
 REGENIE_OUT_DIR="${RUN_DIR}/regenie_per_dataset"
 
 # RICOPILI QC thresholds. All four are preimp_dir's own command-line options -- no
@@ -194,7 +203,7 @@ median() { sort -g | awk '{v[n++]=$1} END{ if(n==0){print "NA"} else if(n%2){pri
 # ============================================================================
 FAILED_IDXS=()
 for idx in "${IDXS[@]}"; do
-    OUT_TABLE="${REGENIE_OUT_DIR}/ricopili_nf_gwas_qcmatched_dataset_idx_${idx}_step2_Y1.regenie"
+    OUT_TABLE="${REGENIE_OUT_DIR}/${METHOD}_dataset_idx_${idx}_step2_Y1.regenie"
     if [[ -e "$OUT_TABLE" ]]; then
         echo "[run_${idx}] eval table already present -- skipping (${OUT_TABLE})"
         continue
@@ -249,7 +258,7 @@ for idx in "${IDXS[@]}"; do
     # plink phenotype;
     # raw VCF -> subset -> GT-only -> split -> bed. Two plink passes (plink2
     # converts, plink1.9 re-sorts the --split-par output that plink1.9 otherwise
-    # refuses -- see ../chained-benchmark/README.md).
+    # refuses -- see ../chained-benchmark-staar/README.md).
     echo "[A] RICOPILI input prep ..."
     awk 'NR>1{print $2}' "$PHENO" | sort -u > "${WD}/keep_iids.txt"
     awk -F'\t' 'NR>1{print $2"\t"$5}' "$PED" > "${WD}/sex_all.tsv"
@@ -489,7 +498,7 @@ for idx in "${IDXS[@]}"; do
     fi
 
     # ------------------------------------------------------------------ Stage E
-    # nf-gwas. Parameters are copied from nf-rare-var-assoc's own tuned settings, so
+    # nf-gwas. Parameters are copied from nf-rare-var-assoc's own settings, so
     # the step-1 quality-control layer is identical across the compared methods; they differ only
     # in what they are fed. nf-gwas ALWAYS runs its own QC pass on the prediction
     # genotypes (there is no off switch), so this carries RICOPILI's quality control and
@@ -497,7 +506,7 @@ for idx in "${IDXS[@]}"; do
     mkdir -p "$RES"
     PARAMS_FILE="${WD}/params.nf_gwas.yaml"
     cat > "$PARAMS_FILE" <<EOF
-project: "ricopili_nf_gwas_qcmatched_dataset_idx_${idx}"
+project: "${METHOD}_dataset_idx_${idx}"
 outdir: "${RES}"
 
 genotypes_prediction: "${WD}/prediction.{bed,bim,fam}"
@@ -514,8 +523,8 @@ covariates_filename: "${COVAR_OUT}"
 covariates_columns: "${COVAR_COLS}"
 
 # nf-gwas's own quality-control call
-qc_maf: 0.045
-qc_mac: 16
+qc_maf: 0.05
+qc_mac: 15
 qc_geno: 0.25
 qc_hwe: "1e-9"
 qc_mind: 0.15
@@ -533,7 +542,7 @@ regenie_run_gene_based_tests: true
 regenie_gene_anno: "${ANNO_FILE}"
 regenie_gene_setlist: "${SETLIST_FILE}"
 regenie_gene_masks: "${GENE_MASKS}"
-regenie_gene_aaf: 0.2
+regenie_gene_aaf: 0.1
 regenie_gene_test: "skato"
 EOF
 
@@ -565,7 +574,7 @@ EOF
     # ------------------------------------------------------------------ Stage F
     # Rename the REGENIE table into the shared dir so ONE eval fan-out scores every
     # dataset (nf-eval parses dataset_idx from the filename, reads sep=' ' comment='#').
-    OUT_TABLE="${REGENIE_OUT_DIR}/ricopili_nf_gwas_qcmatched_dataset_idx_${idx}_step2_Y1.regenie"
+    OUT_TABLE="${REGENIE_OUT_DIR}/${METHOD}_dataset_idx_${idx}_step2_Y1.regenie"
     [[ -e "${RES}/results/Y1.regenie.gz" ]] \
         || { echo "ERROR: nf-gwas produced no ${RES}/results/Y1.regenie.gz" >&2; exit 1; }
     zcat "${RES}/results/Y1.regenie.gz" > "${WD}/.tmp_Y1.regenie"
@@ -633,13 +642,13 @@ fi
 # ----------------------------------------------------------------------------
 if [[ "$SCORE" == "true" ]]; then
     export EVAL_REPO="${EVAL_REPO:-/data/git/doktorat_pw/wum_pims/nf-eval-gene-assoc}"
-    # Sibling of runs/ricopili_nf_gwas_qcmatched, not a child: pairwise_compare.py takes eval
-    # subdirs directly under runs/ (--arm-b ricopili_nf_gwas_qcmatched ricopili_nf_gwas_qcmatched_eval).
-    export EVAL_RUN_DIR="${EVAL_RUN_DIR:-${DATA}/runs/ricopili_nf_gwas_qcmatched_eval}"
-    export EVAL_PROJECT="${EVAL_PROJECT:-ricopili_nf_gwas_qcmatched}"
+    # Sibling of runs/${METHOD}, not a child: pairwise_compare.py takes eval subdirs
+    # directly under runs/ (--arm-b ${METHOD} ${METHOD}_eval).
+    export EVAL_RUN_DIR="${EVAL_RUN_DIR:-${DATA}/runs/${METHOD}_eval}"
+    export EVAL_PROJECT="${EVAL_PROJECT:-${METHOD}}"
     export EVAL_PROFILE="${EVAL_PROFILE:-podman,medium_resources}"
     export INPUT_VCF SKIP_PREP="true"
-    export REGENIE_GLOB="${REGENIE_OUT_DIR}/ricopili_nf_gwas_qcmatched_dataset_idx_*_step2_Y1.regenie"
+    export REGENIE_GLOB="${REGENIE_OUT_DIR}/${METHOD}_dataset_idx_*_step2_Y1.regenie"
     export CAUSAL_SNPLIST_GLOB="${CAUSAL_SNPLIST_GLOB:-${DATASETS_DIR}/run_*/select_genes/*_dataset_idx_*_in_*.snplist}"
     export CAUSAL_GENES_GLOB="${CAUSAL_GENES_GLOB:-${DATASETS_DIR}/run_*/select_genes/*_genes_dataset_idx_*.txt}"
     echo ""
@@ -653,12 +662,13 @@ if [[ "$SCORE" == "true" ]]; then
     PAIRWISE_PYTHON="${PAIRWISE_PYTHON:-/data/git/playground_all/python/.venv/bin/python}"
     [[ -x "$PAIRWISE_PYTHON" ]] || PAIRWISE_PYTHON="python3"
     RUNS_DIR="$(dirname "$EVAL_RUN_DIR")"                 # .../runs
-    EVAL_SUBDIR="$(basename "$EVAL_RUN_DIR")"             # ricopili_nf_gwas_qcmatched_eval
-    # The reference arm's scores to compare against: a subdirectory of runs/. It must be
-    # the eval of the run whose masks RVA_RESULTS points at, since the two arms are only
-    # comparable when they share the gene groupings.
-    REF_EVAL_SUBDIR="${REF_EVAL_SUBDIR:-nf_rare_var_assoc_eval}"
-    PW_OUT="${PW_OUT:-${RUNS_DIR}/pairwise_ricopili_nf_gwas_qcmatched}"
+    EVAL_SUBDIR="$(basename "$EVAL_RUN_DIR")"             # ${METHOD}_eval
+    # The reference arm's scores to compare against: subdirectories of runs/. These MUST
+    # be the run whose masks RVA_RESULTS points at -- the two arms are only comparable
+    # when they share the gene groupings, so the dates normally match.
+    REF_METHOD="${REF_METHOD:-nf_rare_var_assoc_${RUN_DATE}}"
+    REF_EVAL_SUBDIR="${REF_EVAL_SUBDIR:-${REF_METHOD}_eval}"
+    PW_OUT="${PW_OUT:-${RUNS_DIR}/pairwise_${METHOD}}"
 
     # --missing zero: a dataset this could not analyse (e.g. run_27, whose quality control left
     # too few cases for REGENIE) scores 0 rather than being dropped from the pairing --
@@ -670,8 +680,8 @@ if [[ "$SCORE" == "true" ]]; then
     # (a) headline: nf-rare-var-assoc against this combined method.
     "$PAIRWISE_PYTHON" "${COMMON}/pairwise_compare.py" \
         --runs "$RUNS_DIR" --missing "$MISSING" \
-        --arm-a nf_rare_var_assoc "$REF_EVAL_SUBDIR" \
-        --arm-b ricopili_nf_gwas_qcmatched "$EVAL_SUBDIR" \
+        --arm-a "$REF_METHOD" "$REF_EVAL_SUBDIR" \
+        --arm-b "$METHOD" "$EVAL_SUBDIR" \
         --out "${PW_OUT}/vs_reference"
     # (b) cross-check: nf-gwas alone (given our quality control and components)
     #     against this one (given RICOPILI's).
@@ -679,7 +689,7 @@ if [[ "$SCORE" == "true" ]]; then
         "$PAIRWISE_PYTHON" "${COMMON}/pairwise_compare.py" \
             --runs "$RUNS_DIR" --missing "$MISSING" \
             --arm-a nf_gwas nf_gwas_eval \
-            --arm-b ricopili_nf_gwas_qcmatched "$EVAL_SUBDIR" \
+            --arm-b "$METHOD" "$EVAL_SUBDIR" \
             --out "${PW_OUT}/vs_nf_gwas_E1"
     else
         echo "  (skipping the E1 nf-gwas cross-check: no ${RUNS_DIR}/nf_gwas_eval on this host)"

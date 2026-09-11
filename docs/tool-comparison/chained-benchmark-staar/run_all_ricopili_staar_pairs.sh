@@ -10,7 +10,7 @@ export CLEANUP=false
 export SCORE=false
 export THREADS=1
 
-SCRIPT="$RVA_REPO/docs/tool-comparison/chained-benchmark/run_chain_ricopili_staar.sh"
+SCRIPT="$RVA_REPO/docs/tool-comparison/chained-benchmark-staar/run_chain_ricopili_staar.sh"
 
 # dataset pairs, in the same order as your original list
 PAIRS=(

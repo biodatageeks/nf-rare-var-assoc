@@ -48,9 +48,17 @@ PREPARED_VCF="${PREPARED_VCF:-${DATA}/prepared.vcf.gz}"
 # Original unprepared exome VCF -> input for the scoring step (it runs its own VEP).
 INPUT_VCF_RAW="${INPUT_VCF_RAW:-${DATA}/20201028_CCDG_14151_B01_GRM_WGS_2020-08-05_chr_12_22_X.recalibrated_variants.exome.vcf.gz}"
 
+# PROJECT is the pipeline's project_name, so it appears in every published filename
+# (meta.id = "<project>_dataset_idx_<N>"). It is deliberately NOT dated: the nf-gwas
+# arm looks the borrowed mask files up by this name under RVA_RESULTS, and the run is
+# already identified by its dated directory.
 PROJECT="${PROJECT:-tools_comparison}"
-RUN_DIR="${RUN_DIR:-${DATA}/runs/nf_rare_var_assoc}"
-EVAL_RUN_DIR="${EVAL_RUN_DIR:-${DATA}/runs/nf_rare_var_assoc_eval}"
+# Dated run directories, so a re-run lands beside its predecessors rather than
+# overwriting them. Keep RUN_DATE in step with the two chain scripts -- the nf-gwas arm
+# borrows this run's gene groupings and the two are only comparable when they match.
+RUN_DATE="${RUN_DATE:-2026_09_12}"
+RUN_DIR="${RUN_DIR:-${DATA}/runs/nf_rare_var_assoc_${RUN_DATE}}"
+EVAL_RUN_DIR="${EVAL_RUN_DIR:-${DATA}/runs/nf_rare_var_assoc_${RUN_DATE}_eval}"
 RVA_PROFILE="podman,medium_resources,nocache"   # nocache: fresh run, no work-dir cache reuse
 EVAL_PROFILE="podman,medium_resources"
 
@@ -118,26 +126,26 @@ use_dosage: true
 filter_vcf_qual_min: 23
 filter_vcf_avg_gq_min: 23
 filter_vcf_avg_dp_min: 23
-filter_vcf_avg_dp_max: 107
+filter_vcf_avg_dp_max: 110
 filter_vcf_sample_gq_min: 11
 filter_vcf_sample_dp_min: 22
-filter_vcf_sample_dp_max: 339
+filter_vcf_sample_dp_max: 340
 
 inbreeding_outliers_range_stds: 6
 
-plink2_makepgen_3_options: "--geno 0.250 --hwe 1e-9 0.01 --mac 16 --maf 0.045000"
-plink2_makepgen_4_options: "--geno 0.100"
-plink2_makepgen_5_options: "--mind 0.200"
-plink2_write_snplist_qc_options: "--mind 0.150"
-plink2_indep_pairwise_options: "--mind 0.300"
+plink2_makepgen_3_options: "--geno 0.25 --hwe 1e-9 0.01 --mac 15 --maf 0.05"
+plink2_makepgen_4_options: "--geno 0.1"
+plink2_makepgen_5_options: "--mind 0.2"
+plink2_write_snplist_qc_options: "--mind 0.15"
+plink2_indep_pairwise_options: "--mind 0.3"
 plink2_indep_pairwise_window: "800 80 0.2"
-plink2_missing_per_pheno_options: "--geno 0.350"
+plink2_missing_per_pheno_options: "--geno 0.35"
 plink2_indep_pairwise_window_pca: "800 80 0.2"
 plink2_king_cutoff_threshold_pca: 0.19
-plink2_write_snplist_step2_options: "--mind 0.200"
+plink2_write_snplist_step2_options: "--mind 0.2"
 
 regenie_step1_options: "--bt --bsize 400 --covarColList PC1_AVG,PC2_AVG,PC3_AVG,PC4_AVG"
-regenie_step2_options: "--bt --minMAC 7 --ref-first --firth --approx --bsize 200 --aaf-bins 0.2 --vc-tests skato --covarColList PC1_AVG,PC2_AVG,PC3_AVG,PC4_AVG"
+regenie_step2_options: "--bt --minMAC 7 --ref-first --firth --approx --bsize 200 --aaf-bins 0.1 --vc-tests skato --covarColList PC1_AVG,PC2_AVG,PC3_AVG,PC4_AVG"
 EOF
 
 # Extra config: make podman robust on this host (rootless podman needs keep-id

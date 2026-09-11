@@ -93,6 +93,7 @@ def main() -> None:
     gi_start = gi["start_position"].to_dict()
 
     frames = []
+    pcol = None
     for path in args.staar_results:
         df = pd.read_csv(path)
         if df.empty:
@@ -135,7 +136,8 @@ def main() -> None:
 
     out = pd.DataFrame(out_rows, columns=["CHROM", "GENPOS", "ID", "A1FREQ", "BETA", "LOG10P"])
     with open(args.out, "w") as fh:
-        fh.write("## staar_to_eval: STAAR-O gene-centric -> eval table (ID=<SYMBOL>.<category>, LOG10P=-log10 STAAR-O p)\n")
+        fh.write(f"## staar_to_eval: {pcol} gene-centric -> eval table "
+                 f"(ID=<SYMBOL>.<category>, LOG10P=-log10 {pcol} p)\n")
         out.to_csv(fh, sep=" ", index=False)
 
     print(f"wrote {len(out)} rows ({out['ID'].str.split('.').str[0].nunique()} genes) -> {args.out}")

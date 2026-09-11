@@ -7,7 +7,7 @@ In this comparison nf-gwas is given the gene groupings and principal components 
 by this pipeline, because nf-gwas cannot produce them itself. The measured difference
 therefore reflects only the earlier stages -- quality control and the use of dosages
 derived from genotype likelihoods -- and not the two tools as a whole. The comparisons in
-[../chained-benchmark/](../chained-benchmark/) and
+[../chained-benchmark-staar/](../chained-benchmark-staar/) and
 [../chained-benchmark-nf-gwas/](../chained-benchmark-nf-gwas/) exist because of this
 limitation: there, each tool is given only the raw data and does everything else itself.
 

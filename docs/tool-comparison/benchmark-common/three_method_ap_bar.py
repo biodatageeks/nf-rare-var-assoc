@@ -28,8 +28,9 @@ Usage:
   python three_method_ap_bar.py --runs <runs_dir> --out <out_stem>
   python three_method_ap_bar.py --style panel --out <tex_dir>/aux/three_method_ap_bar
   python three_method_ap_bar.py \
-      --arm-a "nf-rare-var-assoc"  nf_rare_var_assoc_eval_<date> \
-      --arm-b "RICOPILI + nf-gwas" ricopili_nf_gwas_qcmatched_rerun_<date>_eval
+      --arm-a "nf-rare-var-assoc"  nf_rare_var_assoc_<date>_eval \
+      --arm-b "RICOPILI + nf-gwas" ricopili_nf_gwas_<date>_eval \
+      --arm-c "RICOPILI + STAAR"   ricopili_staar_<date>_full_spa_eval
 Defaults target this workstation's layout.
 """
 from __future__ import annotations
@@ -50,10 +51,17 @@ C_STAAR = "#1baf7a"   # aqua   -- RICOPILI + STAAR (Full)
 # Each arm: display label, its eval subdirectory under <runs>/, and its colour. The
 # colour belongs to the slot, not to the subdirectory, so an arm keeps its identity
 # across the figures when --arm-* points it at a different run's eval.
+#
+# THE STAAR SLOT IS A PLACEHOLDER UNTIL THE ARMS ARE SCORED. The 2026-09-12 run tests
+# STAAR in two configurations -- full_nospa (STAAR-O, the full omnibus) and full_spa
+# (STAAR-B, burden-only under the saddlepoint approximation) -- and exactly ONE of them
+# belongs in this figure: the one with the higher mean recall-scaled AP over every
+# dataset, chosen once for the whole arm. Set it here (or pass --arm-c) after
+# run_staar_eval.sh has scored both; do NOT mix arms across figures.
 DEFAULT_METHODS = [
-    ("nf-rare-var-assoc", "nf_rare_var_assoc_eval",   C_REF),
-    ("RICOPILI + nf-gwas", "ricopili_nf_gwas_qcmatched_eval",   C_NFGW),
-    ("RICOPILI + STAAR",   "ricopili_staar_qcmatched_full_eval", C_STAAR),
+    ("nf-rare-var-assoc", "nf_rare_var_assoc_2026_09_12_eval",   C_REF),
+    ("RICOPILI + nf-gwas", "ricopili_nf_gwas_2026_09_12_eval",   C_NFGW),
+    ("RICOPILI + STAAR",   "ricopili_staar_2026_09_12_full_nospa_eval", C_STAAR),
 ]
 
 DEFAULT_RUNS = "/data/doktorat/biodatageeks/article_on_nf_rare_var_assoc/tools_comparison/runs"

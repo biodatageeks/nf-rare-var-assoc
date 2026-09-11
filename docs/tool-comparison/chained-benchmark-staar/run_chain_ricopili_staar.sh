@@ -13,13 +13,29 @@
 # Runs per dataset rather than once: RICOPILI's quality control depends on the
 # case/control split, and every dataset has its own sample subset.
 #
-# TWO VERSIONS PER DATASET, differing only in how relatedness is handled:
-#   Filtered = RICOPILI as shipped. pcaer removes related samples; its smartpca
-#              principal components carry into the association test.
-#   Full     = all samples kept. Relatedness is modelled in the null model with a
-#              GENESIS PC-Relate matrix, and principal components come from GENESIS
-#              PC-AiR. This is how STAARpipeline is designed to be used, and it
-#              matches nf-rare-var-assoc's own handling of relatedness.
+# TWO INDEPENDENT AXES produce the ARMS this script runs. An arm is labelled
+# "<version>_<spa mode>" and gets its own result table and its own eval.
+#
+#   VERSIONS -- how relatedness is handled:
+#     full     = all samples kept. Relatedness is modelled in the null model with a
+#                GENESIS PC-Relate matrix, and principal components come from GENESIS
+#                PC-AiR. This is how STAARpipeline is designed to be used, and it
+#                matches nf-rare-var-assoc's own handling of relatedness. DEFAULT.
+#     filtered = RICOPILI as shipped. pcaer removes related samples; its smartpca
+#                principal components carry into the association test. Kept runnable
+#                (VERSIONS="filtered full") but no longer run by default: it scored
+#                worse, for the marker-starvation reason documented in README.md.
+#
+#   SPA_MODES -- which test STAAR runs. These are DIFFERENT TESTS, not a calibration
+#                tweak, and both are run so the better one can be chosen:
+#     nospa    = use_SPA=FALSE -> STAAR-O, the full omnibus (SKAT + Burden + ACAT-V).
+#                The like-for-like analogue of REGENIE's SKAT-O.
+#     spa      = use_SPA=TRUE  -> STAAR-B, a BURDEN-ONLY omnibus. STAARpipeline skips
+#                the SKAT and ACAT-V branches entirely under SPA (coding.R:502-516).
+#                The saddlepoint approximation is what these datasets' extreme
+#                case/control imbalance (as few as 11 cases) calls for.
+#     The p-value column differs per mode and is handed to staar_to_eval.py --p-col;
+#     getting that wrong is a hard failure at stage G, not a silent one.
 #
 # STAGES PER DATASET:
 #   A raw VCF -> sample subset -> genotypes only -> split multi-allelic -> PLINK bed
@@ -27,9 +43,19 @@
 #   C pcaer       (relatedness removal + smartpca components; Filtered version)
 #   D GENESIS PC-AiR + PC-Relate matrix (Full version)  genesis_pcair_pcrelate.R
 #   E per chromosome: bed -> VCF -> GDS -> annotated GDS (FAVORannotator)
-#   F association test per version and chromosome       staar_gene_centric_coding.R
-#   G staar_to_eval.py -> one REGENIE-shaped result table per version
-# With SCORE=true, benchmark-common/run_eval.sh then scores each version.
+#   F association test per arm and chromosome           staar_gene_centric_coding.R
+#   G staar_to_eval.py -> one REGENIE-shaped result table per arm
+# Stages A-E are shared by every arm; only F and G repeat per arm.
+# With SCORE=true, benchmark-common/run_eval.sh then scores each arm.
+#
+# RESUME: a dataset whose result tables all exist already is skipped untouched, and
+#   one dataset's failure is recorded and skipped rather than aborting the run. A
+#   re-launch after an interruption picks up where it stopped.
+#
+# THIS SCRIPT DELETES NOTHING by default. It refuses to start a dataset whose work
+#   dir is dirty (RICOPILI will not re-run in one) and tells you the path to remove.
+#   Set CLEANUP=true to have it drop each dataset's work dir once that dataset's
+#   tables are safely written.
 #
 # QUALITY-CONTROL THRESHOLDS are set explicitly rather than left at RICOPILI's
 #   defaults, which were designed for genotyping arrays and remove so much from exome
@@ -63,7 +89,7 @@ set -euo pipefail
 DATA="${DATA:-/data/doktorat/biodatageeks/article_on_nf_rare_var_assoc/tools_comparison}"
 RVA_REPO="${RVA_REPO:-/data/git/doktorat_pw/wum_pims/nf-rare-var-assoc}"
 DATASETS_DIR="${DATASETS_DIR:-${DATA}/datasets}"
-ARM="${ARM:-${RVA_REPO}/docs/tool-comparison/chained-benchmark}"
+ARM="${ARM:-${RVA_REPO}/docs/tool-comparison/chained-benchmark-staar}"
 COMMON="${COMMON:-${RVA_REPO}/docs/tool-comparison/benchmark-common}"
 
 INPUT_VCF="${INPUT_VCF:-${DATA}/20201028_CCDG_14151_B01_GRM_WGS_2020-08-05_chr_12_22_X.recalibrated_variants.exome.vcf.gz}"
@@ -73,11 +99,15 @@ REF="${REF:-GRCh38_GIABv3_no_alt_analysis_set_maskedGRC_decoys_MAP2K3_KMT2C_KCNJ
 FAVOR_DB="${FAVOR_DB:-${DATA}/favor/db}"          # chr<N>_*.csv(.idx), extracted per chr
 GENES_INFO="${GENES_INFO:-${ARM}/genes_info_hgnc.tsv}"
 
-# NOTE: the default moved to .../ricopili_staar_qcmatched with the QC harmonization, so
-# the original defaults run under .../ricopili_staar stays on disk for comparison.
-# Set RUN_DIR=${DATA}/runs/ricopili_staar to overwrite it instead.
-RUN_DIR="${RUN_DIR:-${DATA}/runs/ricopili_staar_qcmatched}"
-REGENIE_OUT_DIR="${RUN_DIR}/regenie_per_dataset"  # per-version subdirs (filtered/full)
+# Run directory. Dated, so every re-run lands beside its predecessors instead of
+# overwriting them -- nothing on disk is ever replaced by a later run. METHOD is
+# derived from the directory name and is what every result table, eval project and
+# pairwise arm is named after, so pointing RUN_DIR somewhere else renames all of them
+# consistently and cannot produce a mislabelled table.
+RUN_DATE="${RUN_DATE:-2026_09_12}"
+RUN_DIR="${RUN_DIR:-${DATA}/runs/ricopili_staar_${RUN_DATE}}"
+METHOD="$(basename "$RUN_DIR")"
+REGENIE_OUT_DIR="${RUN_DIR}/regenie_per_dataset"  # per-arm subdirs (<version>_<spa mode>)
 
 # RICOPILI quality-control thresholds. All four are preimp_dir's own command-line
 # options -- nothing is patched -- and they are the only thresholds moved off
@@ -118,14 +148,27 @@ awk -v p="$PREIMP_PRE_GENO" -v g="$PREIMP_GENO" 'BEGIN{exit !(p+0 >= g+0)}' || {
 
 # Run knobs.
 CHRS="${CHRS:-12 22}"              # chromosomes to test; each needs its FAVOR database extracted
-VERSIONS="${VERSIONS:-filtered full}"
+VERSIONS="${VERSIONS:-full}"       # relatedness axis; "filtered full" to run both
+SPA_MODES="${SPA_MODES:-nospa spa}"  # test axis; see the header. "nospa" or "spa" alone works
 NPCS_COVAR="${NPCS_COVAR:-4}"      # principal components used as covariates
-USE_SPA="${USE_SPA:-FALSE}"        # STAAR-O (FALSE) or STAAR-B (TRUE)
-RARE_MAF="${RARE_MAF:-0.01}"       # STAAR rare_maf_cutoff
+# STAAR's rare_maf_cutoff: the frequency ceiling below which a variant enters the
+# gene aggregate. HARMONIZED WITH THE REFERENCE, which is the entire point of this
+# value -- nf-rare-var-assoc aggregates at regenie's --aaf-bins 0.1 and the nf-gwas
+# arm at regenie_gene_aaf 0.1, so anything else here means the arms are not testing
+# the same variant sets. (Every run before 2026-09-11 silently used STAAR's own
+# default of 0.01, because this variable existed but was never passed.)
+# CAVEAT: regenie's bin is on ALT allele frequency and STAAR's cutoff is on MINOR
+# allele frequency. With --ref-first and the REF restoration stage E performs these
+# agree for everything rare; they part company only where ALT is the major allele,
+# which at a 0.1 ceiling is a rounding-error set.
+RARE_MAF="${RARE_MAF:-0.1}"        # STAAR rare_maf_cutoff (--rare-maf)
 THREADS="${THREADS:-4}"
 MAX_GENES="${MAX_GENES:-}"         # smoke-test cap on genes tested per chr; empty = all genes
-CLEANUP="${CLEANUP:-true}"         # drop bulky per-dataset work after the eval table is made
-SCORE="${SCORE:-false}"            # true -> run run_eval.sh per version at the tail
+# This script deletes nothing unless you ask it to. With CLEANUP=false (the default)
+# it prints the size of each dataset's work dir and the exact command to remove it;
+# the result tables, the retention TSVs and the logs all live outside it.
+CLEANUP="${CLEANUP:-false}"        # true -> drop each dataset's work dir once its tables exist
+SCORE="${SCORE:-false}"            # true -> run run_eval.sh per arm at the tail
 
 # Container images.
 BCFTOOLS_IMG="docker.io/psuszynski/bioinf_combo:1.5.1"     # bcftools + pandas (staar_to_eval)
@@ -145,6 +188,31 @@ read -r -a IDXS <<< "$DATASET_IDXS"
 [[ ${#IDXS[@]} -gt 0 ]] || { echo "ERROR: no datasets selected (DATASETS_DIR=$DATASETS_DIR)" >&2; exit 1; }
 read -r -a CHR_ARR <<< "$CHRS"
 read -r -a VER_ARR <<< "$VERSIONS"
+read -r -a SPA_ARR <<< "$SPA_MODES"
+
+# The arms: the cross product of the relatedness axis and the test axis. An arm label
+# is "<version>_<spa mode>" and is the name of its result subdir, its result tables,
+# its eval project and its pairwise arm -- one string, so those can never disagree.
+# Each mode also fixes which p-value column staar_to_eval.py must read: STAAR omits
+# STAAR-O entirely under SPA and STAAR-B entirely without it, so reading the wrong one
+# is a hard failure at stage G rather than a quietly empty table.
+ARM_LABELS=()
+declare -A ARM_VER ARM_SPA_FLAG ARM_P_COL
+for v in "${VER_ARR[@]}"; do
+    for s in "${SPA_ARR[@]}"; do
+        case "$s" in
+            nospa) flag=FALSE; pcol="STAAR-O" ;;
+            spa)   flag=TRUE;  pcol="STAAR-B" ;;
+            *) echo "ERROR: SPA_MODES must contain only 'nospa' and/or 'spa', got '${s}'" >&2
+               exit 1 ;;
+        esac
+        label="${v}_${s}"
+        ARM_LABELS+=("$label")
+        ARM_VER["$label"]="$v"
+        ARM_SPA_FLAG["$label"]="$flag"
+        ARM_P_COL["$label"]="$pcol"
+    done
+done
 
 # Smoke-test cap: --max-genes tests only the first N genes of a chromosome, which
 # turns a ~45 min STAAR call into ~1 min. NEVER set it for a scored run.
@@ -174,7 +242,13 @@ for chr in "${CHR_ARR[@]}"; do
         echo "       or extract it first." >&2; exit 1; }
 done
 mkdir -p "$RUN_DIR" "$REGENIE_OUT_DIR"
-for v in "${VER_ARR[@]}"; do mkdir -p "${REGENIE_OUT_DIR}/${v}"; done
+for a in "${ARM_LABELS[@]}"; do mkdir -p "${REGENIE_OUT_DIR}/${a}"; done
+
+# The result table one arm produces for one dataset. Single definition, used by the
+# resume check, by stage G and by the scoring tail, so those three cannot drift apart.
+arm_table() {   # $1 = arm label, $2 = dataset idx
+    echo "${REGENIE_OUT_DIR}/${1}/${METHOD}_${1}_dataset_idx_${2}_step2_Y1.regenie"
+}
 
 VCFBASE="$(basename "$INPUT_VCF")"
 
@@ -188,23 +262,67 @@ genesis() { podman run --rm --userns=keep-id --user "$(id -u):$(id -g)" "$@"; }
 
 # ============================================================================
 # PER-DATASET LOOP
+#
+# Each dataset runs in its own subshell so ONE dataset's failure does not abort the
+# whole benchmark -- at ~2 h per dataset a single bad draw must not cost the night.
+# The subshell is a standalone command (not inside an `if`/`||`), so `set -e` stays
+# ACTIVE within it and the dataset still stops at its first real error; only the outer
+# `set +e` keeps that from killing the loop. Failures are collected and reported.
+#
+# RESUME: a dataset whose tables for EVERY selected arm already exist is skipped
+# untouched, so a re-launch after an interruption picks up where it stopped without
+# redoing finished datasets. A dataset with only some arms done is redone in full --
+# stages A-E are shared, and re-deriving them is what makes the arms comparable.
 # ============================================================================
+FAILED_IDXS=()
 for idx in "${IDXS[@]}"; do
+    # ---- resume: every selected arm already has its table for this dataset? -------
+    N_HAVE=0
+    for a in "${ARM_LABELS[@]}"; do
+        [[ -e "$(arm_table "$a" "$idx")" ]] && N_HAVE=$((N_HAVE + 1))
+    done
+    if [[ "$N_HAVE" -eq "${#ARM_LABELS[@]}" ]]; then
+        echo "[run_${idx}] all ${#ARM_LABELS[@]} arm table(s) present -- skipping"
+        continue
+    fi
+    if [[ "$N_HAVE" -gt 0 ]]; then
+        echo "[run_${idx}] ${N_HAVE}/${#ARM_LABELS[@]} arm tables present -- redoing the dataset in full" >&2
+    fi
+
+    set +e
+    ( set -e
     PHENO="$(pheno_path "$idx")"
     [[ -e "$PHENO" ]] || { echo "ERROR: missing phenotype for run_${idx}: $PHENO" >&2; exit 1; }
     STUDY="run$(printf '%02d' "$idx")"          # 5-char RICOPILI study name (idx<=99)
 
+    # RICOPILI records progress and refuses to repeat a step that "has been done
+    # repeatedly without any progress", so a retry has to start from a clean
+    # directory. This script will NOT delete one for you -- it stops and says so.
     WD="${RUN_DIR}/work/run_${idx}"
-    rm -rf "$WD"; mkdir -p "$WD"                 # RICOPILI refuses to re-run in a dirty dir
+    if [[ -d "$WD" ]] && [[ -n "$(ls -A "$WD" 2>/dev/null)" ]]; then
+        echo "ERROR: work dir for run_${idx} already exists and is not empty:" >&2
+        echo "         $WD" >&2
+        echo "       RICOPILI will not re-run in a dirty directory. Remove it yourself:" >&2
+        echo "         rm -rf '$WD'" >&2
+        exit 1
+    fi
+    mkdir -p "$WD"
     RET="${RUN_DIR}/retention/run_${idx}.tsv"; mkdir -p "$(dirname "$RET")"
     : > "$RET"
-    # Provenance: which QC thresholds produced these counts (defaults vs harmonized).
+    # Provenance: the settings that produced these counts, so a table on disk says
+    # which configuration it came from rather than relying on the directory name.
     printf 'preimp_qc_args\t%s\n' "$PREIMP_QC_ARGS" >> "$RET"
+    printf 'rare_maf\t%s\n'       "$RARE_MAF"       >> "$RET"
+    printf 'variant_type\t%s\n'   "SNV"             >> "$RET"
+    printf 'arms\t%s\n'           "${ARM_LABELS[*]}" >> "$RET"
+    printf 'npcs_covar\t%s\n'     "$NPCS_COVAR"     >> "$RET"
 
     echo "=================================================================="
-    echo " chain run_${idx}  (study ${STUDY}, chrs ${CHRS}, versions ${VERSIONS})"
+    echo " chain run_${idx}  (study ${STUDY}, chrs ${CHRS})"
     echo "   pheno   : ${PHENO}"
     echo "   QC      : ${PREIMP_QC_ARGS}"
+    echo "   arms    : ${ARM_LABELS[*]}"
+    echo "   rare_maf: ${RARE_MAF}"
     echo "   out     : ${RUN_DIR}"
     echo "   started : $(date -Is)"
     echo "=================================================================="
@@ -359,10 +477,13 @@ for idx in "${IDXS[@]}"; do
     done
 
     # ---------------------------------------------------------- Stages F + G
-    # For each version, build an augmented phenotype (Y1 + PCs), run STAAR-O per chr
-    # (Full also passes --grm), then merge all category CSVs into one eval table.
+    # The augmented phenotype (Y1 + PCs) depends only on the RELATEDNESS version, so
+    # it is built once per version and shared by that version's SPA modes -- the two
+    # modes must see byte-identical covariates or they are not comparable.
+    # Then, per arm: STAAR per chromosome, merge the category CSVs into one eval
+    # table, and measure the inflation factor.
     for ver in "${VER_ARR[@]}"; do
-        echo "[F/G] version=${ver}: augmented phenotype + STAAR-O + eval table ..."
+        echo "[F/G] version=${ver}: augmented phenotype ..."
         AUG="${WD}/pheno_${ver}.tsv"
         GRM_ARG=()
         if [[ "$ver" == "filtered" ]]; then
@@ -387,36 +508,89 @@ for idx in "${IDXS[@]}"; do
         fi
         printf 'n_samples_staar_%s\t%s\n' "$ver" "$(($(wc -l < "$AUG") - 1))" >> "$RET"
 
-        CSVS=()
-        for chr in "${CHR_ARR[@]}"; do
-            OUTSUB="staar_${ver}_chr${chr}"
-            bcft -v "$WD":/w:z -v "$ARM":/arm:z,ro "$STAAR_IMG" \
-                Rscript /arm/staar_gene_centric_coding.R \
-                  --agds "/w/c${chr}.agds" --pheno "/w/pheno_${ver}.tsv" --chr "${chr}" \
-                  --out-dir "/w/${OUTSUB}" --pheno-col Y1 --id-col IID \
-                  --use-spa "${USE_SPA}" "${GRM_ARG[@]}" "${MAXG_ARG[@]}" \
-                2>&1 | tee "${WD}/${OUTSUB}.log"
-            for c in plof plof_ds missense disruptive_missense synonymous; do
-                [[ -e "${WD}/${OUTSUB}/${c}.csv" ]] && CSVS+=("/w/${OUTSUB}/${c}.csv")
-            done
-        done
-        [[ ${#CSVS[@]} -gt 0 ]] || { echo "ERROR: version=${ver} produced no STAAR CSVs" >&2; exit 1; }
+        for spa in "${SPA_ARR[@]}"; do
+            label="${ver}_${spa}"
+            SPA_FLAG="${ARM_SPA_FLAG[$label]}"
+            P_COL="${ARM_P_COL[$label]}"
+            echo "[F/G] arm=${label}: STAAR (use_SPA=${SPA_FLAG}, p-col=${P_COL}, rare_maf=${RARE_MAF}) ..."
 
-        OUT_TABLE="${REGENIE_OUT_DIR}/${ver}/ricopili_staar_qcmatched_${ver}_dataset_idx_${idx}_step2_Y1.regenie"
-        bcft -v "$WD":/w:z -v "$ARM":/arm:z,ro -v "$REGENIE_OUT_DIR":/out:z "$BCFTOOLS_IMG" \
-            python3 /arm/staar_to_eval.py \
-              --staar-results "${CSVS[@]}" \
-              --genes-info /arm/genes_info_hgnc.tsv \
-              --out "/out/${ver}/ricopili_staar_qcmatched_${ver}_dataset_idx_${idx}_step2_Y1.regenie"
-        echo "[run_${idx}] ${ver} eval table -> ${OUT_TABLE}"
+            CSVS=()
+            for chr in "${CHR_ARR[@]}"; do
+                OUTSUB="staar_${label}_chr${chr}"
+                bcft -v "$WD":/w:z -v "$ARM":/arm:z,ro "$STAAR_IMG" \
+                    Rscript /arm/staar_gene_centric_coding.R \
+                      --agds "/w/c${chr}.agds" --pheno "/w/pheno_${ver}.tsv" --chr "${chr}" \
+                      --out-dir "/w/${OUTSUB}" --pheno-col Y1 --id-col IID \
+                      --use-spa "${SPA_FLAG}" --rare-maf "${RARE_MAF}" \
+                      "${GRM_ARG[@]}" "${MAXG_ARG[@]}" \
+                    2>&1 | tee "${WD}/${OUTSUB}.log"
+                for c in plof plof_ds missense disruptive_missense synonymous; do
+                    [[ -e "${WD}/${OUTSUB}/${c}.csv" ]] && CSVS+=("/w/${OUTSUB}/${c}.csv")
+                done
+            done
+            [[ ${#CSVS[@]} -gt 0 ]] || { echo "ERROR: arm=${label} produced no STAAR CSVs" >&2; exit 1; }
+
+            # --p-col is NOT optional. STAAR emits STAAR-O only without SPA and
+            # STAAR-B only with it, and staar_to_eval.py's default candidate list
+            # names STAAR-O alone -- so an SPA run without this dies here rather than
+            # writing a wrong table. That is the intended behaviour: loud, not silent.
+            OUT_TABLE="$(arm_table "$label" "$idx")"
+            TABLE_BASE="$(basename "$OUT_TABLE")"
+            bcft -v "$WD":/w:z -v "$ARM":/arm:z,ro -v "$REGENIE_OUT_DIR":/out:z "$BCFTOOLS_IMG" \
+                python3 /arm/staar_to_eval.py \
+                  --staar-results "${CSVS[@]}" \
+                  --genes-info /arm/genes_info_hgnc.tsv \
+                  --p-col "${P_COL}" \
+                  --out "/out/${label}/${TABLE_BASE}"
+
+            # Inflation factor. The README states it is measured for every dataset in
+            # every method, every time -- this arm is the one that was not doing it.
+            # LOG10P is -log10(p) of the arm's omnibus column, so lambda is
+            # qchisq(median p, 1, upper) / qchisq(0.5, 1). With no structure
+            # correction both tools measured >8 on this data; near 1.0 is the evidence
+            # that the principal components did their job.
+            LAMBDA="$(bcft -v "$REGENIE_OUT_DIR":/out:z,ro "$STAAR_IMG" Rscript -e \
+                'a <- commandArgs(TRUE); d <- read.table(a[1], header = TRUE, comment.char = "#"); p <- 10^(-as.numeric(d$LOG10P)); p <- p[is.finite(p) & p > 0 & p <= 1]; cat(if (length(p) == 0) "NA" else sprintf("%.4f", qchisq(median(p), 1, lower.tail = FALSE) / qchisq(0.5, 1)))' \
+                "/out/${label}/${TABLE_BASE}" 2>/dev/null | tail -1)"
+            N_ROWS="$(awk 'NR>2' "$OUT_TABLE" | wc -l)"
+            N_GENES="$(awk 'NR>2{split($3,a,"."); print a[1]}' "$OUT_TABLE" | sort -u | wc -l)"
+            printf 'use_spa_%s\t%s\n'        "$label" "$SPA_FLAG" >> "$RET"
+            printf 'p_col_%s\t%s\n'          "$label" "$P_COL"    >> "$RET"
+            printf 'n_result_rows_%s\t%s\n'  "$label" "$N_ROWS"   >> "$RET"
+            printf 'n_genes_tested_%s\t%s\n' "$label" "$N_GENES"  >> "$RET"
+            printf 'lambda_%s\t%s\n'         "$label" "${LAMBDA:-NA}" >> "$RET"
+            echo "[run_${idx}] ${label} eval table -> ${OUT_TABLE}"
+            echo "             ${N_ROWS} rows, ${N_GENES} genes, lambda ${LAMBDA:-NA}"
+        done
     done
 
+    # This script deletes nothing unless CLEANUP=true. The work dir is the only bulky
+    # thing here; the tables, the retention TSV and the logs live outside it.
     if [[ "$CLEANUP" == "true" ]]; then
-        echo "[cleanup] rm -rf ${WD}  (retention + eval tables are kept elsewhere)"
+        echo "[cleanup] CLEANUP=true -- removing ${WD}"
         rm -rf "$WD"
+    else
+        echo "[run_${idx}] disposable now that the tables above are written:"
+        du -sh "$WD" 2>/dev/null | sed 's/^/    /'
+        echo "    remove by hand with:  rm -rf '${WD}'"
     fi
     echo "[run_${idx}] done: $(date -Is)"
+    )                                # end of the per-dataset subshell
+    rc=$?
+    set -e
+    if [[ $rc -ne 0 ]]; then
+        echo "[run_${idx}] FAILED (exit ${rc}) -- recorded and skipped; continuing." >&2
+        echo "             (leftover work under ${RUN_DIR}/work/run_${idx} may need removing" >&2
+        echo "              by hand before this dataset can be retried.)" >&2
+        FAILED_IDXS+=("$idx")
+    fi
 done
+
+if [[ ${#FAILED_IDXS[@]} -gt 0 ]]; then
+    echo ""
+    echo "NOTE: ${#FAILED_IDXS[@]} dataset(s) did not produce a full set of arm tables: ${FAILED_IDXS[*]}"
+    echo "      Scoring below simply omits them (the regenie glob only matches tables that exist)."
+fi
 
 # ----------------------------------------------------------------------------
 # Scoring (optional). One run_eval.sh call per version, over that version's result
@@ -424,20 +598,24 @@ done
 # chromosomes (the output of filter_causal_autosomal.py), so causal genes on
 # chromosome X count as misses. Point them elsewhere to score differently.
 # Then compare with benchmark-common/pairwise_compare.py, passing
-# --arm-b ricopili_staar_qcmatched_<version>.
+# --arm-b <METHOD> <METHOD>_<arm>_eval  and --missing zero.
+#
+# The eval dir is a SIBLING of RUN_DIR under runs/, not a child: pairwise_compare.py
+# and three_method_ap_bar.py both resolve eval subdirs directly under runs/.
 # ----------------------------------------------------------------------------
 if [[ "$SCORE" == "true" ]]; then
     : "${CAUSAL_SNPLIST_GLOB:?set CAUSAL_SNPLIST_GLOB (autosomal truth) to score}"
     : "${CAUSAL_GENES_GLOB:?set CAUSAL_GENES_GLOB (autosomal truth) to score}"
-    for ver in "${VER_ARR[@]}"; do
+    RUNS_DIR="$(dirname "$RUN_DIR")"
+    for label in "${ARM_LABELS[@]}"; do
         echo ""
-        echo "=== scoring version=${ver} ==="
-        export EVAL_REPO="/data/git/doktorat_pw/wum_pims/nf-eval-gene-assoc"
-        export EVAL_RUN_DIR="${RUN_DIR}/eval_${ver}"
-        export EVAL_PROJECT="ricopili_staar_qcmatched_${ver}"
-        export EVAL_PROFILE="podman,medium_resources"
+        echo "=== scoring arm=${label} ==="
+        export EVAL_REPO="${EVAL_REPO:-/data/git/doktorat_pw/wum_pims/nf-eval-gene-assoc}"
+        export EVAL_RUN_DIR="${RUNS_DIR}/${METHOD}_${label}_eval"
+        export EVAL_PROJECT="${METHOD}_${label}"
+        export EVAL_PROFILE="${EVAL_PROFILE:-podman,medium_resources}"
         export INPUT_VCF SKIP_PREP="true"
-        export REGENIE_GLOB="${REGENIE_OUT_DIR}/${ver}/ricopili_staar_qcmatched_${ver}_dataset_idx_*_step2_Y1.regenie"
+        export REGENIE_GLOB="${REGENIE_OUT_DIR}/${label}/${METHOD}_${label}_dataset_idx_*_step2_Y1.regenie"
         export CAUSAL_SNPLIST_GLOB CAUSAL_GENES_GLOB
         bash "${COMMON}/run_eval.sh"
     done

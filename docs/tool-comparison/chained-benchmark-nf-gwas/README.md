@@ -6,7 +6,7 @@ components; [nf-gwas](https://github.com/genepi/nf-gwas) runs the gene-based ass
 test with REGENIE. Together they are treated as one method and compared against
 nf-rare-var-assoc on the same simulated datasets.
 
-Unlike the [comparison against RICOPILI combined with STAARpipeline](../chained-benchmark/),
+Unlike the [comparison against RICOPILI combined with STAARpipeline](../chained-benchmark-staar/),
 no analysis script of ours sits between the two tools. One thing is still borrowed: the
 gene groupings, which nf-gwas cannot build itself. That is the only input this method
 receives from nf-rare-var-assoc besides the raw VCF, the phenotypes and the causal genes
@@ -14,7 +14,7 @@ used for scoring.
 
 The scripts that are not specific to these tools are in
 [../benchmark-common/](../benchmark-common/). **The setup instructions and practical notes
-in the [RICOPILI + STAARpipeline README](../chained-benchmark/README.md) apply here
+in the [RICOPILI + STAARpipeline README](../chained-benchmark-staar/README.md) apply here
 unchanged and are not repeated** -- in particular building the RICOPILI container, how
 `preimp_dir` and `pcaer` behave, and the quality-control settings.
 
@@ -214,7 +214,7 @@ is patched, and everything else is left as shipped.
 
 **The full reasoning -- including why raising `--geno` alone has no effect, and why
 `--midi` is not an exact equivalent of anything in this pipeline -- is in one place: the
-quality-control section of [`../chained-benchmark/README.md`](../chained-benchmark/README.md).**
+quality-control section of [`../chained-benchmark-staar/README.md`](../chained-benchmark-staar/README.md).**
 Both combined comparisons must run RICOPILI at identical thresholds or their
 quality-control halves stop being the same pipeline, which is why the settings block is
 duplicated verbatim in both scripts rather than shared.
