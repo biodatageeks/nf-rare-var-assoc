@@ -89,6 +89,7 @@ GENE_MASKS="${GENE_MASKS:-${RVA_REPO}/assets/default.masks}"   # static mask def
 # derived from the directory name and is what every result table, the nf-gwas project,
 # the eval project and the pairwise arm are named after, so pointing RUN_DIR somewhere
 # else renames all of them consistently and cannot produce a mislabelled table.
+RUN_DIR_FROM_ENV="${RUN_DIR:+yes}"   # recorded so the banner below can flag a stale one
 RUN_DIR="${RUN_DIR:-${DATA}/runs/ricopili_nf_gwas_${RUN_DATE}}"   # RUN_DATE set above
 METHOD="$(basename "$RUN_DIR")"
 REGENIE_OUT_DIR="${RUN_DIR}/regenie_per_dataset"
@@ -176,6 +177,28 @@ for f in "$INPUT_VCF" "$PED" "$GENE_MASKS" "${NFGWAS_REPO}/main.nf" \
     [[ -e "$f" ]] || { echo "ERROR: missing required path: $f" >&2; exit 1; }
 done
 mkdir -p "$RUN_DIR" "$REGENIE_OUT_DIR"
+
+# Resolved configuration, printed ONCE before any work. Every location below can be
+# overridden from the environment, so this is where a stale exported variable -- a
+# RUN_DIR left over from a different run being the easy one to do -- becomes visible,
+# before the first dataset rather than in its first error message.
+echo "=================================================================="
+echo " RICOPILI + nf-gwas"
+echo "   run dir  : ${RUN_DIR}${RUN_DIR_FROM_ENV:+   <- from the environment, NOT the default}"
+echo "   method   : ${METHOD}"
+echo "   datasets : ${IDXS[*]}"
+echo "   QC       : ${PREIMP_QC_ARGS}"
+echo "   input    : ${INPUT_VCF}"
+echo "   masks    : ${RVA_RESULTS}  (project ${RVA_PROJECT})"
+echo "   score    : ${SCORE}    threads: ${THREADS}"
+echo "=================================================================="
+# A RUN_DIR inherited from the environment is legitimate (that is how a re-run is
+# pointed at an existing directory), but it is also the one setting whose staleness
+# silently sends a whole run into another comparison's directory. Say so plainly.
+if [[ -n "$RUN_DIR_FROM_ENV" && "$METHOD" != ricopili_nf_gwas* ]]; then
+    echo "WARNING: RUN_DIR came from the environment and its name does not look like an" >&2
+    echo "         nf-gwas run ('${METHOD}'). If that is not deliberate, unset RUN_DIR." >&2
+fi
 
 VCFBASE="$(basename "$INPUT_VCF")"
 

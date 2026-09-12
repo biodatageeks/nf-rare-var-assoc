@@ -105,6 +105,7 @@ GENES_INFO="${GENES_INFO:-${ARM}/genes_info_hgnc.tsv}"
 # pairwise arm is named after, so pointing RUN_DIR somewhere else renames all of them
 # consistently and cannot produce a mislabelled table.
 RUN_DATE="${RUN_DATE:-2026_09_12}"
+RUN_DIR_FROM_ENV="${RUN_DIR:+yes}"   # recorded so the banner below can flag a stale one
 RUN_DIR="${RUN_DIR:-${DATA}/runs/ricopili_staar_${RUN_DATE}}"
 METHOD="$(basename "$RUN_DIR")"
 REGENIE_OUT_DIR="${RUN_DIR}/regenie_per_dataset"  # per-arm subdirs (<version>_<spa mode>)
@@ -243,6 +244,31 @@ for chr in "${CHR_ARR[@]}"; do
 done
 mkdir -p "$RUN_DIR" "$REGENIE_OUT_DIR"
 for a in "${ARM_LABELS[@]}"; do mkdir -p "${REGENIE_OUT_DIR}/${a}"; done
+
+# Resolved configuration, printed ONCE before any work. Every location below can be
+# overridden from the environment, so this is where a stale exported variable -- a
+# RUN_DIR left over from a different run being the easy one to do -- becomes visible,
+# before the first dataset rather than in its first error message.
+echo "=================================================================="
+echo " RICOPILI + STAARpipeline"
+echo "   run dir  : ${RUN_DIR}${RUN_DIR_FROM_ENV:+   <- from the environment, NOT the default}"
+echo "   method   : ${METHOD}"
+echo "   arms     : ${ARM_LABELS[*]}"
+echo "   datasets : ${IDXS[*]}"
+echo "   chrs     : ${CHRS}"
+echo "   rare_maf : ${RARE_MAF}"
+echo "   QC       : ${PREIMP_QC_ARGS}"
+echo "   input    : ${INPUT_VCF}"
+echo "   favor db : ${FAVOR_DB}"
+echo "   cleanup  : ${CLEANUP}    score: ${SCORE}    threads: ${THREADS}"
+echo "=================================================================="
+# A RUN_DIR inherited from the environment is legitimate (that is how a re-run is
+# pointed at an existing directory), but it is also the one setting whose staleness
+# silently sends a whole run into another comparison's directory. Say so plainly.
+if [[ -n "$RUN_DIR_FROM_ENV" && "$METHOD" != ricopili_staar* ]]; then
+    echo "WARNING: RUN_DIR came from the environment and its name does not look like a" >&2
+    echo "         STAAR run ('${METHOD}'). If that is not deliberate, unset RUN_DIR." >&2
+fi
 
 # The result table one arm produces for one dataset. Single definition, used by the
 # resume check, by stage G and by the scoring tail, so those three cannot drift apart.
