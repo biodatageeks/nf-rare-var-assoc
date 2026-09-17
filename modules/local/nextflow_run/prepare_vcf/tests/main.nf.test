@@ -153,37 +153,40 @@ nextflow_process {
             assert bad_format.isEmpty() :
                 "every record's FORMAT must end with the DS key; offending: ${bad_format.take(3).collect { [it[2], it[8]] }}"
 
-            // The substantive correctness check: DS must equal the genotype dosage
-            // defined by the SPEC, recomputed independently of the CALC_DOSAGE
-            // implementation. Spec: convert each PL (Phred-scaled) to a likelihood
-            // L_g = 10^(-PL_g/10), normalise across the genotypes, then
-            //   DS = P(het) + 2 * P(hom_alt).
-            // Diploid PL has 3 entries [ref,het,alt]; haploid (male chrX) PL has 2
-            // [ref,alt] and DS = P(alt). We recompute DS from every genotype's own PL
-            // and require it to match the written value. Agreement is essentially exact
-            // (mean |diff| ~1.5e-6 on the fixture). The only deviations are PL-saturation
-            // artifacts: a handful of extreme-LowQual calls whose PLs all sit near the 255
-            // cap, where the dosage of a fully-saturated likelihood is implementation-
-            // defined (17 of ~1.54M genotypes, all at one site). So we assert a negligible
-            // mean deviation plus a violation fraction far below anything a real systematic
-            // dosage bug would produce -- NOT zero, which the saturation tail would break.
+            // The dosage formula itself is deliberately NOT recomputed here. It used to be:
+            // this test normalised each genotype's likelihoods across the genotypes the record
+            // can express and required DS to match, which it did to ~1.5e-6 -- because that
+            // formula *was* the implementation, a flat prior over the PL values. nf-prepare-vcf
+            // now applies a Hardy-Weinberg prior to GATK-like PL, doses haploid (male chrX)
+            // genotypes, and handles the PL that a multiallelic split leaves with no zero in it,
+            // so the old formula is no longer the specification. Rewriting it under the new model
+            // would put a second, untested copy of that model -- and of any misunderstanding of
+            // it -- in a repository that only consumes the file. The formula is checked genotype
+            // by genotype against an independently written implementation, on fixtures crafted to
+            // reach every branch, in nf-prepare-vcf's own module suite
+            // (modules/local/python/calc_dosage_polarsbio/tests/main.nf.test), and its pipeline
+            // test asserts the same kind of properties as below on the same fixture.
             //
-            // Alongside the spec check, a biological-plausibility check: dosage must
-            // track read depth. Deep calls (DP > 20) collapse onto the integer GT dosage
-            // almost perfectly, and the rare intermediate dosages come from shallow calls.
-            // DP separates these far better than GQ -- on this fixture DP>20 match-rate is
-            // 0.99999 and intermediate-DS mean DP 8.4 vs clean-integer mean DP 32.9.
-            def specDs = { plInts ->
-                def ls = plInts.collect { Math.pow(10.0, -(it as double) / 10.0) }
-                double tot = ls.sum() as double
-                if (tot <= 0) return null
-                if (plInts.size() == 3) return (ls[1] + 2.0 * ls[2]) / tot
-                if (plInts.size() == 2) return ls[1] / tot
-                return null
-            }
-            int dsChecked = 0, specViolations = 0
-            double specDiffSum = 0.0, specMaxDiff = 0.0
-            def specExamples = []
+            // Measured when the new dosages first came through here, for the record: the old
+            // flat-prior formula disagrees by 0.0016 per genotype on average, and the whole of
+            // that sits in calls carrying almost no information -- the 97.6% of genotypes with
+            // GQ > 40 differ by 1e-6, and DP>20 calls still round to their hard call 99.99% of
+            // the time. Where the disagreement is largest the old formula is the wrong one: a
+            // 0/0 call whose split-leftover PL is 143,42,28 was dosed at 1.96 alternative
+            // alleles and is now dosed at 0.002.
+            //
+            // What follows asserts the properties this pipeline depends on when it hands the
+            // file to PLINK2_EXPORT_OTHER / PLINK2_IMPORT_DOSAGE, plus the plausibility check
+            // that dosage tracks read depth.
+            int genotypesSeen = 0, dsPresent = 0
+            int outOfRange = 0, haploidWithDs = 0, haploidUncertain = 0
+            int confidentChecked = 0, confidentViolations = 0
+            double confidentMaxDiff = 0.0
+            double totalDs = 0.0
+            int hardTotal = 0
+            int singletonRecords = 0
+            double singletonCarrierDs = 0.0, singletonNonCarrierDs = 0.0
+            def rangeExamples = [], confidentExamples = []
             int hiDpTotal = 0, hiDpMatch = 0
             int inBetween = 0
             double inBetweenDpSum = 0.0
@@ -197,34 +200,76 @@ nextflow_process {
                 int dsIdx = keys.indexOf('DS')
                 int plIdx = keys.indexOf('PL')
                 if (dsIdx < 0 || plIdx < 0) return
+
+                // The dosage prior is computed from the allele counts of the split records,
+                // which the `bcftools +fill-tags` piped onto BCFTOOLS_NORM recomputes. Without
+                // them CALC_DOSAGE cannot weight the likelihoods at all.
+                def ac = cols[7].split(';').find { it.startsWith('AC=') }
+                def an = cols[7].split(';').find { it.startsWith('AN=') }
+                assert ac != null && an != null :
+                    "every record must carry INFO/AC and INFO/AN for the dosage prior; " +
+                    "${cols[2]} has AC=${ac} AN=${an}"
+                int acValue = ac.substring(3).split(',')[0] as int
+                boolean singleton = acValue == 1
+                if (singleton) singletonRecords++
+
                 for (int s = 9; s < cols.size(); s++) {
                     def sv = cols[s].split(':')
                     if (sv.size() <= Math.max(dsIdx, plIdx)) continue
+                    genotypesSeen++
+                    def gt = sv[gtIdx]
+                    int ploidy = gt.count('/') + gt.count('|') + 1
                     if (!sv[dsIdx].isNumber()) continue        // DS only emitted for usable calls
                     double ds = sv[dsIdx] as double
+                    dsPresent++
+                    totalDs += ds
+                    hardTotal += gt.count('1')
 
-                    // ---- spec recomputation from this genotype's own PL ----
+                    // DS is the expected number of alternative alleles, so a haploid genotype
+                    // belongs in [0,1] and a diploid one in [0,2]. That scale is what keeps
+                    // dosages and hard calls consistent downstream: plink2 reads the ploidy off
+                    // GT and doubles a haploid dosage, exactly as it doubles a hemizygous call.
+                    if (ds < 0.0 || ds > ploidy) {
+                        outOfRange++
+                        if (rangeExamples.size() < 5) rangeExamples <<
+                            [pos: "${cols[0]}:${cols[1]}", gt: gt, ploidy: ploidy, ds: ds]
+                    }
+                    if (ploidy == 1) {
+                        haploidWithDs++
+                        if (ds > 0.0 && ds < 1.0) haploidUncertain++
+                    }
+
+                    // The one check on individual values, and it holds under any prior: when the
+                    // likelihoods put a single genotype a million to one ahead of the rest (a PL
+                    // gap of 60), no prior in a cohort this size can pull the dosage off that
+                    // genotype's own allele count. Only where the likelihoods are the whole
+                    // story, though -- a PL with no zero in it is what a multiallelic split
+                    // leaves behind, and there the dosage deliberately follows GT instead.
                     def plParts = sv[plIdx].split(',')
-                    if (plParts.every { it.isInteger() } && (plParts.size() in [2, 3])) {
+                    if (plParts.every { it.isInteger() } && plParts.size() == ploidy + 1) {
                         def plInts = plParts.collect { it.toInteger() }
-                        def expected = specDs(plInts)
-                        if (expected != null) {
-                            dsChecked++
-                            double diff = Math.abs(ds - (expected as double))
-                            specDiffSum += diff
-                            if (diff > specMaxDiff) specMaxDiff = diff
+                        def ranked = plInts.sort(false)
+                        if (ranked[0] == 0 && ranked[1] - ranked[0] >= 60) {
+                            confidentChecked++
+                            // The index of the smallest PL is that genotype's alt-allele count.
+                            double diff = Math.abs(ds - plInts.indexOf(ranked[0]))
+                            if (diff > confidentMaxDiff) confidentMaxDiff = diff
                             if (diff > 0.01) {
-                                specViolations++
-                                if (specExamples.size() < 5)
-                                    specExamples << [pos: "${cols[0]}:${cols[1]}", pl: sv[plIdx], actual: ds, spec: expected]
+                                confidentViolations++
+                                if (confidentExamples.size() < 5) confidentExamples <<
+                                    [pos: "${cols[0]}:${cols[1]}", gt: gt, pl: sv[plIdx], ds: ds]
                             }
                         }
                     }
 
+                    if (singleton) {
+                        if (gt.contains('1')) singletonCarrierDs += ds
+                        else singletonNonCarrierDs += ds
+                    }
+
                     // ---- DP-vs-dosage plausibility ----
-                    if (gtIdx >= 0 && dpIdx >= 0 && dpIdx < sv.size() && sv[dpIdx].isNumber()) {
+                    if (dpIdx >= 0 && dpIdx < sv.size() && sv[dpIdx].isNumber()) {
                         double dp = sv[dpIdx] as double
-                        def gt = sv[gtIdx]
                         if (!gt.contains('.')) {                // skip missing genotypes
                             def alleles = gt.split('[/|]')      // post-split records are biallelic
                             if (alleles.every { it.isInteger() } && dp > 20) {
@@ -238,17 +283,62 @@ nextflow_process {
                 }
             }
 
-            // Spec correctness: DS reproduces the spec dosage for essentially every genotype.
-            assert dsChecked > 100000 :
-                "expected to spec-check a large number of DS values, only checked ${dsChecked}"
-            double specMeanDiff = specDiffSum / dsChecked
-            double specViolFrac = specViolations / (double) dsChecked
-            assert specMeanDiff < 1e-3 :
-                "mean |DS - spec| must be negligible; got ${specMeanDiff} over ${dsChecked} genotypes"
-            assert specViolFrac < 0.0005 :
-                "fraction of genotypes where |DS - spec| > 0.01 must be tiny (PL-saturation tail " +
-                "only); got ${specViolFrac} (${specViolations}/${dsChecked}, max diff ${specMaxDiff}), " +
-                "e.g. ${specExamples}"
+            // Coverage: a genotype without a DS falls back to its hard call on import, so a
+            // large gap would quietly replace dosages with rounded calls. 98.0% carry one here;
+            // the rest are masked genotypes, calls below the child pipeline's GQ threshold, and
+            // the split leftovers whose likelihoods say nothing about this record's ALT.
+            assert dsPresent > 1000000 :
+                "expected a dosage on most of the ~1.75M genotypes, got ${dsPresent}"
+            assert dsPresent > 0.95 * genotypesSeen :
+                "at least 95% of genotypes must carry a DS; got ${dsPresent} of ${genotypesSeen}"
+            assert outOfRange == 0 :
+                "every DS must lie in [0, ploidy] -- [0,1] for male chrX, [0,2] elsewhere; " +
+                "${outOfRange} do not, e.g. ${rangeExamples}"
+
+            // Most genotypes are confidently called, so this covers the great majority of the
+            // file (1.62M of the 1.72M dosed here), and the observed worst case is 0.0012.
+            assert confidentChecked > 1000000 :
+                "expected most genotypes to be confidently called, only ${confidentChecked} have " +
+                "a PL gap of 60 or more"
+            assert confidentViolations == 0 :
+                "a genotype whose likelihoods put one genotype a million to one ahead must be " +
+                "dosed at that genotype's allele count; ${confidentViolations} of " +
+                "${confidentChecked} are further than 0.01 away (worst ${confidentMaxDiff}), " +
+                "e.g. ${confidentExamples}"
+
+            // Over the file the dosages must still describe the calls they came from. Individual
+            // dosages sit either side of their hard call, so the deviations cancel over 1.7M
+            // genotypes and what is left is the prior's own shrinkage of weak carrier calls:
+            // -0.63% here, against +3.7% before the multiallelic-split handling landed upstream.
+            assert Math.abs(totalDs - hardTotal) < 0.01 * hardTotal :
+                "the total dosage (${totalDs}) must be within 1% of the alternative alleles the " +
+                "same genotypes were hard-called with (${hardTotal}); it is " +
+                "${String.format(Locale.ROOT, '%+.3f', 100 * (totalDs - hardTotal) / hardTotal)}%"
+
+            // Male chrX: the pipeline used to require three PL values and so left every haploid
+            // genotype without a dosage, which this test never noticed because it only looked at
+            // genotypes that had one. They must now be dosed, and genuinely computed.
+            assert haploidWithDs > 100000 :
+                "expected male chrX genotypes to be dosed on the haploid scale, only " +
+                "${haploidWithDs} haploid genotypes carry a DS"
+            assert haploidUncertain > 100 :
+                "haploid dosages must be computed, not pinned to 0 or 1; only ${haploidUncertain} " +
+                "of ${haploidWithDs} lie strictly between"
+
+            // The allele-frequency prior is what removes the spurious dosage this pipeline's
+            // burden tests used to add up: at a variant carried by a single allele in the cohort,
+            // the ~3201 non-carriers must together hold almost none. Under the flat prior the
+            // same fixture gives them 521 -- more than twice the carriers' own dosage.
+            assert singletonRecords > 100 :
+                "expected many AC=1 records in the fixture, got ${singletonRecords}"
+            assert singletonNonCarrierDs < 5.0 :
+                "non-carriers at AC=1 records must hold almost no dosage; got " +
+                "${singletonNonCarrierDs} over ${singletonRecords} records (a value in the " +
+                "hundreds means the child pipeline fell back to the flat prior -- check that " +
+                "pl_type=auto resolved to 'likelihood' and that INFO/AC,AN reached CALC_DOSAGE)"
+            assert singletonCarrierDs > 0.9 * singletonRecords :
+                "carriers at AC=1 records must keep their dosage; got ${singletonCarrierDs} over " +
+                "${singletonRecords} records"
 
             // Plausibility: dosage tracks read depth. Deep calls match the integer GT
             // dosage, and intermediate dosages are concentrated in shallow calls.
