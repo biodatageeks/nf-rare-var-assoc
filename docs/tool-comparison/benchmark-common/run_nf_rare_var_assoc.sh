@@ -62,6 +62,7 @@ EVAL_RUN_DIR="${EVAL_RUN_DIR:-${DATA}/runs/nf_rare_var_assoc_${RUN_DATE}_eval}"
 RVA_PROFILE="podman,medium_resources,nocache"   # nocache: fresh run, no work-dir cache reuse
 # true: association tests use the FORMAT/DS dosages; false: hard genotype calls.
 USE_DOSAGE="${USE_DOSAGE:-true}"
+PUBLISH_INTERMEDIATE="${PUBLISH_INTERMEDIATE:-true}"
 EVAL_PROFILE="podman,medium_resources"
 
 # Big intermediate result dirs to delete after the run (not needed downstream).
@@ -104,6 +105,7 @@ for f in "$PREPARED_VCF" "$INPUT_VCF_RAW" "$RVA_REPO/main.nf" "$EVAL_REPO/main.n
     [[ -e "$f" ]] || { echo "ERROR: missing required path: $f" >&2; exit 1; }
 done
 [[ "$USE_DOSAGE" == "true" || "$USE_DOSAGE" == "false" ]] || { echo "ERROR: USE_DOSAGE must be true or false, got: $USE_DOSAGE" >&2; exit 1; }
+[[ "$PUBLISH_INTERMEDIATE" == "true" || "$PUBLISH_INTERMEDIATE" == "false" ]] || { echo "ERROR: PUBLISH_INTERMEDIATE must be true or false, got: $PUBLISH_INTERMEDIATE" >&2; exit 1; }
 mkdir -p "$RUN_DIR" "$EVAL_RUN_DIR"
 
 # ----------------------------------------------------------------------------
@@ -125,7 +127,7 @@ skip_reporting: true
 
 # Publish the intermediates (gene groupings + covariates) so a REGENIE-based
 # comparison can reuse them.
-publish_intermediate: true
+publish_intermediate: ${PUBLISH_INTERMEDIATE}
 
 use_dosage: ${USE_DOSAGE}
 
@@ -173,6 +175,7 @@ echo "   dosage   : ${USE_DOSAGE}"
 echo "   outdir   : ${RUN_DIR}/results"
 echo "   params   : ${PARAMS_FILE}"
 echo "   started  : $(date -Is)"
+echo "   publish_intermediate: ${PUBLISH_INTERMEDIATE}"
 echo "=================================================================="
 echo ""
 
