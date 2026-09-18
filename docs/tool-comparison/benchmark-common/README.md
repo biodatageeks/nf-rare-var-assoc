@@ -1,8 +1,8 @@
 # benchmark-common -- shared parts of the benchmark
 
-The parts that do not depend on which tool is being compared: running this pipeline as
-the reference method, scoring the results of any method, and comparing two methods
-statistically.
+The parts that do not depend on which tool is being compared: preparing the input VCF,
+running this pipeline as the reference method, scoring the results of any method, and
+comparing two methods statistically.
 
 The scripts in [../nf-gwas-benchmark/](../nf-gwas-benchmark/) are earlier **copies** of
 some of these, deliberately left unchanged so that the nf-gwas comparison can still be
@@ -12,7 +12,8 @@ reproduced exactly as it was originally run.
 
 | File | What it does |
 |---|---|
-| `run_nf_rare_var_assoc.sh` | Runs this pipeline over all datasets in a single `nextflow run`, with `--skip_preparation`. Writes results to `runs/nf_rare_var_assoc/results/...`, then scores them with `run_eval.sh`. |
+| `run_nf_prepare_vcf.sh` | Prepares the raw exome VCF once with [nf-prepare-vcf](https://github.com/biodatageeks/nf-prepare-vcf) (checked out at `PV_REPO`), using the same parameters file, [`conf/nf_prepare_params.yml`](../../../conf/nf_prepare_params.yml), as this pipeline's own preparation step. Its output, `nf_prepare_vcf_results_<RUN_DATE>/bcftools_reheader/prepare_vcf_reheader.vcf.gz`, is the default `PREPARED_VCF` of `run_nf_rare_var_assoc.sh`. Run it first. |
+| `run_nf_rare_var_assoc.sh` | Runs this pipeline over all datasets in a single `nextflow run`, with `--skip_preparation` and `--skip_reporting`. `USE_DOSAGE` (default `true`) selects dosages or hard genotype calls for the association tests. Writes results to `runs/nf_rare_var_assoc/results/...`, then scores them with `run_eval.sh`. |
 | `run_eval.sh` | Scores results. Runs `nf-eval-gene-assoc` once, giving it file patterns that match every dataset; it matches results to the correct dataset by the `dataset_idx` in each filename. Its settings are passed as environment variables, documented in the file header. |
 | `filter_causal_autosomal.py` | Makes a copy of the known-answer files that keeps only genes on the numbered chromosomes. Needed when a tool cannot test chromosome X. Only the copy is modified; the original files and the pipeline are untouched. |
 | `pairwise_compare.py` | Compares two methods dataset by dataset (`--arm-a` / `--arm-b`). Writes `pairwise_per_dataset.csv` and `pairwise_summary.csv`, and, unless you pass `--no-plots`, the five figures listed below. `--missing {drop,zero}` decides what to do with datasets that one of the two methods failed to produce a result for. Requires pandas, scipy and matplotlib. |

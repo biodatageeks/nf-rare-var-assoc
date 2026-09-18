@@ -44,7 +44,7 @@ DATASETS_DIR="${DATASETS_DIR:-${DATA}/datasets}"
 # Prepared (split + normalised + CSQ + DS) VCF -> input for skip_preparation=true.
 # The masks this run publishes are keyed on this file's variant identifiers, so every
 # arm that borrows them must be built from the same file.
-PREPARED_VCF="${PREPARED_VCF:-${DATA}/prepared.vcf.gz}"
+PREPARED_VCF="${PREPARED_VCF:-${DATA}/nf_prepare_vcf_results_2026_09_17/bcftools_reheader/prepare_vcf_reheader.vcf.gz}"
 # Original unprepared exome VCF -> input for the scoring step (it runs its own VEP).
 INPUT_VCF_RAW="${INPUT_VCF_RAW:-${DATA}/20201028_CCDG_14151_B01_GRM_WGS_2020-08-05_chr_12_22_X.recalibrated_variants.exome.vcf.gz}"
 
@@ -60,6 +60,8 @@ RUN_DATE="${RUN_DATE:-2026_09_12}"
 RUN_DIR="${RUN_DIR:-${DATA}/runs/nf_rare_var_assoc_${RUN_DATE}}"
 EVAL_RUN_DIR="${EVAL_RUN_DIR:-${DATA}/runs/nf_rare_var_assoc_${RUN_DATE}_eval}"
 RVA_PROFILE="podman,medium_resources,nocache"   # nocache: fresh run, no work-dir cache reuse
+# true: association tests use the FORMAT/DS dosages; false: hard genotype calls.
+USE_DOSAGE="${USE_DOSAGE:-true}"
 EVAL_PROFILE="podman,medium_resources"
 
 # Big intermediate result dirs to delete after the run (not needed downstream).
@@ -101,6 +103,7 @@ done
 for f in "$PREPARED_VCF" "$INPUT_VCF_RAW" "$RVA_REPO/main.nf" "$EVAL_REPO/main.nf"; do
     [[ -e "$f" ]] || { echo "ERROR: missing required path: $f" >&2; exit 1; }
 done
+[[ "$USE_DOSAGE" == "true" || "$USE_DOSAGE" == "false" ]] || { echo "ERROR: USE_DOSAGE must be true or false, got: $USE_DOSAGE" >&2; exit 1; }
 mkdir -p "$RUN_DIR" "$EVAL_RUN_DIR"
 
 # ----------------------------------------------------------------------------
@@ -117,11 +120,14 @@ outdir: "${RUN_DIR}/results"
 # Prepared VCF in, preparation skipped (genotype filter_vcf_* QC still runs).
 skip_preparation: true
 
+# No plots or HTML report; scoring and the borrowed intermediates do not need them.
+skip_reporting: true
+
 # Publish the intermediates (gene groupings + covariates) so a REGENIE-based
 # comparison can reuse them.
 publish_intermediate: true
 
-use_dosage: true
+use_dosage: ${USE_DOSAGE}
 
 filter_vcf_qual_min: 23
 filter_vcf_avg_gq_min: 23
@@ -163,6 +169,7 @@ echo " nf-rare-var-assoc benchmark run (multi-dataset, skip_preparation)"
 echo "   project  : ${PROJECT}"
 echo "   input    : ${PREPARED_VCF} (prepared; --skip_preparation)"
 echo "   datasets : ${IDXS[*]}  (${#IDXS[@]} total)"
+echo "   dosage   : ${USE_DOSAGE}"
 echo "   outdir   : ${RUN_DIR}/results"
 echo "   params   : ${PARAMS_FILE}"
 echo "   started  : $(date -Is)"
@@ -183,8 +190,8 @@ echo ""
 echo "Finished: $(date -Is)"
 echo ""
 echo "Per-dataset files a REGENIE-based comparison can reuse (one set per dataset_idx):"
-ls -1 "${RUN_DIR}/results/bcftools/"*_dataset_idx_*.annotations 2>/dev/null || echo "  MISSING: *.annotations"
-ls -1 "${RUN_DIR}/results/bcftools/"*_dataset_idx_*.setlist     2>/dev/null || echo "  MISSING: *.setlist"
+ls -1 "${RUN_DIR}/results/bcftools_assign_annotations/"*_dataset_idx_*.annotations 2>/dev/null || echo "  MISSING: *.annotations"
+ls -1 "${RUN_DIR}/results/bcftools_assign_annotations/"*_dataset_idx_*.setlist     2>/dev/null || echo "  MISSING: *.setlist"
 ls -1 "${RUN_DIR}/results/merge/"*_dataset_idx_*_sex_covar.txt   2>/dev/null || echo "  MISSING: *_sex_covar.txt"
 
 # ----------------------------------------------------------------------------
