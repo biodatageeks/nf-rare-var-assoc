@@ -190,6 +190,12 @@ ordinary workstation.
 
 ## Citations
 
+If you use nf-rare-var-assoc, please cite the preprint:
+
+> Suszyński P. M., Gambin T. nf-rare-var-assoc: a comprehensive genetic association pipeline
+> with rich QC. *bioRxiv* (2026). doi:
+> [10.64898/2026.09.19.750380](https://doi.org/10.64898/2026.09.19.750380)
+
 This pipeline uses code and infrastructure developed and maintained by the
 [nf-core](https://nf-co.re) community, reused here under the
 [MIT license](https://github.com/nf-core/tools/blob/main/LICENSE).

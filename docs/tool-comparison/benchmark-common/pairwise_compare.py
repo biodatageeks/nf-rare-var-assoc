@@ -305,7 +305,7 @@ def make_plots(per_ds: pd.DataFrame, summ: pd.DataFrame,
             # Mid-height rows are the near-zero differences, so a vertically centred key
             # pushed to the right sits over empty plot area whatever the data does.
             ax.legend(handles=legend, frameon=False, fontsize=5,
-                      loc="center right", bbox_to_anchor=(1.04, 0.5),
+                      loc="center right", bbox_to_anchor=(1.02, 0.42),
                       handlelength=1.2, labelspacing=0.3, borderpad=0.2)
         else:
             ax.legend(handles=legend, frameon=False, fontsize=8, loc="lower right")
