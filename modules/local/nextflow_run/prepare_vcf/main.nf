@@ -12,8 +12,7 @@ process PREPARE_VCF {
     // child_results/plink2_makepgen/ respectively.
 
     input:
-    tuple val(meta), path(vcf), path(ref_fasta), path(ref_fasta_fai)
-    path(params_file)
+    tuple val(meta), path(vcf), path(ref_fasta), path(ref_fasta_fai), path(params_file), path(config_file)
 
     output:
     tuple val(meta), path("child_results/bcftools_reheader/*_reheader.vcf.gz"),    emit: prepared_vcf
@@ -28,6 +27,7 @@ process PREPARE_VCF {
     def child_pipeline = "${projectDir}/../nf-prepare-vcf/main.nf"
     def ref_fasta_arg  = ref_fasta ? "--input_ref_fasta ${ref_fasta}" : ''
     def profile_arg    = workflow.profile ? "-profile ${workflow.profile}" : ''
+    def config_arg     = config_file ? "-c ${config_file}" : ''
     // Values given on a nextflow command line are always strings, and the string "false"
     // is truthy in Groovy -- so --cpu_support_avx2 false would leave the child on the AVX2
     // images. Hand it over in a config file instead, where it stays a real boolean.
@@ -37,6 +37,7 @@ process PREPARE_VCF {
     nextflow run ${child_pipeline} \\
         ${profile_arg} \\
         -c child_avx2.config \\
+        ${config_arg} \\
         -params-file ${params_file} \\
         --input_vcf ${vcf} \\
         ${ref_fasta_arg} \\

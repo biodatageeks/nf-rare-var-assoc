@@ -82,11 +82,17 @@ workflow RARE_VAR_ASSOC {
     )
 
     if (params.skip_preparation == false) {
-        ch_prep_params_file = Channel.fromPath("${projectDir}/conf/nf_prepare_params.yml", checkIfExists: true).first()
+        ch_prep_params_file = file("${projectDir}/conf/nf_prepare_params.yml", checkIfExists: true)
+        if (params.aux_nextflow_config) {
+            ch_prep_config_file = file(params.aux_nextflow_config, checkIfExists: true)
+        } else {
+            ch_prep_config_file = []
+        }
 
         PREPARE_VCF (
-            ch_input_vcf.map { meta, vcf -> tuple(meta, vcf, input_ref_fasta, input_ref_fasta_fai) },
-            ch_prep_params_file
+            ch_input_vcf.map { meta, vcf ->
+                tuple(meta, vcf, input_ref_fasta, input_ref_fasta_fai, ch_prep_params_file, ch_prep_config_file)
+            }
         )
         ch_prepared_vcf = PREPARE_VCF.out.prepared_vcf
         ch_versions = ch_versions.mix(PREPARE_VCF.out.versions)

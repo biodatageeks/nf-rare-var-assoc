@@ -51,11 +51,10 @@ nextflow_process {
                         [ id: 'rand500' ],
                         file('${projectDir}/assets/three_chr_unprepared/unprepared_rand_500.vcf.gz', checkIfExists: true),
                         [],
+                        [],
+                        file('${projectDir}/modules/local/nextflow_run/prepare_vcf/assets/prep.yml', checkIfExists: true),
                         []
                     )
-                )
-                input[1] = Channel.value(
-                    file('${projectDir}/modules/local/nextflow_run/prepare_vcf/assets/prep.yml', checkIfExists: true)
                 )
                 """
             }
