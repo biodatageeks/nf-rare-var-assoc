@@ -4,7 +4,7 @@ process EXPLORATORY_DATA_ANALYSIS {
     label 'process_2'
 
     conda "${moduleDir}/environment.yml"
-    container 'docker.io/psuszynski/python_tools:1.0.11'
+    container 'docker.io/psuszynski/python_tools:1.0.12'
 
     input:
     tuple val(meta), path(vcf), path(tbi), path(phenotype_file), path(python_script)

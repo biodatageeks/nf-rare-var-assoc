@@ -4,7 +4,7 @@ process GENERATE_TRACKING_REPORT {
     label 'process_1'
 
     conda "${moduleDir}/environment.yml"
-    container 'docker.io/psuszynski/python_tools:1.0.0'
+    container 'docker.io/psuszynski/python_tools:1.0.12'
 
     input:
     tuple val(meta), path(tracking_files)
