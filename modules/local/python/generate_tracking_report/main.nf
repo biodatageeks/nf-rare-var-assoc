@@ -4,7 +4,7 @@ process GENERATE_TRACKING_REPORT {
     label 'process_1'
 
     conda "${moduleDir}/environment.yml"
-    container 'docker.io/psuszynski/python_tools:1.0.12'
+    container "${ params.cpu_support_avx2 ? 'docker.io/psuszynski/python_tools:1.0.13' : 'docker.io/psuszynski/python_tools:1.0.13.noavx2' }"
 
     input:
     tuple val(meta), path(tracking_files)
